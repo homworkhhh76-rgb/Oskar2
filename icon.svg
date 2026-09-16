@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="128" fill="#10B981"/>
+  <circle cx="256" cy="256" r="220" fill="url(#grad)" opacity="0.15"/>
+  <defs>
+    <linearGradient id="grad" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#059669"/>
+    </linearGradient>
+  </defs>
+  <!-- Scale & Market Icon -->
+  <path d="M256 110V390" stroke="white" stroke-width="24" stroke-linecap="round"/>
+  <path d="M190 390H322" stroke="white" stroke-width="24" stroke-linecap="round"/>
+  <path d="M140 170L256 150L372 170" stroke="white" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Left Pan -->
+  <path d="M140 170L100 270H180L140 170Z" fill="white" fill-opacity="0.2" stroke="white" stroke-width="16" stroke-linejoin="round"/>
+  <!-- Right Pan -->
+  <path d="M372 170L332 270H412L372 170Z" fill="white" fill-opacity="0.2" stroke="white" stroke-width="16" stroke-linejoin="round"/>
+  <!-- Top Balance pivot -->
+  <circle cx="256" cy="150" r="20" fill="white"/>
+  <circle cx="256" cy="150" r="10" fill="#059669"/>
+</svg>

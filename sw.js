@@ -1,0 +1,14 @@
+const CACHE='oscar-accounting-v7.9-multicompany-live-v2';
+const LOCAL=["./App.js","./app-icon.png","./brand-logo.png","./app.css","./components__accounts__AccountsView.js","./components__barcodes__BarcodesView.js","./components__categories__CategoriesView.js","./components__common__BottomNav.js","./components__common__Dropdown.js","./components__common__Header.js","./components__common__PWAInstallButton.js","./components__common__Sidebar.js","./components__common__Toast.js","./components__customers__CustomersView.js","./components__dashboard__DashboardView.js","./components__employees__EmployeesView.js","./components__expenses__ExpensesView.js","./components__inventory__InventoryView.js","./components__inventory__TransferForm.js","./components__pos__CameraScannerModal.js","./components__pos__CartPanel.js","./components__pos__FullCartView.js","./components__pos__HoldInvoicesModal.js","./components__pos__POSView.js","./components__pos__PaymentModal.js","./components__pos__ProductGrid.js","./components__pos__ThermalReceiptModal.js","./components__products__ProductsView.js","./components__purchases__PurchasesView.js","./components__reports__ReportsView.js","./components__sales__SalesView.js","./components__settings__SettingsView.js","./components__suppliers__SuppliersView.js","./components__sync__SyncModal.js","./components__trash__TrashView.js","./components__vouchers__VouchersView.js","./context__AppContext.js","./hooks__usePWAInstall.js","./icon-192.png","./icon-512.png","./icon-maskable-512.png","./icon.svg","./index.html","./main.js","./manifest.webmanifest","./services__audio.js","./services__db.js","./types__index.js","./utils__export.js","./utils__canvasRenderer.js","./utils__imageExport.js","./utils__pdfExport.js","./utils__professionalExport.js","./brand__logo.js","./utils__unitTree.js","./utils__code128.js","./oscar-activation-runtime.js","./oscar-cloud-sync.js","./components__auth__LoginGate.js","./admin.html","./master-admin.js"];
+self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(LOCAL)).then(()=>self.skipWaiting())));
+self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
+self.addEventListener('fetch',e=>{
+  if(e.request.method!=='GET') return;
+  const u=new URL(e.request.url);
+  if(u.origin===location.origin){
+    // Network-first keeps uploaded hosting builds fresh; cache is only the offline fallback.
+    e.respondWith(fetch(e.request).then(r=>{const x=r.clone();caches.open(CACHE).then(c=>c.put(e.request,x));return r;}).catch(()=>caches.match(e.request).then(hit=>hit||caches.match('./index.html'))));
+  } else {
+    e.respondWith(caches.match(e.request).then(hit=>hit||fetch(e.request).then(r=>{if(r.ok||r.type==='opaque'){const x=r.clone();caches.open(CACHE).then(c=>c.put(e.request,x));}return r;})));
+  }
+});
