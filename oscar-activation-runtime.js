@@ -162,6 +162,16 @@
     const msg=String(error?.message||error||'');
     return /مفتاح الشركة غير مسجل|لا يطابق|تم إيقاف|انتهت مدة|غير متاح|تم إصدار ملف|الحساب غير موجود|تم إيقاف هذا الحساب|لم يعد مندوباً|مدير الفرع غير متاح/.test(msg);
   }
+  function validatePayloadLocally(payload){
+    if(!payload||payload.app!==APP_TAG)throw new Error('ملف التفعيل غير صالح.');
+    const companyId=String(payload.companyId||payload.tenantId||'').trim();
+    if(!companyId)throw new Error('ملف الشركة غير مكتمل.');
+    if(payload.status&&payload.status!=='active')throw new Error('ملف الشركة غير فعال.');
+    if(payload.expiresAt&&Date.now()>=new Date(payload.expiresAt).getTime())throw new Error('انتهت مدة تفعيل الشركة.');
+    const db=payload.database||readDatabaseAccess(companyId)||{};
+    if(!db.databaseURL||!db.authToken)throw new Error('ملف التفعيل لا يحتوي على قاعدة شركة صالحة.');
+    return {status:'active',endAt:payload.expiresAt||'',companyId,offlineLocal:true};
+  }
   async function verifyPayload(payload,{allowOffline=true}={}){
     if(navigator.onLine!==false){
       try{return await verifyPayloadRemote(payload)}
@@ -169,10 +179,17 @@
         if(isLogicalVerificationError(error))throw error;
         const cached=allowOffline?cachedVerification(payload):null;
         if(cached)return{access:cached,online:false,deferred:true,error:String(error?.message||error)};
+        if(allowOffline){
+          const access=validatePayloadLocally(payload);try{markVerified(payload,access)}catch(_){}
+          return{access,online:false,deferred:true,provisional:true,error:String(error?.message||error)};
+        }
         throw error;
       }
     }
-    const cached=allowOffline?cachedVerification(payload):null;if(cached)return{access:cached,online:false,deferred:true};throw new Error('يلزم الإنترنت في أول استخدام لهذا الملف على هذا الجهاز. بعد التحقق الأول يعمل الدخول دون إنترنت.')
+    const cached=allowOffline?cachedVerification(payload):null;
+    if(cached)return{access:cached,online:false,deferred:true};
+    if(allowOffline){const access=validatePayloadLocally(payload);try{markVerified(payload,access)}catch(_){}return{access,online:false,deferred:true,provisional:true}}
+    throw new Error('تعذر التحقق من ملف الدخول.');
   }
   function buildRolePayload(type,account,extra={}){const rt=readRuntime()||{};return{type,activationKey:rt.companyKey||rt.activationKey,fileId:`${type}_${account?.id||Date.now()}_${account?.authVersion||''}`,companyId:rt.companyId,tenantId:rt.companyId,companyKey:rt.companyKey||rt.activationKey,companyName:rt.companyName||'الشركة',status:rt.status||'active',plan:rt.plan||'lifetime',expiresAt:rt.expiresAt||'',rootPath:rt.rootPath||'oscar/companies',database:readDatabaseAccess(rt.companyId)||rt.database||{},permissions:account?.permissions||[],account:clone(account),...extra}}
   async function prepareVerifiedRoleFile(type,account,fileName){const payload=buildRolePayload(type,account);if(window.OscarCloudSync){const result=await window.OscarCloudSync.syncNow({manual:false,force:true});if(result?.remaining>0||result?.error)throw new Error('الحساب محفوظ محلياً لكن لم يصل إلى قاعدة الشركة بعد. شغّل المزامنة ثم أعد المحاولة.')}await verifyPayloadRemote(payload);return downloadActivationFile(payload,fileName)}

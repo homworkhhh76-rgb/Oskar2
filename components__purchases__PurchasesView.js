@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from './context__AppContext.js';
 import { SearchableDropdown } from './components__common__Dropdown.js';
 import { getBrandLogoDataUrl } from './brand__logo.js';
@@ -33,11 +33,12 @@ export const PurchasesView = () => {
   const accounts = Array.isArray(app.accounts) ? app.accounts.filter(Boolean) : [];
   const settings = app.settings || {};
   const { createPurchaseInvoice, deletePurchase, saveSupplier, activeEmployee, showToast } = app;
+  const primaryWarehouse = warehouses.find((w) => w?.id === 'wh-main') || warehouses.find((w) => /صالة\s*العرض/.test(String(w?.name || ''))) || warehouses.find((w) => w?.isDefault) || warehouses.find((w) => w?.id === settings.activeWarehouseId) || warehouses[0];
 
   const activeProducts = products.filter((p) => !p.deletedAt && p.status !== 'archived' && Array.isArray(p.units) && p.units.length > 0);
   const [mode, setMode] = useState('list');
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id || '');
-  const [warehouseId, setWarehouseId] = useState(settings.activeWarehouseId || warehouses[0]?.id || '');
+  const [warehouseId, setWarehouseId] = useState(primaryWarehouse?.id || settings.activeWarehouseId || warehouses[0]?.id || '');
   const [accountId, setAccountId] = useState(accounts.find(a=>a.isDefault)?.id || accounts[0]?.id || '');
   const [paid, setPaid] = useState('');
   const [discountType, setDiscountType] = useState('fixed');
@@ -49,7 +50,18 @@ export const PurchasesView = () => {
   const [quickName, setQuickName] = useState('');
   const [quickPhone, setQuickPhone] = useState('');
   const [exporting, setExporting] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   const singleRef = useRef(null);
+
+  useEffect(() => {
+    if (warehouses.length) {
+      const preferred = warehouses.find((w) => w?.id === 'wh-main') || warehouses.find((w) => /صالة\s*العرض/.test(String(w?.name || ''))) || warehouses.find((w) => w?.isDefault) || warehouses[0];
+      if (!warehouseId || !warehouses.some((w) => w.id === warehouseId)) setWarehouseId(preferred?.id || '');
+    }
+    if (suppliers.length && (!supplierId || !suppliers.some((x) => x.id === supplierId))) setSupplierId(suppliers[0].id);
+    const preferredAccount = accounts.find((a) => a?.isDefault) || accounts[0];
+    if (preferredAccount && (!accountId || !accounts.some((a) => a.id === accountId))) setAccountId(preferredAccount.id);
+  }, [warehouses, suppliers, accounts, settings.activeWarehouseId]);
 
   const makeRow = (p = activeProducts[0]) => ({
     productId: p?.id || '',
@@ -88,6 +100,9 @@ export const PurchasesView = () => {
   }));
 
   const submit = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
     const supplier = suppliers.find((s) => s.id === supplierId);
     if (!supplier) { showToast('اختر المورد', 'warning'); return; }
     if (!warehouseId) { showToast('اختر المخزن المستلم', 'warning'); return; }
@@ -122,6 +137,14 @@ export const PurchasesView = () => {
       setMode('list');
       setRows([makeRow()]);
       setPaid(''); setDiscountValue(''); setNotes('');
+      const preferred = warehouses.find((w) => w?.id === 'wh-main') || warehouses.find((w) => /صالة\s*العرض/.test(String(w?.name || ''))) || warehouses.find((w) => w?.isDefault) || warehouses[0];
+      if (preferred) setWarehouseId(preferred.id);
+    }
+    } catch (err) {
+      console.error('Purchase save failed:', err);
+      showToast?.(`تعذر حفظ فاتورة المشتريات: ${String(err?.message || err || 'خطأ غير معروف')}`, 'error');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -179,7 +202,7 @@ export const PurchasesView = () => {
       h('div', { className: 'rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-700 p-2' }, h('div', { className: 'text-[10px] text-slate-500' }, 'الصافي بعد الخصم'), h('div', { className: 'font-mono font-black text-emerald-700 text-lg' }, `${money(total)} ${settings.currencySymbol || ''}`))
     ),
     h('input', { value: notes, onChange: (e) => setNotes(e.target.value), placeholder: 'ملاحظات فاتورة الشراء...', className: 'w-full px-3 py-2 border rounded-xl text-xs bg-white dark:bg-slate-900 dark:border-slate-700' }),
-    h('div', { className: 'flex justify-end gap-2' }, h('button', { type: 'button', onClick: () => setMode('list'), className: 'px-4 py-2 border rounded-xl text-xs font-bold' }, 'إلغاء'), h('button', { type: 'button', onClick: submit, className: 'px-6 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-black' }, 'حفظ فاتورة الشراء'))
+    h('div', { className: 'flex justify-end gap-2' }, h('button', { type: 'button', onClick: () => setMode('list'), className: 'px-4 py-2 border rounded-xl text-xs font-bold' }, 'إلغاء'), h('button', { type: 'button', onClick: submit, disabled: isSaving, className: 'px-6 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-black disabled:opacity-60' }, isSaving ? 'جاري الحفظ محلياً...' : 'حفظ فاتورة الشراء'))
   );
 
 

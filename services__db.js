@@ -1,6 +1,6 @@
 import { calculateUnitConversions } from './utils__unitTree.js';
 const DB_BASE_NAME = 'Oscar_Accounting_POS_DB';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 export const getTenantId = () => String(window.OscarActivation?.readRuntime?.()?.companyId || 'local').trim() || 'local';
 const dbNameForTenant = () => `${DB_BASE_NAME}__${encodeURIComponent(getTenantId())}`;
 let cachedTenant = '';
@@ -10,6 +10,28 @@ export const syncChannel = typeof window !== 'undefined' && 'BroadcastChannel' i
     : null;
 let cachedDB = null;
 let dbOpenPromise = null;
+let storageStatusPromise = null;
+export async function enablePersistentLocalStorage() {
+    if (storageStatusPromise) return storageStatusPromise;
+    storageStatusPromise = (async () => {
+        try {
+            const storage = typeof navigator !== 'undefined' ? navigator.storage : null;
+            if (!storage) return { supported: false, persisted: false };
+            let persisted = false;
+            try { persisted = !!(await storage.persisted?.()); } catch {}
+            if (!persisted) { try { persisted = !!(await storage.persist?.()); } catch {} }
+            let estimate = {};
+            try { estimate = await storage.estimate?.() || {}; } catch {}
+            const detail = { supported: true, persisted, usage: Number(estimate.usage || 0), quota: Number(estimate.quota || 0), at: Date.now() };
+            try { localStorage.setItem('oscar_storage_status_v1', JSON.stringify(detail)); } catch {}
+            try { window.dispatchEvent(new CustomEvent('oscar:storage-status', { detail })); } catch {}
+            return detail;
+        } catch (error) {
+            return { supported: false, persisted: false, error: String(error?.message || error) };
+        }
+    })();
+    return storageStatusPromise;
+}
 function openDB() {
     const wantedTenant = getTenantId();
     if (cachedDB && cachedTenant === wantedTenant) {
@@ -96,7 +118,8 @@ function openDB() {
 }
 // Cloud sync capture is intentionally kept outside IndexedDB transactions.
 function captureCloud(storeName, value, opts={}) {
-    try { if (!window.OscarCloudSync?.suppress) window.OscarCloudSync?.captureStoreChange?.(storeName, value, opts); } catch (e) { console.warn('Cloud capture warning', e); }
+    try { if (!window.OscarCloudSync?.suppress) return window.OscarCloudSync?.captureStoreChange?.(storeName, value, opts) || Promise.resolve(false); } catch (e) { console.warn('Cloud capture warning', e); }
+    return Promise.resolve(false);
 }
 // Generic CRUD operations
 function recordKey(storeName, value) {
@@ -147,8 +170,11 @@ export async function putInStore(storeName, value, notifySync = true) {
         const tx = db.transaction(storeName, 'readwrite');
         const store = tx.objectStore(storeName);
         const request = store.put(value);
-        request.onsuccess = () => {
-            if (notifySync) { captureCloud(storeName, value); if (syncChannel) syncChannel.postMessage({ type: 'STORE_UPDATED', storeName, tenantId: getTenantId() }); }
+        request.onsuccess = async () => {
+            if (notifySync) {
+                await captureCloud(storeName, value).catch(() => {});
+                if (syncChannel) syncChannel.postMessage({ type: 'STORE_UPDATED', storeName, tenantId: getTenantId() });
+            }
             resolve();
         };
         request.onerror = () => reject(request.error);
@@ -160,8 +186,11 @@ export async function deleteFromStore(storeName, key, notifySync = true) {
         const tx = db.transaction(storeName, 'readwrite');
         const store = tx.objectStore(storeName);
         const request = store.delete(key);
-        request.onsuccess = () => {
-            if (notifySync) { captureCloud(storeName, null, { deleted: true, key }); if (syncChannel) syncChannel.postMessage({ type: 'STORE_UPDATED', storeName, tenantId: getTenantId() }); }
+        request.onsuccess = async () => {
+            if (notifySync) {
+                await captureCloud(storeName, null, { deleted: true, key }).catch(() => {});
+                if (syncChannel) syncChannel.postMessage({ type: 'STORE_UPDATED', storeName, tenantId: getTenantId() });
+            }
             resolve();
         };
         request.onerror = () => reject(request.error);
@@ -174,7 +203,10 @@ export async function clearStore(storeName, notifySync = true) {
         const tx = db.transaction(storeName, 'readwrite');
         const store = tx.objectStore(storeName);
         const request = store.clear();
-        request.onsuccess = () => { if (notifySync) existing.forEach(v => captureCloud(storeName, null, { deleted:true, key: storeName === 'stock' ? [v.productId, v.warehouseId] : (storeName === 'settings' ? v.key : v.id) })); resolve(); };
+        request.onsuccess = async () => {
+            if (notifySync) await Promise.allSettled(existing.map(v => captureCloud(storeName, null, { deleted:true, key: storeName === 'stock' ? [v.productId, v.warehouseId] : (storeName === 'settings' ? v.key : v.id) })));
+            resolve();
+        };
         request.onerror = () => reject(request.error);
     });
 }
@@ -194,8 +226,11 @@ export async function bulkPut(storeName, items, notifySync = true) {
         const tx = db.transaction(storeName, 'readwrite');
         const store = tx.objectStore(storeName);
         changedItems.forEach((item) => store.put(item));
-        tx.oncomplete = () => {
-            if (notifySync) { changedItems.forEach(item => captureCloud(storeName, item)); if (syncChannel) syncChannel.postMessage({ type: 'STORE_UPDATED', storeName, tenantId: getTenantId() }); }
+        tx.oncomplete = async () => {
+            if (notifySync) {
+                await Promise.allSettled(changedItems.map(item => captureCloud(storeName, item)));
+                if (syncChannel) syncChannel.postMessage({ type: 'STORE_UPDATED', storeName, tenantId: getTenantId() });
+            }
             resolve();
         };
         tx.onerror = () => reject(tx.error);
@@ -229,8 +264,8 @@ export const DEFAULT_SETTINGS = {
 };
 // Initial Warehouses
 export const DEFAULT_WAREHOUSES = [
-    { id: 'wh-main', name: 'المخزن الرئيسي', code: 'WH-MAIN', isDefault: true },
-    { id: 'wh-shop', name: 'واجهة المحل (الرفوف)', code: 'WH-SHOP', isDefault: false },
+    { id: 'wh-main', name: 'صالة العرض', code: 'SHOWROOM', isDefault: true },
+    { id: 'wh-shop', name: 'المخزن الإضافي', code: 'WH-2', isDefault: false },
 ];
 // Initial Categories
 export const DEFAULT_CATEGORIES = [
@@ -792,6 +827,25 @@ export const DEFAULT_VOUCHERS = [
         createdAt: new Date(Date.now() - 12 * 3600 * 1000).toISOString(),
     },
 ];
+export async function ensurePrimaryShowroomWarehouse() {
+    try {
+        const rows = await getAllFromStore('warehouses');
+        if (!Array.isArray(rows) || !rows.length) return false;
+        const main = rows.find(w => w?.id === 'wh-main') || rows.find(w => w?.isDefault) || rows.find(w => /صالة\s*العرض/.test(String(w?.name || '')));
+        if (!main) return false;
+        const oldDefaultNames = new Set(['المخزن الرئيسي','المستودع الرئيسي','واجهة المحل (الرفوف)']);
+        const next = rows.map(w => ({
+            ...w,
+            isDefault: w.id === main.id,
+            ...(w.id === main.id && (w.id === 'wh-main' || oldDefaultNames.has(String(w.name || ''))) ? { name: 'صالة العرض', code: 'SHOWROOM' } : {})
+        }));
+        await bulkPut('warehouses', next, false);
+        const settings = await getFromStore('settings', 'store_config');
+        if (settings && settings.activeWarehouseId !== main.id) await putInStore('settings', { ...settings, activeWarehouseId: main.id }, false);
+        return true;
+    } catch { return false; }
+}
+
 // Seed initial database if empty
 export async function seedDatabaseDefaults() {
     const settings = await getFromStore('settings', 'store_config');
@@ -837,12 +891,16 @@ export async function migrateLegacyDatabaseIfNeeded() {
     try {
         const currentSettings = await getFromStore('settings', 'store_config');
         if (currentSettings) { try { localStorage.setItem(marker, '1'); } catch {} return false; }
+        const legacyCandidates = ['Oscar_Accounting_POS_DB', 'AlMezan_POS_DB'];
+        let legacyDbName = legacyCandidates[0];
         if (indexedDB.databases) {
             const list = await indexedDB.databases();
-            if (!list.some(x => x?.name === 'AlMezan_POS_DB')) { try { localStorage.setItem(marker, '1'); } catch {} return false; }
+            const names = new Set((list || []).map(x => x?.name).filter(Boolean));
+            legacyDbName = legacyCandidates.find(name => names.has(name)) || '';
+            if (!legacyDbName) { try { localStorage.setItem(marker, '1'); } catch {} return false; }
         }
         const legacy = await new Promise((resolve, reject) => {
-            const req = indexedDB.open('AlMezan_POS_DB');
+            const req = indexedDB.open(legacyDbName);
             req.onsuccess = () => resolve(req.result);
             req.onerror = () => reject(req.error || new Error('تعذر فتح قاعدة البيانات القديمة'));
             req.onupgradeneeded = () => {};
@@ -864,6 +922,7 @@ export async function migrateLegacyDatabaseIfNeeded() {
                 }
             }
         } finally { try { legacy.close(); } catch {} }
+        if (copied) await ensurePrimaryShowroomWarehouse().catch(() => {});
         try { localStorage.setItem(marker, '1'); if (copied) localStorage.setItem(claimKey, tenantId); } catch {}
         if (copied) {
             try { window.dispatchEvent(new CustomEvent('oscar:legacy-migrated', { detail: { copied, tenantId } })); } catch {}
@@ -878,7 +937,9 @@ export async function migrateLegacyDatabaseIfNeeded() {
 
 export async function initializeDatabase(options = {}) {
     await openDB();
+    enablePersistentLocalStorage().catch(() => {});
     if (!options.deferSeed) await seedDatabaseDefaults();
+    await ensurePrimaryShowroomWarehouse().catch(() => {});
     return true;
 }
 // Reset Database to clean state

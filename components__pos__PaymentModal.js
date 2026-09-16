@@ -131,12 +131,16 @@ export const PaymentModal = ({ isOpen, onClose, onSuccess }) => {
                 notes,
             });
             if (inv) {
-                onSuccess();
-                onClose();
-                if ((settings.printOnSave ?? settings.autoPrintReceipt)) {
-                    setShowThermalModal(inv);
-                }
+                // Open the receipt from the already-saved local invoice first, then close payment.
+                // This prevents a slow refresh/sync from swallowing the print action.
+                if ((settings.printOnSave ?? settings.autoPrintReceipt)) setShowThermalModal(inv);
+                try { onSuccess?.(); } catch (e) { console.warn('Payment success callback warning', e); }
+                onClose?.();
             }
+        }
+        catch (err) {
+            console.error('Payment save failed:', err);
+            showToast(`تعذر إتمام الفاتورة: ${String(err?.message || err || 'خطأ غير معروف')}`, 'error');
         }
         finally {
             setIsSubmitting(false);

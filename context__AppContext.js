@@ -1,6 +1,6 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, migrateLegacyDatabaseIfNeeded, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, DEFAULT_CUSTOMERS, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js';
+import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, migrateLegacyDatabaseIfNeeded, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, DEFAULT_CUSTOMERS, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js';
 import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js';
 import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js';
 const AppContext = createContext(null);
@@ -148,6 +148,34 @@ export const AppProvider = ({ children }) => {
             setIsLoaded(true);
         }
     }, []);
+    // Reload only the local IndexedDB datasets that actually changed. This keeps live sync fast
+    // and avoids re-reading the whole local database after every remote delta.
+    const reloadStores = useCallback(async (storeNames = []) => {
+        const wanted = new Set(Array.isArray(storeNames) ? storeNames : [storeNames]);
+        if (!wanted.size) return;
+        const jobs = [];
+        if (wanted.has('products')) jobs.push(getAllFromStore('products').then(v => setProducts(newestFirst(v))));
+        if (wanted.has('categories')) jobs.push(getAllFromStore('categories').then(v => setCategories((v || []).sort((a,b)=>(a.displayOrder||0)-(b.displayOrder||0)))));
+        if (wanted.has('warehouses')) jobs.push(getAllFromStore('warehouses').then(v => setWarehouses(v || [])));
+        if (wanted.has('stock')) jobs.push(getAllFromStore('stock').then(v => setStock(v || [])));
+        if (wanted.has('stock_movements')) jobs.push(getAllFromStore('stock_movements').then(v => setStockMovements((v || []).sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()))));
+        if (wanted.has('invoices')) jobs.push(getAllFromStore('invoices').then(v => setInvoices((v || []).sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()))));
+        if (wanted.has('purchases')) jobs.push(getAllFromStore('purchases').then(v => setPurchases((v || []).sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()))));
+        if (wanted.has('customers')) jobs.push(getAllFromStore('customers').then(v => { setCustomers(newestFirst(v)); setSelectedCustomer(prev => prev ? (v || []).find(c=>c.id===prev.id)||v?.[0]||prev : v?.[0]||prev); }));
+        if (wanted.has('suppliers')) jobs.push(getAllFromStore('suppliers').then(v => setSuppliers(newestFirst(v))));
+        if (wanted.has('accounts')) jobs.push(getAllFromStore('accounts').then(v => { const x=newestFirst(v); x.sort((a,b)=>Number(Boolean(b?.isDefault))-Number(Boolean(a?.isDefault))); setAccounts(x); }));
+        if (wanted.has('transfers')) jobs.push(getAllFromStore('transfers').then(v => setTransfers((v || []).sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()))));
+        if (wanted.has('expenses')) jobs.push(getAllFromStore('expenses').then(v => setExpenses((v || []).sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()))));
+        if (wanted.has('shifts')) jobs.push(getAllFromStore('shifts').then(v => setShifts((v || []).sort((a,b)=>new Date(b.startTime).getTime()-new Date(a.startTime).getTime()))));
+        if (wanted.has('audit_logs')) jobs.push(getAllFromStore('audit_logs').then(v => setAuditLogs((v || []).sort((a,b)=>new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime()))));
+        if (wanted.has('held_invoices')) jobs.push(getAllFromStore('held_invoices').then(v => setHeldInvoices(newestFirst(v))));
+        if (wanted.has('partner_statements')) jobs.push(getAllFromStore('partner_statements').then(v => setPartnerStatements(newestFirst(v))));
+        if (wanted.has('vouchers')) jobs.push(getAllFromStore('vouchers').then(v => setVouchers((v || []).sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()))));
+        if (wanted.has('employees')) jobs.push(getAllFromStore('employees').then(v => { if(v?.length){ setEmployees(newestFirst(v)); const loginId=window.OscarActivation?.readRuntime?.()?.account?.id; setActiveEmployee(prev => v.find(e=>e.id===loginId)||v.find(e=>e.id===prev?.id)||v[0]); } }));
+        if (wanted.has('settings')) jobs.push(getFromStore('settings','store_config').then(v => { if(v) setSettings(v); }));
+        if (wanted.has('sync_queue')) jobs.push(Promise.resolve().then(()=>setSyncQueue(window.OscarCloudSync?.pendingItems?.() || [])));
+        await Promise.allSettled(jobs);
+    }, []);
     // Initial load with guaranteed fallback
     useEffect(() => {
         let isMounted = true;
@@ -160,23 +188,31 @@ export const AppProvider = ({ children }) => {
         initializeDatabase({ deferSeed: true })
             .then(async () => {
             if (!isMounted) return;
+            let existingSettings = await getFromStore('settings', 'store_config');
+            // Existing installations open immediately from IndexedDB. Cloud work happens after the UI is usable.
+            if (existingSettings) await reloadData();
             let syncResult = null;
             try {
                 syncResult = await window.OscarCloudSync?.initialize?.({
                     bridge: {
                         putInStore, deleteFromStore, getAllFromStore,
-                        onApplied: async () => { if (isMounted) await reloadData(); }
+                        onApplied: async (stores) => { if (isMounted) await reloadStores(stores || []); }
                     }
                 });
             } catch (syncError) { console.warn('Cloud sync bootstrap warning:', syncError); }
-            let existingSettings = await getFromStore('settings', 'store_config');
-            // Upgrade an existing single-company installation only when this company has no cloud/local data yet.
-            if (!existingSettings && Number(syncResult?.remoteRows || 0) === 0) {
-                const migrated = await migrateLegacyDatabaseIfNeeded();
-                if (migrated) existingSettings = await getFromStore('settings', 'store_config');
+            // Keep the primary warehouse normalized locally even when old/cloud data still uses the previous name.
+            const showroomNormalized = await ensurePrimaryShowroomWarehouse().catch(() => false);
+            if (showroomNormalized && existingSettings) await reloadStores(['warehouses', 'settings']);
+            if (!existingSettings) {
+                existingSettings = await getFromStore('settings', 'store_config');
+                // Upgrade an existing single-company installation only when this company has no cloud/local data yet.
+                if (!existingSettings && Number(syncResult?.remoteRows || 0) === 0) {
+                    const migrated = await migrateLegacyDatabaseIfNeeded();
+                    if (migrated) existingSettings = await getFromStore('settings', 'store_config');
+                }
+                if (!existingSettings) await seedDatabaseDefaults();
+                await reloadData();
             }
-            if (!existingSettings) await seedDatabaseDefaults();
-            await reloadData();
             if (window.OscarCloudSync?.pendingCount?.()) window.OscarCloudSync.requestSync?.(80);
         })
             .catch((err) => {
@@ -193,7 +229,7 @@ export const AppProvider = ({ children }) => {
                 const msg = event?.data || {};
                 const tenantId = window.OscarActivation?.readRuntime?.()?.companyId || '';
                 if (msg.tenantId && msg.tenantId !== tenantId) return;
-                reloadData();
+                msg.storeName ? reloadStores([msg.storeName]) : reloadData();
             };
             syncChannel.addEventListener('message', handleMessage);
             return () => {
@@ -206,19 +242,19 @@ export const AppProvider = ({ children }) => {
             isMounted = false;
             clearTimeout(safetyTimer);
         };
-    }, [reloadData]);
+    }, [reloadData, reloadStores]);
     useEffect(() => {
         const onStatus = (event) => {
             const d = event.detail || {};
             setIsSyncing(!!d.busy || d.state === 'syncing');
             setSyncQueue(window.OscarCloudSync?.pendingItems?.() || []);
         };
-        const onApplied = () => reloadData();
+        const onApplied = (event) => reloadStores(event?.detail?.stores || []);
         window.addEventListener('oscar:sync-status', onStatus);
         window.addEventListener('oscar:sync-applied', onApplied);
         onStatus({ detail: {} });
         return () => { window.removeEventListener('oscar:sync-status', onStatus); window.removeEventListener('oscar:sync-applied', onApplied); };
-    }, [reloadData]);
+    }, [reloadStores]);
     // Online / Offline monitor
     useEffect(() => {
         const handleOnline = () => {
@@ -228,7 +264,6 @@ export const AppProvider = ({ children }) => {
         };
         const handleOffline = () => {
             setIsOnline(false);
-            showToast('أنت تعمل الآن بدون إنترنت (Offline) - كافة العمليات محفوظة محلياً', 'warning');
         };
         window.addEventListener('online', handleOnline);
         window.addEventListener('offline', handleOffline);
@@ -447,11 +482,12 @@ export const AppProvider = ({ children }) => {
         const rawGrandTotal = Math.max(0, beforeInvoiceDiscount - invoiceDiscountAmount);
         const grandTotal = settings.scaleModeEnabled ? Math.round(rawGrandTotal) : rawGrandTotal;
         const roundingAdjustment = grandTotal - rawGrandTotal;
+        const payments = Array.isArray(payload.payments) ? payload.payments.filter(p => p && Number(p.amount) > 0 && p.accountId) : [];
         let paid = Number(payload.paidAmount)||0;
         const remaining = Math.max(0, grandTotal - paid);
         const change = Math.max(0, paid - grandTotal);
         if ((payload.paymentType === 'debt' || payload.paymentType === 'partial') && (!selectedCustomer || selectedCustomer.id === 'cust-walkin')) { showToast('يجب اختيار عميل مسجل للبيع الآجل أو الدفع الجزئي!', 'error'); return null; }
-        const invoice = { id:'inv-'+Date.now(), invoiceNumber, type:'sale', date:now, customerId:selectedCustomer?.id, customerName:selectedCustomer?.name, cashierId:currentUser.id, cashierName:currentUser.name, shiftId:activeShift?.id, branchId:settings.activeBranchName, warehouseId, items:invoiceItems, subtotal, lineDiscountTotal, invoiceDiscountType, invoiceDiscountValue:rawDiscount, invoiceDiscountAmount, discountTotal, taxTotal, roundingAdjustment, grandTotal, paidAmount:Math.min(paid,grandTotal), remainingAmount:remaining, changeAmount:change, paymentType:payload.paymentType, payments:payload.payments, status:'completed', notes:payload.notes, syncId, isSynced:false, createdAt:now };
+        const invoice = { id:'inv-'+Date.now(), invoiceNumber, type:'sale', date:now, customerId:selectedCustomer?.id, customerName:selectedCustomer?.name, cashierId:currentUser.id, cashierName:currentUser.name, shiftId:activeShift?.id, branchId:settings.activeBranchName, warehouseId, items:invoiceItems, subtotal, lineDiscountTotal, invoiceDiscountType, invoiceDiscountValue:rawDiscount, invoiceDiscountAmount, discountTotal, taxTotal, roundingAdjustment, grandTotal, paidAmount:Math.min(paid,grandTotal), remainingAmount:remaining, changeAmount:change, paymentType:payload.paymentType, payments, status:'completed', notes:payload.notes, syncId, isSynced:false, createdAt:now };
         await putInStore('invoices', invoice);
         const updatedStockList=[...stock], newMovements=[];
         for (const item of invoiceItems) {
@@ -459,17 +495,27 @@ export const AppProvider = ({ children }) => {
             const currentQty=stockIndex>=0?updatedStockList[stockIndex].baseQuantity:0;
             const newQty=currentQty-item.baseQuantity;
             if(stockIndex>=0) updatedStockList[stockIndex]={...updatedStockList[stockIndex],baseQuantity:newQty}; else updatedStockList.push({productId:item.productId,warehouseId,baseQuantity:newQty});
-            newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:now,productId:item.productId,productName:item.productName,warehouseId,warehouseName:warehouse?.name||'المخزن الرئيسي',type:'sale',unitName:item.unitName,quantityInUnit:item.quantity,conversionFactor:item.conversionFactor,baseQuantityChange:-item.baseQuantity,newBaseBalance:newQty,referenceId:invoice.id,referenceType:'INVOICE',userId:currentUser.id,userName:currentUser.name});
+            newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:now,productId:item.productId,productName:item.productName,warehouseId,warehouseName:warehouse?.name||'صالة العرض',type:'sale',unitName:item.unitName,quantityInUnit:item.quantity,conversionFactor:item.conversionFactor,baseQuantityChange:-item.baseQuantity,newBaseBalance:newQty,referenceId:invoice.id,referenceType:'INVOICE',userId:currentUser.id,userName:currentUser.name});
         }
         await bulkPut('stock',updatedStockList); await bulkPut('stock_movements',newMovements); await bulkPut('products',productCopies);
         const updatedAccounts=[...accounts];
-        for(const p of payload.payments){const i=updatedAccounts.findIndex(a=>a.id===p.accountId);if(i>=0)updatedAccounts[i]={...updatedAccounts[i],balance:updatedAccounts[i].balance+p.amount};}
+        for(const p of payments){const i=updatedAccounts.findIndex(a=>a.id===p.accountId);if(i>=0)updatedAccounts[i]={...updatedAccounts[i],balance:(Number(updatedAccounts[i].balance)||0)+(Number(p.amount)||0)};}
         await bulkPut('accounts',updatedAccounts);
-        if(remaining>0&&selectedCustomer&&selectedCustomer.id!=='cust-walkin'){const newBalance=selectedCustomer.balance+remaining;await putInStore('customers',{...selectedCustomer,balance:newBalance});await putInStore('partner_statements',{id:'stmt-'+Date.now(),date:now,type:'sale',referenceNumber:invoiceNumber,description:`فاتورة مبيعات آجل رقم ${invoiceNumber}`,debit:remaining,credit:0,runningBalance:newBalance});}
-        if(activeShift){const cashPaid=payload.payments.filter(p=>p.method==='cash').reduce((x,p)=>x+p.amount,0)-change;const otherPaid=payload.payments.filter(p=>p.method!=='cash').reduce((x,p)=>x+p.amount,0);await putInStore('shifts',{...activeShift,totalCashSales:activeShift.totalCashSales+Math.max(0,cashPaid),totalOtherSales:activeShift.totalOtherSales+otherPaid,expectedCash:activeShift.expectedCash+Math.max(0,cashPaid)});}
-        await putInStore('sync_queue',{id:'sync-'+Date.now(),syncId,action:'create',entity:'invoices',data:invoice,timestamp:now,retries:0,status:'pending'});
-        playSuccessSound(settings.scannerBeepEnabled); clearCart(); await reloadData(); showToast(`تم حفظ الفاتورة بنجاح [${invoiceNumber}]`,'success'); return invoice;
-    }, [cart, invoiceDiscountType, invoiceDiscountValue, settings, warehouses, products, selectedCustomer, currentUser, activeShift, stock, accounts, clearCart, reloadData, showToast]);
+        let updatedCustomer = null, customerStatement = null, updatedShift = null;
+        if(remaining>0&&selectedCustomer&&selectedCustomer.id!=='cust-walkin'){const newBalance=(Number(selectedCustomer.balance)||0)+remaining;updatedCustomer={...selectedCustomer,balance:newBalance};customerStatement={id:'stmt-'+Date.now(),date:now,type:'sale',referenceNumber:invoiceNumber,description:`فاتورة مبيعات آجل رقم ${invoiceNumber}`,debit:remaining,credit:0,runningBalance:newBalance};await putInStore('customers',updatedCustomer);await putInStore('partner_statements',customerStatement);}
+        if(activeShift){const cashPaid=payments.filter(p=>p.method==='cash').reduce((x,p)=>x+(Number(p.amount)||0),0)-change;const otherPaid=payments.filter(p=>p.method!=='cash').reduce((x,p)=>x+(Number(p.amount)||0),0);updatedShift={...activeShift,totalCashSales:(Number(activeShift.totalCashSales)||0)+Math.max(0,cashPaid),totalOtherSales:(Number(activeShift.totalOtherSales)||0)+otherPaid,expectedCash:(Number(activeShift.expectedCash)||0)+Math.max(0,cashPaid)};await putInStore('shifts',updatedShift);}
+        // Update the open screen from the already-saved local data; no full database reload and no cloud wait.
+        setInvoices(prev => [invoice, ...prev.filter(x => x.id !== invoice.id)]);
+        setStock(updatedStockList);
+        setStockMovements(prev => [...newMovements, ...prev]);
+        setProducts(productCopies);
+        setAccounts(updatedAccounts);
+        if(updatedCustomer)setCustomers(prev => prev.map(c => c.id===updatedCustomer.id?updatedCustomer:c));
+        if(customerStatement)setPartnerStatements(prev => [customerStatement, ...prev]);
+        if(updatedShift)setShifts(prev => prev.map(x => x.id===updatedShift.id?updatedShift:x));
+        setSyncQueue(window.OscarCloudSync?.pendingItems?.() || []);
+        playSuccessSound(settings.scannerBeepEnabled); clearCart(); showToast(`تم حفظ الفاتورة بنجاح [${invoiceNumber}]`,'success'); return invoice;
+    }, [cart, invoiceDiscountType, invoiceDiscountValue, settings, warehouses, products, selectedCustomer, currentUser, activeShift, stock, accounts, clearCart, showToast]);
     // Create Return Invoice
     const createReturnInvoice = useCallback(async (payload) => {
         const original = invoices.find((inv) => inv.id === payload.originalInvoiceId);
@@ -599,24 +645,35 @@ export const AppProvider = ({ children }) => {
         showToast(`تم تسجيل المرتجع بنجاح [${returnNumber}]`, 'info');
         return returnInvoice;
     }, [invoices, products, currentUser, activeShift, accounts, stock, warehouses, reloadData, showToast]);
-    // Create Purchase Invoice (discounts + FIFO batches + current average inventory valuation)
+    // Create Purchase Invoice (local-first: durable local save first, cloud sync later)
     const createPurchaseInvoice = useCallback(async (payload) => {
         const now=new Date().toISOString(); const invoiceNumber=`PUR-${Date.now().toString().slice(-6)}`; const syncId=`pur-${Date.now()}`;
-        const subtotal=payload.items.reduce((x,i)=>x+(Number(i.total)||0),0);
+        const targetWarehouse = warehouses.find(w=>w.id===payload?.warehouseId) || warehouses.find(w=>w.id===settings.activeWarehouseId) || warehouses.find(w=>w.isDefault) || warehouses.find(w=>/صالة\s*العرض/.test(String(w.name||''))) || warehouses[0];
+        if(!targetWarehouse) throw new Error('لا يوجد مخزن رئيسي. أضف صالة العرض من المخازن أولاً.');
+        const warehouseId=targetWarehouse.id;
+        const items=Array.isArray(payload?.items)?payload.items.filter(i=>i?.productId&&Number(i.quantity)>0):[];
+        if(!items.length) throw new Error('أضف صنفاً واحداً على الأقل إلى فاتورة المشتريات.');
+        const payments=Array.isArray(payload?.payments)?payload.payments.filter(p=>p&&p.accountId&&Number(p.amount)>0):[];
+        const subtotal=items.reduce((x,i)=>x+(Number(i.total)||0),0);
         const discountTotal=Math.max(0,Math.min(subtotal,Number(payload.discountAmount)||0));
         const grandTotal=Math.max(0,subtotal-discountTotal); const paidAmount=Math.min(grandTotal,Math.max(0,Number(payload.paidAmount)||0)); const remaining=Math.max(0,grandTotal-paidAmount); const ratio=subtotal>0?grandTotal/subtotal:1;
-        const purchaseInvoice={id:'pur-'+Date.now(),invoiceNumber,date:now,supplierId:payload.supplierId,supplierName:payload.supplierName,warehouseId:payload.warehouseId,warehouseName:warehouses.find(w=>w.id===payload.warehouseId)?.name||'المخزن',items:payload.items.map((it,idx)=>({id:`pur-it-${Date.now()}-${idx}`,...it})),subtotal,discountType:payload.discountType||'fixed',discountValue:Number(payload.discountValue)||0,discountTotal,taxTotal:0,grandTotal,paidAmount,remainingAmount:remaining,paymentType:payload.paymentType,payments:payload.payments,notes:payload.notes,syncId,isSynced:false,createdAt:now};
+        const purchaseInvoice={id:'pur-'+Date.now(),invoiceNumber,date:now,supplierId:payload.supplierId,supplierName:payload.supplierName,warehouseId,warehouseName:targetWarehouse.name||'صالة العرض',items:items.map((it,idx)=>({id:`pur-it-${Date.now()}-${idx}`,...it})),subtotal,discountType:payload.discountType||'fixed',discountValue:Number(payload.discountValue)||0,discountTotal,taxTotal:0,grandTotal,paidAmount,remainingAmount:remaining,paymentType:payload.paymentType,payments,notes:payload.notes||'',syncId,isSynced:false,createdAt:now};
         await putInStore('purchases',purchaseInvoice);
         const updatedProducts=products.map(p=>({...p,fifoBatches:Array.isArray(p.fifoBatches)?p.fifoBatches.map(b=>({...b})):[]})); const updatedStockList=[...stock],newMovements=[];
-        for(const item of payload.items){const pi=updatedProducts.findIndex(p=>p.id===item.productId);const si=updatedStockList.findIndex(x=>x.productId===item.productId&&x.warehouseId===payload.warehouseId);const currentBaseStock=si>=0?Number(updatedStockList[si].baseQuantity)||0:0;const newBaseStock=currentBaseStock+item.baseQuantity;
-          if(pi>=0){const currentCost=Number(updatedProducts[pi].costPrice)||0;const unitCost=((Number(item.unitPrice)||0)*ratio)/(Number(item.conversionFactor)||1);let batches=updatedProducts[pi].fifoBatches||[];if(currentBaseStock>0&&!batches.some(b=>(b.warehouseId===payload.warehouseId||!b.warehouseId)&&Number(b.remainingBaseQty)>0)){batches.push({id:`legacy-${item.productId}-${payload.warehouseId}`,purchaseId:'legacy',warehouseId:payload.warehouseId,receivedAt:'2000-01-01T00:00:00.000Z',expiryDate:updatedProducts[pi].expiryDate||'',unitCost:currentCost,remainingBaseQty:currentBaseStock});}batches.push({id:`batch-${purchaseInvoice.id}-${item.productId}-${Math.random().toString(36).slice(2,6)}`,purchaseId:purchaseInvoice.id,warehouseId:payload.warehouseId,receivedAt:now,expiryDate:item.expiryDate||updatedProducts[pi].expiryDate||'',unitCost,remainingBaseQty:item.baseQuantity});const oldVal=Math.max(0,currentBaseStock)*currentCost,newVal=item.baseQuantity*unitCost,totalUnits=Math.max(0,currentBaseStock)+item.baseQuantity,newWAC=totalUnits>0?(oldVal+newVal)/totalUnits:unitCost;updatedProducts[pi]={...updatedProducts[pi],costPrice:parseFloat(newWAC.toFixed(4)),fifoBatches:batches,updatedAt:now};}
-          if(si>=0)updatedStockList[si]={...updatedStockList[si],baseQuantity:newBaseStock};else updatedStockList.push({productId:item.productId,warehouseId:payload.warehouseId,baseQuantity:newBaseStock});
-          newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:now,productId:item.productId,productName:item.productName,warehouseId:payload.warehouseId,warehouseName:warehouses.find(w=>w.id===payload.warehouseId)?.name||'المخزن',type:'purchase',unitName:item.unitName,quantityInUnit:item.quantity,conversionFactor:item.conversionFactor,baseQuantityChange:item.baseQuantity,newBaseBalance:newBaseStock,referenceId:purchaseInvoice.id,referenceType:'PURCHASE',userId:currentUser.id,userName:currentUser.name});}
+        for(const item of items){const pi=updatedProducts.findIndex(p=>p.id===item.productId);const si=updatedStockList.findIndex(x=>x.productId===item.productId&&x.warehouseId===warehouseId);const currentBaseStock=si>=0?Number(updatedStockList[si].baseQuantity)||0:0;const baseQty=Math.max(0,Number(item.baseQuantity)||0);const newBaseStock=currentBaseStock+baseQty;
+          if(pi>=0){const currentCost=Number(updatedProducts[pi].costPrice)||0;const unitCost=((Number(item.unitPrice)||0)*ratio)/Math.max(0.00000001,(Number(item.conversionFactor)||1));let batches=updatedProducts[pi].fifoBatches||[];if(currentBaseStock>0&&!batches.some(b=>(b.warehouseId===warehouseId||!b.warehouseId)&&Number(b.remainingBaseQty)>0)){batches.push({id:`legacy-${item.productId}-${warehouseId}`,purchaseId:'legacy',warehouseId,receivedAt:'2000-01-01T00:00:00.000Z',expiryDate:updatedProducts[pi].expiryDate||'',unitCost:currentCost,remainingBaseQty:currentBaseStock});}batches.push({id:`batch-${purchaseInvoice.id}-${item.productId}-${Math.random().toString(36).slice(2,6)}`,purchaseId:purchaseInvoice.id,warehouseId,receivedAt:now,expiryDate:item.expiryDate||updatedProducts[pi].expiryDate||'',unitCost,remainingBaseQty:baseQty});const oldVal=Math.max(0,currentBaseStock)*currentCost,newVal=baseQty*unitCost,totalUnits=Math.max(0,currentBaseStock)+baseQty,newWAC=totalUnits>0?(oldVal+newVal)/totalUnits:unitCost;updatedProducts[pi]={...updatedProducts[pi],costPrice:parseFloat(newWAC.toFixed(4)),fifoBatches:batches,updatedAt:now};}
+          if(si>=0)updatedStockList[si]={...updatedStockList[si],baseQuantity:newBaseStock};else updatedStockList.push({productId:item.productId,warehouseId,baseQuantity:newBaseStock});
+          newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:now,productId:item.productId,productName:item.productName,warehouseId,warehouseName:targetWarehouse.name||'صالة العرض',type:'purchase',unitName:item.unitName,quantityInUnit:item.quantity,conversionFactor:item.conversionFactor,baseQuantityChange:baseQty,newBaseBalance:newBaseStock,referenceId:purchaseInvoice.id,referenceType:'PURCHASE',userId:currentUser.id,userName:currentUser.name});}
         await bulkPut('products',updatedProducts);await bulkPut('stock',updatedStockList);await bulkPut('stock_movements',newMovements);
-        const updatedAccounts=[...accounts];for(const p of payload.payments){const ai=updatedAccounts.findIndex(a=>a.id===p.accountId);if(ai>=0)updatedAccounts[ai]={...updatedAccounts[ai],balance:updatedAccounts[ai].balance-p.amount};}await bulkPut('accounts',updatedAccounts);
-        if(remaining>0){const supp=suppliers.find(s=>s.id===payload.supplierId);if(supp){const nb=supp.balance+remaining;await putInStore('suppliers',{...supp,balance:nb});await putInStore('partner_statements',{id:'stmt-'+Date.now(),date:now,type:'purchase',referenceNumber:invoiceNumber,description:`فاتورة مشتريات رقم ${invoiceNumber}`,debit:0,credit:remaining,runningBalance:nb});}}
-        playSuccessSound(settings.scannerBeepEnabled);await reloadData();showToast(`تم تسجيل فاتورة الشراء بنجاح [${invoiceNumber}]`,'success');return purchaseInvoice;
-    }, [warehouses,products,stock,accounts,suppliers,currentUser,reloadData,showToast,settings.scannerBeepEnabled]);
+        const updatedAccounts=[...accounts];for(const pay of payments){const ai=updatedAccounts.findIndex(a=>a.id===pay.accountId);if(ai>=0)updatedAccounts[ai]={...updatedAccounts[ai],balance:(Number(updatedAccounts[ai].balance)||0)-(Number(pay.amount)||0)};}await bulkPut('accounts',updatedAccounts);
+        let updatedSupplier=null,supplierStatement=null;
+        if(remaining>0){const supp=suppliers.find(s=>s.id===payload.supplierId);if(supp){const nb=(Number(supp.balance)||0)+remaining;updatedSupplier={...supp,balance:nb};supplierStatement={id:'stmt-'+Date.now(),date:now,type:'purchase',partyType:'supplier',partyId:supp.id,referenceNumber:invoiceNumber,description:`فاتورة مشتريات رقم ${invoiceNumber}`,debit:0,credit:remaining,runningBalance:nb};await putInStore('suppliers',updatedSupplier);await putInStore('partner_statements',supplierStatement);}}
+        setPurchases(prev => [purchaseInvoice, ...prev.filter(x=>x.id!==purchaseInvoice.id)]);
+        setProducts(updatedProducts);setStock(updatedStockList);setStockMovements(prev=>[...newMovements,...prev]);setAccounts(updatedAccounts);
+        if(updatedSupplier)setSuppliers(prev=>prev.map(x=>x.id===updatedSupplier.id?updatedSupplier:x));if(supplierStatement)setPartnerStatements(prev=>[supplierStatement,...prev]);
+        setSyncQueue(window.OscarCloudSync?.pendingItems?.() || []);
+        playSuccessSound(settings.scannerBeepEnabled);showToast(`تم تسجيل فاتورة الشراء بنجاح [${invoiceNumber}]`,'success');return purchaseInvoice;
+    }, [warehouses,products,stock,accounts,suppliers,currentUser,showToast,settings.activeWarehouseId,settings.scannerBeepEnabled]);
 
     // Damaged/expired stock: deduct quantity and exact FIFO cost as a loss expense.
     const recordDamagedStock = useCallback(async (productId, warehouseId, baseQuantity, reason='تالف / منتهي الصلاحية') => {
@@ -887,7 +944,7 @@ export const AppProvider = ({ children }) => {
                         productId: product.id,
                         productName: product.name,
                         warehouseId,
-                        warehouseName: warehouses.find((w) => w.id === warehouseId)?.name || 'المخزن الرئيسي',
+                        warehouseName: warehouses.find((w) => w.id === warehouseId)?.name || 'صالة العرض',
                         type: 'opening',
                         unitName: row.unitName || baseUnit?.name || product.baseUnitName || 'حبة',
                         quantityInUnit: Number(row.quantity) || 0,
@@ -1495,15 +1552,14 @@ export const AppProvider = ({ children }) => {
         try {
             const result = await window.OscarCloudSync?.syncNow?.({ manual: true, force: true });
             if (result?.error) throw new Error(result.message || 'فشل الاتصال');
-            await clearStore('sync_queue', false).catch(() => {});
             setSyncQueue(window.OscarCloudSync?.pendingItems?.() || []);
-            await reloadData();
+            if (result?.changedStores?.length) await reloadStores(result.changedStores);
             showToast(result?.applied ? `تمت المزامنة وتحديث الشاشة (${result.applied} تغيير)` : 'اكتملت المزامنة — البيانات محدثة', 'success');
         } catch (err) {
             console.error('Sync failed:', err);
             showToast('تعذر الاتصال الآن. بياناتك محفوظة محلياً وستتم المحاولة تلقائياً.', 'warning');
         } finally { setIsSyncing(false); }
-    }, [showToast, reloadData]);
+    }, [showToast, reloadStores]);
     const retrySyncItem = useCallback(async () => {
         await syncPendingQueue();
     }, [syncPendingQueue]);

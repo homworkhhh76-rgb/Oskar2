@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from './context__AppContext.js';
 import { SearchableDropdown } from './components__common__Dropdown.js';
 import { exportToCSV, printElementOnly, warmExportLibraries } from './utils__export.js';
@@ -167,9 +168,9 @@ export const VouchersView = () => {
         )):[h('tr',{key:'empty'},h('td',{colSpan:8,className:'p-8 text-center text-slate-400'},'لا توجد سندات مطابقة'))]))
       )
     ),
-    isModalOpen ? h('div',{className:'fixed inset-x-0 oscar-bounded-modal z-[100] bg-black/60 backdrop-blur-[2px] p-3 flex items-stretch sm:items-center justify-center overflow-hidden'},
-      h('div',{className:'w-full max-w-full h-full sm:h-auto max-h-full overflow-y-auto custom-scrollbar flex items-start sm:items-center justify-center py-1 sm:py-2'},
-      h('form',{onSubmit:submitVoucher,className:'w-full max-w-full bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-4 sm:p-5 space-y-4 text-right'},
+    isModalOpen ? createPortal(h('div',{className:'fixed inset-x-0 oscar-bounded-modal z-[100] bg-black/60 backdrop-blur-[2px] p-1.5 sm:p-3 flex items-stretch sm:items-center justify-center overflow-hidden'},
+      h('div',{className:'w-screen max-w-none h-full sm:h-auto max-h-full overflow-y-auto custom-scrollbar flex items-start sm:items-center justify-center py-1 sm:py-2'},
+      h('form',{onSubmit:submitVoucher,className:'w-[calc(100vw-.75rem)] max-w-none sm:max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-4 sm:p-5 space-y-4 text-right'},
         h('div',{className:'flex items-center justify-between'},h('h3',{className:'font-black'},formType==='receipt'?'إضافة سند قبض':'إضافة سند صرف'),h('button',{type:'button',onClick:()=>setIsModalOpen(false),className:'p-1 text-slate-400'},h(X,{className:'w-5 h-5'}))),
         h('div',{className:'grid grid-cols-2 gap-3'},
           h('div',null,h('label',{className:'text-xs font-bold block mb-1'},'نوع الجهة'),h(SearchableDropdown,{id:'voucher-party-type',options:[{id:'customer',label:'عميل'},{id:'supplier',label:'مورد'},{id:'other',label:'جهة أخرى'}],selectedId:formPartyType,onSelect:(id)=>{setFormPartyType(id);setFormPartyId(id==='customer'?(customers[0]?.id||''):id==='supplier'?(suppliers[0]?.id||''):'');},placeholder:'اختر الجهة'})),
@@ -182,8 +183,8 @@ export const VouchersView = () => {
         h('div',null,h('label',{className:'text-xs font-bold block mb-1'},'البيان / ملاحظات'),h('textarea',{rows:2,value:formNotes,onChange:e=>setFormNotes(e.target.value),className:'w-full px-3 py-2 text-xs border rounded-xl'})),
         h('div',{className:'flex justify-end gap-2 pt-2 border-t'},h('button',{type:'button',onClick:()=>setIsModalOpen(false),className:'px-4 py-2 text-xs font-bold text-slate-500'},'إلغاء'),h('button',{type:'submit',className:`px-5 py-2 rounded-xl text-white text-xs font-black ${formType==='receipt'?'bg-emerald-600':'bg-amber-600'}`},formType==='receipt'?'حفظ سند القبض':'حفظ سند الصرف'))
       ))
-    ) : null,
-    viewingVoucher ? h('div',{className:'fixed inset-x-0 oscar-bounded-modal z-[120] bg-black/70 backdrop-blur-[2px] p-2 sm:p-3 flex items-stretch justify-center overflow-hidden'},
+    ), document.body) : null,
+    viewingVoucher ? createPortal(h('div',{className:'fixed inset-x-0 oscar-bounded-modal z-[120] bg-black/70 backdrop-blur-[2px] p-2 sm:p-3 flex items-stretch justify-center overflow-hidden'},
       h('div',{className:`w-full ${voucherPaperSize==='a4'?'max-w-4xl':'max-w-md'} h-full max-h-full bg-slate-100 dark:bg-slate-950 rounded-2xl shadow-2xl p-2 sm:p-3 flex flex-col overflow-hidden`},
         h('div',{className:'no-print flex flex-wrap items-center justify-between gap-2 bg-white rounded-xl p-2 border mb-2 shrink-0'},
           h('div',{className:'flex items-center gap-1'},...['80mm','58mm','a4'].map(id=>h('button',{key:id,type:'button',onClick:()=>setVoucherPaperSize(id),className:`px-2.5 py-1.5 rounded-lg text-[11px] font-black ${voucherPaperSize===id?'bg-emerald-600 text-white':'bg-slate-100 text-slate-600'}`},id==='80mm'?'80 ملم':id==='58mm'?'58 ملم':'A4'))),
@@ -196,7 +197,7 @@ export const VouchersView = () => {
         ),
         h('div',{className:'flex-1 min-h-0 overflow-y-auto overflow-x-auto overscroll-contain touch-pan-y custom-scrollbar flex justify-center items-start p-2'},voucherPaper)
       )
-    ) : null,
+    ), document.body) : null,
     deleteConfirmId ? h('div',{className:'fixed inset-0 z-[130] bg-black/60 p-4 flex items-center justify-center'},h('div',{className:'w-full max-w-sm bg-white rounded-2xl p-5 text-right'},h('div',{className:'flex items-center gap-2 text-rose-600 mb-2'},h(AlertCircle,{className:'w-5 h-5'}),h('h3',{className:'font-black'},'حذف السند؟')),h('p',{className:'text-xs text-slate-500'},'سيتم حذف السند وإلغاء أثره المالي.'),h('div',{className:'flex justify-end gap-2 mt-4'},h('button',{type:'button',onClick:()=>setDeleteConfirmId(null),className:'px-3 py-2 text-xs font-bold'},'تراجع'),h('button',{type:'button',onClick:async()=>{await deleteVoucher(deleteConfirmId);setDeleteConfirmId(null);},className:'px-4 py-2 bg-rose-600 text-white text-xs font-black rounded-xl'},'حذف')))) : null
   );
 };

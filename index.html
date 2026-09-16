@@ -36,7 +36,7 @@
   <script type="module" src="./main.js"></script>
   <script>
     if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
-      addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=7.9-multicompany-live-v2', { updateViaCache: 'none' }).then(r => r.update()).catch(() => {}));
+      addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=7.9-localfirst-v7', { updateViaCache: 'none' }).then(r => r.update()).catch(() => {}));
     }
   </script>
 </body>

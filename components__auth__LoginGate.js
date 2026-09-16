@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Upload, ShieldCheck, Building2, Wifi, WifiOff, Database, LogIn, Settings2 } from 'lucide-react';
+import { Upload, ShieldCheck, Building2, Wifi, WifiOff, Database, LogIn } from 'lucide-react';
 import { DEFAULT_LOGO_DATA_URL } from './brand__logo.js';
 const h=React.createElement;
 export const LoginGate=({children})=>{
@@ -25,8 +25,7 @@ export const LoginGate=({children})=>{
     h('input',{ref:inputRef,type:'file',accept:'.mzauth',className:'hidden',onChange:async e=>{const f=e.target.files?.[0]||null;setFile(f);setError('');if(f)try{await A().primeActivationFile(f)}catch(err){setError(String(err?.message||err))}}}),
     error?h('div',{className:'mt-3 p-3 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold'},error):null,
     h('button',{type:'button',disabled:busy,onClick:open,className:'mt-4 w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-black flex items-center justify-center gap-2'},busy?h('span',{className:'w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin'}):h(LogIn,{className:'w-5 h-5'}),h('span',null,busy?'جاري التحقق وفتح الشركة...':'فتح النظام')),
-    h('div',{className:'mt-4 flex items-start gap-2 text-[11px] text-slate-500'},navigator.onLine!==false?h(Wifi,{className:'w-4 h-4 text-emerald-500 shrink-0'}):h(WifiOff,{className:'w-4 h-4 text-amber-500 shrink-0'}),h('span',null,'أول استخدام للملف يحتاج اتصالاً للتحقق. بعد التحقق الأول يمكن الدخول والعمل أوف لاين، وتتم المزامنة تلقائياً عند عودة الإنترنت.')),
-    h('a',{href:'./admin.html',className:'mt-5 h-10 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800'},h(Settings2,{className:'w-4 h-4'}),'إدارة القاعدة الأم والشركات')
+    h('div',{className:'mt-4 flex items-start gap-2 text-[11px] text-slate-500'},navigator.onLine!==false?h(Wifi,{className:'w-4 h-4 text-emerald-500 shrink-0'}):h(WifiOff,{className:'w-4 h-4 text-amber-500 shrink-0'}),h('span',null,'يعمل النظام محلياً بالكامل حتى بدون إنترنت. تحفظ العمليات على الجهاز وتتم مزامنتها تلقائياً عند عودة الاتصال.'))
    )
   )
  )
