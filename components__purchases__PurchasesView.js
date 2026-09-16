@@ -32,8 +32,8 @@ export const PurchasesView = () => {
   const warehouses = Array.isArray(app.warehouses) ? app.warehouses.filter(Boolean) : [];
   const accounts = Array.isArray(app.accounts) ? app.accounts.filter(Boolean) : [];
   const settings = app.settings || {};
-  const { createPurchaseInvoice, deletePurchase, saveSupplier, activeEmployee, showToast } = app;
-  const primaryWarehouse = warehouses.find((w) => w?.id === 'wh-main') || warehouses.find((w) => /صالة\s*العرض/.test(String(w?.name || ''))) || warehouses.find((w) => w?.isDefault) || warehouses.find((w) => w?.id === settings.activeWarehouseId) || warehouses[0];
+  const { createPurchaseInvoice, deletePurchase, saveSupplier, saveWarehouse, activeEmployee, showToast } = app;
+  const primaryWarehouse = warehouses[0] || warehouses.find((w) => w?.id === settings.activeWarehouseId) || warehouses.find((w) => w?.isDefault);
 
   const activeProducts = products.filter((p) => !p.deletedAt && p.status !== 'archived' && Array.isArray(p.units) && p.units.length > 0);
   const [mode, setMode] = useState('list');
@@ -47,6 +47,9 @@ export const PurchasesView = () => {
   const [viewing, setViewing] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [showQuickSupp, setShowQuickSupp] = useState(false);
+  const [showQuickWarehouse, setShowQuickWarehouse] = useState(false);
+  const [quickWarehouseName, setQuickWarehouseName] = useState('');
+  const [quickWarehouseCode, setQuickWarehouseCode] = useState('');
   const [quickName, setQuickName] = useState('');
   const [quickPhone, setQuickPhone] = useState('');
   const [exporting, setExporting] = useState('');
@@ -55,7 +58,7 @@ export const PurchasesView = () => {
 
   useEffect(() => {
     if (warehouses.length) {
-      const preferred = warehouses.find((w) => w?.id === 'wh-main') || warehouses.find((w) => /صالة\s*العرض/.test(String(w?.name || ''))) || warehouses.find((w) => w?.isDefault) || warehouses[0];
+      const preferred = warehouses[0];
       if (!warehouseId || !warehouses.some((w) => w.id === warehouseId)) setWarehouseId(preferred?.id || '');
     }
     if (suppliers.length && (!supplierId || !suppliers.some((x) => x.id === supplierId))) setSupplierId(suppliers[0].id);
@@ -137,7 +140,7 @@ export const PurchasesView = () => {
       setMode('list');
       setRows([makeRow()]);
       setPaid(''); setDiscountValue(''); setNotes('');
-      const preferred = warehouses.find((w) => w?.id === 'wh-main') || warehouses.find((w) => /صالة\s*العرض/.test(String(w?.name || ''))) || warehouses.find((w) => w?.isDefault) || warehouses[0];
+      const preferred = warehouses[0];
       if (preferred) setWarehouseId(preferred.id);
     }
     } catch (err) {
@@ -156,6 +159,18 @@ export const PurchasesView = () => {
     setSupplierId(ns.id); setShowQuickSupp(false); setQuickName(''); setQuickPhone('');
   };
 
+  const addWarehouse = async (e) => {
+    e.preventDefault();
+    const name = quickWarehouseName.trim();
+    if (!name) return;
+    const wh = { id: `wh-${Date.now()}`, name, code: quickWarehouseCode.trim() || `WH-${String(Date.now()).slice(-4)}`, isDefault: warehouses.length === 0, createdAt: new Date().toISOString() };
+    await saveWarehouse?.(wh);
+    setWarehouseId(wh.id);
+    setShowQuickWarehouse(false);
+    setQuickWarehouseName('');
+    setQuickWarehouseCode('');
+  };
+
   const supplierOpts = suppliers.map((s) => ({ id: s.id, label: s.name || 'مورد', subLabel: s.phone || '', badge: Number(s.balance) ? `رصيد ${money(s.balance)}` : undefined }));
   const whOpts = warehouses.map((w) => ({ id: w.id, label: w.name || 'مخزن', subLabel: w.code || '' }));
   const accountOpts = accounts.map((a) => ({ id: a.id, label: a.name || 'حساب', subLabel: `الرصيد: ${money(a.balance)} ${settings.currencySymbol || ''}` }));
@@ -164,7 +179,7 @@ export const PurchasesView = () => {
   const form = h('div', { className: 'rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-sm space-y-4' },
     h('div', { className: 'grid grid-cols-1 sm:grid-cols-3 gap-3' },
       h(SearchableDropdown, { id: 'purchase-supplier', label: 'المورد:', options: supplierOpts, selectedId: supplierId, onSelect: setSupplierId, onQuickAdd: () => setShowQuickSupp(true), quickAddLabel: '+ مورد جديد', icon: h(Building2, { className: 'w-4 h-4' }) }),
-      h(SearchableDropdown, { id: 'purchase-warehouse', label: 'المخزن المستلم:', options: whOpts, selectedId: warehouseId, onSelect: setWarehouseId, placeholder: 'ابحث عن مخزن...' }),
+      h(SearchableDropdown, { id: 'purchase-warehouse', label: 'المخزن المستلم:', options: whOpts, selectedId: warehouseId, onSelect: setWarehouseId, onQuickAdd: () => setShowQuickWarehouse(true), quickAddLabel: '+ إضافة مخزن', placeholder: 'ابحث عن مخزن...' }),
       h(SearchableDropdown, { id: 'purchase-account', label: paidSafe > 0 ? 'حساب دفع المبلغ المدفوع:' : 'الحساب (يستخدم عند الدفع):', options: accountOpts, selectedId: accountId, onSelect: setAccountId, placeholder: 'ابحث عن حساب...' })
     ),
     h('div', { className: 'overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl slim-scrollbar' },
@@ -320,6 +335,7 @@ export const PurchasesView = () => {
       )
     ) : null,
     deleting ? h('div', { className: 'fixed inset-0 z-[60] bg-black/60 p-4 flex items-center justify-center' }, h('div', { className: 'w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl p-5 text-center space-y-3' }, h(AlertTriangle, { className: 'w-9 h-9 text-rose-600 mx-auto' }), h('div', { className: 'font-black' }, 'حذف فاتورة المشتريات؟'), h('div', { className: 'flex gap-2' }, h('button', { type: 'button', onClick: () => setDeleting(null), className: 'flex-1 py-2 border rounded-xl' }, 'إلغاء'), h('button', { type: 'button', onClick: async () => { if (await deletePurchase?.(deleting)) { setDeleting(null); setViewing(null); } }, className: 'flex-1 py-2 bg-rose-600 text-white rounded-xl' }, 'حذف')))) : null,
-    showQuickSupp ? h('div', { className: 'fixed inset-0 z-[70] bg-black/60 p-4 flex items-center justify-center' }, h('form', { onSubmit: addSupplier, className: 'w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl p-4 space-y-3' }, h('div', { className: 'font-black' }, 'مورد جديد'), h('input', { required: true, value: quickName, onChange: (e) => setQuickName(e.target.value), placeholder: 'اسم المورد', className: 'w-full p-2 border rounded-lg bg-white dark:bg-slate-800 dark:border-slate-700' }), h('input', { value: quickPhone, onChange: (e) => setQuickPhone(e.target.value), placeholder: 'الهاتف', className: 'w-full p-2 border rounded-lg bg-white dark:bg-slate-800 dark:border-slate-700' }), h('div', { className: 'flex gap-2' }, h('button', { type: 'button', onClick: () => setShowQuickSupp(false), className: 'flex-1 p-2 border rounded-lg' }, 'إلغاء'), h('button', { type: 'submit', className: 'flex-1 p-2 bg-emerald-600 text-white rounded-lg' }, 'حفظ')))) : null
+    showQuickSupp ? h('div', { className: 'fixed inset-0 z-[70] bg-black/60 p-4 flex items-center justify-center' }, h('form', { onSubmit: addSupplier, className: 'w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl p-4 space-y-3' }, h('div', { className: 'font-black' }, 'مورد جديد'), h('input', { required: true, value: quickName, onChange: (e) => setQuickName(e.target.value), placeholder: 'اسم المورد', className: 'w-full p-2 border rounded-lg bg-white dark:bg-slate-800 dark:border-slate-700' }), h('input', { value: quickPhone, onChange: (e) => setQuickPhone(e.target.value), placeholder: 'الهاتف', className: 'w-full p-2 border rounded-lg bg-white dark:bg-slate-800 dark:border-slate-700' }), h('div', { className: 'flex gap-2' }, h('button', { type: 'button', onClick: () => setShowQuickSupp(false), className: 'flex-1 p-2 border rounded-lg' }, 'إلغاء'), h('button', { type: 'submit', className: 'flex-1 p-2 bg-emerald-600 text-white rounded-lg' }, 'حفظ')))) : null,
+    showQuickWarehouse ? h('div', { className: 'fixed inset-0 z-[72] bg-black/60 p-4 flex items-center justify-center' }, h('form', { onSubmit: addWarehouse, className: 'w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl p-4 space-y-3 shadow-2xl' }, h('div', { className: 'font-black' }, 'إضافة مخزن جديد'), h('input', { required: true, value: quickWarehouseName, onChange: (e) => setQuickWarehouseName(e.target.value), placeholder: 'اسم المخزن', className: 'w-full p-2 border rounded-lg bg-white dark:bg-slate-800 dark:border-slate-700' }), h('input', { value: quickWarehouseCode, onChange: (e) => setQuickWarehouseCode(e.target.value), placeholder: 'الكود (اختياري)', className: 'w-full p-2 border rounded-lg bg-white dark:bg-slate-800 dark:border-slate-700' }), h('div', { className: 'flex gap-2' }, h('button', { type: 'button', onClick: () => setShowQuickWarehouse(false), className: 'flex-1 p-2 border rounded-lg' }, 'إلغاء'), h('button', { type: 'submit', className: 'flex-1 p-2 bg-emerald-600 text-white rounded-lg font-bold' }, 'حفظ واختيار')))) : null
   );
 };

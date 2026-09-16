@@ -631,17 +631,18 @@ export function getDemoStock() {
         { productId: 'prod-ariel', warehouseId: 'wh-shop', baseQuantity: 12 }, // 3 كراتين
     ];
 }
-// Initial Demo Customers
+// Virtual cash customer used only inside the POS. It is never stored in the customers table.
+export const CASH_CUSTOMER = Object.freeze({
+    id: 'cust-walkin',
+    name: 'عميل نقدي',
+    phone: '',
+    address: '',
+    balance: 0,
+    priceList: 'retail',
+    isVirtual: true,
+});
+// Initial Demo Customers (registered customers only)
 export const DEFAULT_CUSTOMERS = [
-    {
-        id: 'cust-walkin',
-        name: 'زبون نقدي (عام)',
-        phone: '',
-        address: 'المحل',
-        balance: 0,
-        priceList: 'retail',
-        createdAt: new Date().toISOString(),
-    },
     {
         id: 'cust-1',
         name: 'أحمد محمود القواسمي',
@@ -973,7 +974,7 @@ export async function resetDatabase(withDemo = false) {
     await bulkPut('warehouses', DEFAULT_WAREHOUSES);
     await bulkPut('categories', DEFAULT_CATEGORIES);
     await bulkPut('accounts', DEFAULT_ACCOUNTS);
-    await bulkPut('customers', [DEFAULT_CUSTOMERS[0]]); // Keep walk-in customer
+    // No virtual cash customer is stored in the customers table.
     await bulkPut('employees', DEFAULT_EMPLOYEES);
     if (withDemo) {
         await bulkPut('customers', DEFAULT_CUSTOMERS);

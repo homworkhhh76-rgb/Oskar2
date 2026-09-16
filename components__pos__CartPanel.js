@@ -66,15 +66,13 @@ export const CartPanel = ({ onOpenPayment }) => {
   const rawGrandTotal = Math.max(0, beforeInvoiceDiscount - invoiceDiscountAmount);
   const grandTotal = settings.scaleModeEnabled ? Math.round(rawGrandTotal) : rawGrandTotal;
 
-  const customerOptions = [...customers]
-    .filter((c) => !c.deletedAt)
-    .sort((a,b) => (a.id === 'cust-walkin' ? -1 : b.id === 'cust-walkin' ? 1 : String(a.name||'').localeCompare(String(b.name||''),'ar')))
-    .map((c) => ({
-      id: c.id,
-      label: c.id === 'cust-walkin' ? 'زبون عام نقدي' : c.name,
-      subLabel: c.id === 'cust-walkin' ? 'بيع نقدي مباشر' : (c.phone || undefined),
-      badge: c.balance > 0 ? `دين: ${c.balance} ${settings.currencySymbol}` : undefined,
-    }));
+  const customerOptions = [
+    { id: 'cust-walkin', label: 'عميل نقدي', subLabel: 'الافتراضي للبيع النقدي المباشر' },
+    ...[...customers]
+      .filter((c) => c && c.id !== 'cust-walkin' && !c.deletedAt)
+      .sort((a,b) => String(a.name||'').localeCompare(String(b.name||''),'ar'))
+      .map((c) => ({ id:c.id, label:c.name, subLabel:c.phone || undefined, badge:c.balance > 0 ? `دين: ${c.balance} ${settings.currencySymbol}` : undefined }))
+  ];
 
   const addQuickCustomer = async (e) => {
     e.preventDefault();
@@ -90,7 +88,7 @@ export const CartPanel = ({ onOpenPayment }) => {
       h('div', { className: 'flex items-center gap-1.5' },
         h('div', { className: 'flex-1 min-w-0' }, h(SearchableDropdown, {
           id: 'cart-customer-select', options: customerOptions, selectedId: selectedCustomer?.id,
-          onSelect: (id) => { const found = customers.find((c) => c.id === id); if (found) setSelectedCustomer(found); },
+          onSelect: (id) => { if (id === 'cust-walkin') setSelectedCustomer({ id:'cust-walkin', name:'عميل نقدي', balance:0, priceList:'retail', isVirtual:true }); else { const found = customers.find((c) => c.id === id); if (found) setSelectedCustomer(found); } },
           icon: h(User, { className: 'w-4 h-4' }), placeholder: 'اختر العميل...',
         })),
         h('button', { type:'button', onClick:()=>setShowQuickCustomer(true), className:'shrink-0 w-9 h-9 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 flex items-center justify-center hover:bg-emerald-100', title:'إضافة عميل جديد' }, h(UserPlus,{className:'w-4.5 h-4.5'}))

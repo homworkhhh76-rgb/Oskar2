@@ -1,6 +1,6 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, migrateLegacyDatabaseIfNeeded, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, DEFAULT_CUSTOMERS, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js';
+import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, migrateLegacyDatabaseIfNeeded, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js';
 import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js';
 import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js';
 const AppContext = createContext(null);
@@ -72,7 +72,7 @@ export const AppProvider = ({ children }) => {
     const [cart, setCart] = useState([]);
     const [invoiceDiscountType, setInvoiceDiscountType] = useState('fixed');
     const [invoiceDiscountValue, setInvoiceDiscountValue] = useState(0);
-    const [selectedCustomer, setSelectedCustomer] = useState(DEFAULT_CUSTOMERS[0]);
+    const [selectedCustomer, setSelectedCustomer] = useState(CASH_CUSTOMER);
     // Toast helper
     const showToast = useCallback((message, type = 'info') => {
         const id = Math.random().toString(36).substring(2, 9);
@@ -116,7 +116,8 @@ export const AppProvider = ({ children }) => {
             setStockMovements((stkMovs || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
             setInvoices((invs || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
             setPurchases((purchs || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-            setCustomers(newestFirst(custs));
+            const registeredCustomers = (custs || []).filter((c) => c && c.id !== CASH_CUSTOMER.id);
+            setCustomers(newestFirst(registeredCustomers));
             setSuppliers(newestFirst(supps));
             const orderedAccounts = newestFirst(accs);
             orderedAccounts.sort((a, b) => Number(Boolean(b?.isDefault)) - Number(Boolean(a?.isDefault)));
@@ -136,10 +137,11 @@ export const AppProvider = ({ children }) => {
             }
             if (sett)
                 setSettings(sett);
-            // Default customer fallback
-            if (custs && custs.length > 0) {
-                setSelectedCustomer((prev) => prev ? custs.find((c) => c.id === prev.id) || custs[0] : custs[0]);
-            }
+            // Cash customer is virtual and always the POS fallback; it is never taken from the customers table.
+            setSelectedCustomer((prev) => {
+                if (!prev || prev.id === CASH_CUSTOMER.id) return CASH_CUSTOMER;
+                return registeredCustomers.find((c) => c.id === prev.id) || CASH_CUSTOMER;
+            });
         }
         catch (err) {
             console.error('Error reloading database:', err);
@@ -161,7 +163,7 @@ export const AppProvider = ({ children }) => {
         if (wanted.has('stock_movements')) jobs.push(getAllFromStore('stock_movements').then(v => setStockMovements((v || []).sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()))));
         if (wanted.has('invoices')) jobs.push(getAllFromStore('invoices').then(v => setInvoices((v || []).sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()))));
         if (wanted.has('purchases')) jobs.push(getAllFromStore('purchases').then(v => setPurchases((v || []).sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()))));
-        if (wanted.has('customers')) jobs.push(getAllFromStore('customers').then(v => { setCustomers(newestFirst(v)); setSelectedCustomer(prev => prev ? (v || []).find(c=>c.id===prev.id)||v?.[0]||prev : v?.[0]||prev); }));
+        if (wanted.has('customers')) jobs.push(getAllFromStore('customers').then(v => { const real=(v||[]).filter(c=>c&&c.id!==CASH_CUSTOMER.id); setCustomers(newestFirst(real)); setSelectedCustomer(prev => (!prev || prev.id===CASH_CUSTOMER.id) ? CASH_CUSTOMER : (real.find(c=>c.id===prev.id)||CASH_CUSTOMER)); }));
         if (wanted.has('suppliers')) jobs.push(getAllFromStore('suppliers').then(v => setSuppliers(newestFirst(v))));
         if (wanted.has('accounts')) jobs.push(getAllFromStore('accounts').then(v => { const x=newestFirst(v); x.sort((a,b)=>Number(Boolean(b?.isDefault))-Number(Boolean(a?.isDefault))); setAccounts(x); }));
         if (wanted.has('transfers')) jobs.push(getAllFromStore('transfers').then(v => setTransfers((v || []).sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()))));
@@ -200,6 +202,14 @@ export const AppProvider = ({ children }) => {
                     }
                 });
             } catch (syncError) { console.warn('Cloud sync bootstrap warning:', syncError); }
+            // Remove the old persisted walk-in customer. Cash customer is now virtual POS-only.
+            try {
+                const oldWalkIn = await getFromStore('customers', CASH_CUSTOMER.id);
+                if (oldWalkIn) {
+                    await deleteFromStore('customers', CASH_CUSTOMER.id);
+                    if (isMounted) await reloadStores(['customers']);
+                }
+            } catch (_) {}
             // Keep the primary warehouse normalized locally even when old/cloud data still uses the previous name.
             const showroomNormalized = await ensurePrimaryShowroomWarehouse().catch(() => false);
             if (showroomNormalized && existingSettings) await reloadStores(['warehouses', 'settings']);
@@ -382,6 +392,8 @@ export const AppProvider = ({ children }) => {
         setCart([]);
         setInvoiceDiscountType('fixed');
         setInvoiceDiscountValue(0);
+        // Every new sale starts as a direct cash sale.
+        setSelectedCustomer(CASH_CUSTOMER);
     }, []);
     // Hold current invoice
     const holdCurrentInvoice = useCallback(async (notes) => {
@@ -392,7 +404,8 @@ export const AppProvider = ({ children }) => {
         const held = {
             id: 'held-' + Date.now(),
             date: new Date().toISOString(),
-            customerName: selectedCustomer?.name,
+            customerId: selectedCustomer?.id || CASH_CUSTOMER.id,
+            customerName: selectedCustomer?.name || CASH_CUSTOMER.name,
             items: [...cart],
             subtotal: cart.reduce((s, i) => s + (i.quantity * i.unitPrice), 0),
             notes,
@@ -410,11 +423,12 @@ export const AppProvider = ({ children }) => {
             await holdCurrentInvoice('فاتورة مستبدلة تلقائياً');
         }
         setCart(held.items);
+        setSelectedCustomer(held.customerId === CASH_CUSTOMER.id ? CASH_CUSTOMER : (customers.find((c) => c.id === held.customerId) || CASH_CUSTOMER));
         await deleteFromStore('held_invoices', heldId);
         setHeldInvoices((prev) => prev.filter((h) => h.id !== heldId));
         setShowHoldInvoicesModal(false);
         showToast('تم استعادة الفاتورة المعلقة إلى السلة', 'info');
-    }, [heldInvoices, cart.length, holdCurrentInvoice, showToast]);
+    }, [heldInvoices, cart.length, holdCurrentInvoice, customers, showToast]);
     const deleteHeldInvoice = useCallback(async (heldId) => {
         await deleteFromStore('held_invoices', heldId);
         setHeldInvoices((prev) => prev.filter((h) => h.id !== heldId));
@@ -486,8 +500,9 @@ export const AppProvider = ({ children }) => {
         let paid = Number(payload.paidAmount)||0;
         const remaining = Math.max(0, grandTotal - paid);
         const change = Math.max(0, paid - grandTotal);
-        if ((payload.paymentType === 'debt' || payload.paymentType === 'partial') && (!selectedCustomer || selectedCustomer.id === 'cust-walkin')) { showToast('يجب اختيار عميل مسجل للبيع الآجل أو الدفع الجزئي!', 'error'); return null; }
-        const invoice = { id:'inv-'+Date.now(), invoiceNumber, type:'sale', date:now, customerId:selectedCustomer?.id, customerName:selectedCustomer?.name, cashierId:currentUser.id, cashierName:currentUser.name, shiftId:activeShift?.id, branchId:settings.activeBranchName, warehouseId, items:invoiceItems, subtotal, lineDiscountTotal, invoiceDiscountType, invoiceDiscountValue:rawDiscount, invoiceDiscountAmount, discountTotal, taxTotal, roundingAdjustment, grandTotal, paidAmount:Math.min(paid,grandTotal), remainingAmount:remaining, changeAmount:change, paymentType:payload.paymentType, payments, status:'completed', notes:payload.notes, syncId, isSynced:false, createdAt:now };
+        const saleCustomer = selectedCustomer || CASH_CUSTOMER;
+        if ((payload.paymentType === 'debt' || payload.paymentType === 'partial') && saleCustomer.id === CASH_CUSTOMER.id) { showToast('يجب اختيار عميل مسجل للبيع الآجل أو الدفع الجزئي!', 'error'); return null; }
+        const invoice = { id:'inv-'+Date.now(), invoiceNumber, type:'sale', date:now, customerId:saleCustomer.id, customerName:saleCustomer.name, cashierId:currentUser.id, cashierName:currentUser.name, shiftId:activeShift?.id, branchId:settings.activeBranchName, warehouseId, items:invoiceItems, subtotal, lineDiscountTotal, invoiceDiscountType, invoiceDiscountValue:rawDiscount, invoiceDiscountAmount, discountTotal, taxTotal, roundingAdjustment, grandTotal, paidAmount:Math.min(paid,grandTotal), remainingAmount:remaining, changeAmount:change, paymentType:payload.paymentType, payments, status:'completed', notes:payload.notes, syncId, isSynced:false, createdAt:now };
         await putInStore('invoices', invoice);
         const updatedStockList=[...stock], newMovements=[];
         for (const item of invoiceItems) {
@@ -502,7 +517,7 @@ export const AppProvider = ({ children }) => {
         for(const p of payments){const i=updatedAccounts.findIndex(a=>a.id===p.accountId);if(i>=0)updatedAccounts[i]={...updatedAccounts[i],balance:(Number(updatedAccounts[i].balance)||0)+(Number(p.amount)||0)};}
         await bulkPut('accounts',updatedAccounts);
         let updatedCustomer = null, customerStatement = null, updatedShift = null;
-        if(remaining>0&&selectedCustomer&&selectedCustomer.id!=='cust-walkin'){const newBalance=(Number(selectedCustomer.balance)||0)+remaining;updatedCustomer={...selectedCustomer,balance:newBalance};customerStatement={id:'stmt-'+Date.now(),date:now,type:'sale',referenceNumber:invoiceNumber,description:`فاتورة مبيعات آجل رقم ${invoiceNumber}`,debit:remaining,credit:0,runningBalance:newBalance};await putInStore('customers',updatedCustomer);await putInStore('partner_statements',customerStatement);}
+        if(remaining>0&&saleCustomer.id!==CASH_CUSTOMER.id){const newBalance=(Number(saleCustomer.balance)||0)+remaining;updatedCustomer={...saleCustomer,balance:newBalance};customerStatement={id:'stmt-'+Date.now(),date:now,type:'sale',referenceNumber:invoiceNumber,description:`فاتورة مبيعات آجل رقم ${invoiceNumber}`,debit:remaining,credit:0,runningBalance:newBalance};await putInStore('customers',updatedCustomer);await putInStore('partner_statements',customerStatement);}
         if(activeShift){const cashPaid=payments.filter(p=>p.method==='cash').reduce((x,p)=>x+(Number(p.amount)||0),0)-change;const otherPaid=payments.filter(p=>p.method!=='cash').reduce((x,p)=>x+(Number(p.amount)||0),0);updatedShift={...activeShift,totalCashSales:(Number(activeShift.totalCashSales)||0)+Math.max(0,cashPaid),totalOtherSales:(Number(activeShift.totalOtherSales)||0)+otherPaid,expectedCash:(Number(activeShift.expectedCash)||0)+Math.max(0,cashPaid)};await putInStore('shifts',updatedShift);}
         // Update the open screen from the already-saved local data; no full database reload and no cloud wait.
         setInvoices(prev => [invoice, ...prev.filter(x => x.id !== invoice.id)]);

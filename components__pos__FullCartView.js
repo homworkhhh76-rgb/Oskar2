@@ -73,10 +73,10 @@ export const FullCartView = ({ onOpenPayment, onToggleLayout }) => {
       )).slice(0, 8)
     : [];
 
-  const customerOptions = [...customers]
-    .filter((c) => !c.deletedAt)
-    .sort((a,b) => (a.id === 'cust-walkin' ? -1 : b.id === 'cust-walkin' ? 1 : String(a.name||'').localeCompare(String(b.name||''),'ar')))
-    .map((c) => ({ id:c.id, label:c.id === 'cust-walkin' ? 'زبون عام نقدي' : c.name, subLabel:c.id === 'cust-walkin' ? 'بيع نقدي مباشر' : (c.phone || undefined), badge:c.balance > 0 ? `دين: ${c.balance}` : undefined }));
+  const customerOptions = [
+    { id:'cust-walkin', label:'عميل نقدي', subLabel:'الافتراضي للبيع النقدي المباشر' },
+    ...[...customers].filter((c)=>c && c.id!=='cust-walkin' && !c.deletedAt).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'ar')).map((c)=>({ id:c.id, label:c.name, subLabel:c.phone || undefined, badge:c.balance > 0 ? `دين: ${c.balance}` : undefined }))
+  ];
 
   const addQuickCustomer = async (e) => {
     e.preventDefault();
@@ -104,7 +104,7 @@ export const FullCartView = ({ onOpenPayment, onToggleLayout }) => {
         )
       ),
       h('div', { className: 'flex items-center gap-2 min-w-0' },
-        h('div', { className: 'w-56 max-w-[55vw]' }, h(SearchableDropdown, { id:'full-cart-customer-select', options:customerOptions, selectedId:selectedCustomer?.id, onSelect:(id)=>{const found=customers.find((c)=>c.id===id);if(found)setSelectedCustomer(found);}, icon:h(User,{className:'w-4 h-4'}), placeholder:'اختر العميل...' })),
+        h('div', { className: 'w-56 max-w-[55vw]' }, h(SearchableDropdown, { id:'full-cart-customer-select', options:customerOptions, selectedId:selectedCustomer?.id, onSelect:(id)=>{if(id==='cust-walkin')setSelectedCustomer({id:'cust-walkin',name:'عميل نقدي',balance:0,priceList:'retail',isVirtual:true});else{const found=customers.find((c)=>c.id===id);if(found)setSelectedCustomer(found);}}, icon:h(User,{className:'w-4 h-4'}), placeholder:'اختر العميل...' })),
         h('button',{type:'button',onClick:()=>setShowQuickCustomer(true),className:'shrink-0 w-9 h-9 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 flex items-center justify-center hover:bg-emerald-100',title:'إضافة عميل جديد'},h(UserPlus,{className:'w-4 h-4'})),
         h('button', { type: 'button', onClick: onToggleLayout, className: 'flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold' }, h(LayoutGrid, { className: 'w-4 h-4 text-emerald-600' }), h('span', { className: 'hidden sm:inline' }, 'عرض مقسم'))
       )
