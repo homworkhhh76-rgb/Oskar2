@@ -1,9 +1,10 @@
 /* Oscar Accounting Cloud Sync v2 - IndexedDB durable queue, tenant isolated, local-first delta sync */
 (()=>{'use strict';
-const VERSION='OscarSyncV2-IDB';
-const STORES=new Set(['products','categories','warehouses','stock','stock_movements','invoices','purchases','customers','suppliers','partner_statements','accounts','transfers','expenses','shifts','audit_logs','held_invoices','settings','vouchers','employees']);
-const META_PREFIX='oscar_sync_meta_v2::', LEGACY_PENDING_PREFIX='oscar_sync_pending_v1::', DEVICE_KEY='oscar_sync_device_v1';
-let bridge=null, initialized=false, busy=false, suppress=false, syncTimer=null, probeTimer=null, bc=null, schemaTenant='', seq=0, lastProbe=0;
+const VERSION='OscarSyncV3-RestaurantRealtime';
+const STORES=new Set(['products','categories','warehouses','stock','stock_movements','invoices','purchases','customers','suppliers','partner_statements','accounts','transfers','expenses','shifts','audit_logs','held_invoices','settings','vouchers','employees','restaurant_tables','restaurant_sections','restaurant_orders','kitchen_sections','table_reservations','recipes','waste_records']);
+const REALTIME_STORES=new Set(['restaurant_tables','restaurant_sections','restaurant_orders','kitchen_sections','table_reservations','recipes','waste_records']);
+const META_PREFIX='oscar_sync_meta_v2::', LEGACY_PENDING_PREFIX='oscar_sync_pending_v1::', DEVICE_KEY='oscar_sync_device_v1', RT_SEEN_PREFIX='oscar_rt_seen_v3::';
+let bridge=null, initialized=false, busy=false, suppress=false, syncTimer=null, probeTimer=null, bc=null, schemaTenant='', seq=0, lastProbe=0, lastRealtimePull=0, realtimePullBusy=false, rerunRequested=false;
 let pendingCache=null, pendingHydrated=false, hydratePromise=null;
 const safe=v=>String(v??'').trim();
 const clone=v=>v==null?v:JSON.parse(JSON.stringify(v));
@@ -12,6 +13,9 @@ const cfg=()=>window.OscarActivation?.readDatabaseAccess?.(tenant())||window.Osc
 function deviceId(){let x=localStorage.getItem(DEVICE_KEY);if(!x){x='DEV-'+(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));localStorage.setItem(DEVICE_KEY,x)}return x}
 function metaKey(t=tenant()){return META_PREFIX+encodeURIComponent(t||'none')}
 function legacyPendingKey(t=tenant()){return LEGACY_PENDING_PREFIX+encodeURIComponent(t||'none')}
+function realtimeSeenKey(t=tenant()){return RT_SEEN_PREFIX+encodeURIComponent(t||'none')}
+function readRealtimeSeen(){try{return JSON.parse(localStorage.getItem(realtimeSeenKey())||'{}')}catch(_){return{}}}
+function writeRealtimeSeen(v){try{localStorage.setItem(realtimeSeenKey(),JSON.stringify(v||{}))}catch(_){}}
 function readMeta(){try{return JSON.parse(localStorage.getItem(metaKey())||'{}')}catch(_){return{}}}
 function writeMeta(m){try{localStorage.setItem(metaKey(),JSON.stringify(m||{}))}catch(_){}}
 function readLegacyPending(){try{return JSON.parse(localStorage.getItem(legacyPendingKey())||'{}')}catch(_){return{}}}
@@ -74,11 +78,76 @@ async function captureStoreChange(store,value,{deleted=false,key}={}){
   const k=keyString(store,value,key);if(!k)return false;
   const rev=nextRev(),id=pk(store,k),op={store,key:k,deleted:!!deleted,value:deleted?null:clone(value),rev,deviceId:deviceId(),timestamp:Date.now(),attempts:0};
   await persistPendingOp(id,op);
-  broadcast('local-change');requestSync(80);return true;
+  const realtime=REALTIME_STORES.has(store)||(store==='settings'&&k==='store_config');
+  broadcast('local-change');
+  requestSync(realtime?15:80);
+  // Restaurant/settings operations should leave the device immediately.
+  // Use a compact single-record flush first; the durable queue remains the fallback.
+  if(realtime&&navigator.onLine!==false){
+    Promise.resolve().then(()=>flushRealtimeOp(id,op)).catch(()=>requestSync(60));
+  }
+  return true;
 }
 async function ensureSchema(){const t=tenant(),d=window.OscarActivation?.tursoDirect,c=cfg();if(!t||!d||!c?.databaseURL||!c?.authToken)throw Error('بيانات مزامنة الشركة غير متاحة.');const table=d.table(c),metaTable=table+'_syncmeta';if(schemaTenant===t)return{d,c,table,metaTable};await d.ensure(c);const[info]=await d.pipeline(c,[{sql:`PRAGMA table_info(${table})`,args:[]}]);const cols=d.rows(info).map(x=>String(x.name));if(!cols.includes('sync_batch')){try{await d.pipeline(c,[{sql:`ALTER TABLE ${table} ADD COLUMN sync_batch INTEGER NOT NULL DEFAULT 0`,args:[]}])}catch(e){if(!/duplicate column|already exists/i.test(String(e?.message||e)))throw e}}await d.pipeline(c,[{sql:`CREATE TABLE IF NOT EXISTS ${metaTable} (id INTEGER PRIMARY KEY CHECK(id=1),batch INTEGER NOT NULL DEFAULT 0)`,args:[]},{sql:`INSERT OR IGNORE INTO ${metaTable}(id,batch) VALUES(1,0)`,args:[]},{sql:`CREATE INDEX IF NOT EXISTS idx_${table}_sync_batch ON ${table}(sync_batch,path)`,args:[]}]);schemaTenant=t;return{d,c,table,metaTable}}
 async function remoteBatch(s){const[r]=await s.d.pipeline(s.c,[{sql:`SELECT batch FROM ${s.metaTable} WHERE id=1`,args:[]}]);return Number(s.d.rows(r)[0]?.batch||0)}
-function buildStatements(s,batch){const st=[{sql:'BEGIN IMMEDIATE',args:[]},{sql:`UPDATE ${s.metaTable} SET batch=batch+1 WHERE id=1`,args:[]}];for(const[id,o]of batch){const env={v:o.deleted?null:o.value,deleted:!!o.deleted,rev:Number(o.rev||nextRev()),deviceId:o.deviceId||deviceId()};st.push({sql:`INSERT INTO ${s.table}(path,payload,deleted,updated_at,sync_batch) VALUES(?,?,?,?,(SELECT batch FROM ${s.metaTable} WHERE id=1)) ON CONFLICT(path) DO UPDATE SET payload=excluded.payload,deleted=excluded.deleted,updated_at=excluded.updated_at,sync_batch=excluded.sync_batch WHERE excluded.updated_at>=${s.table}.updated_at`,args:[pathFor(o.store,o.key),JSON.stringify(env),o.deleted?1:0,Number(o.rev||nextRev())]})}st.push({sql:'COMMIT',args:[]});return st}
+function buildStatements(s,batch){const st=[{sql:`UPDATE ${s.metaTable} SET batch=batch+1 WHERE id=1`,args:[]}];for(const[id,o]of batch){const env={v:o.deleted?null:o.value,deleted:!!o.deleted,rev:Number(o.rev||nextRev()),deviceId:o.deviceId||deviceId()};st.push({sql:`INSERT INTO ${s.table}(path,payload,deleted,updated_at,sync_batch) VALUES(?,?,?,?,(SELECT batch FROM ${s.metaTable} WHERE id=1)) ON CONFLICT(path) DO UPDATE SET payload=excluded.payload,deleted=excluded.deleted,updated_at=excluded.updated_at,sync_batch=excluded.sync_batch WHERE excluded.updated_at>=${s.table}.updated_at`,args:[pathFor(o.store,o.key),JSON.stringify(env),o.deleted?1:0,Number(o.rev||nextRev())]})}return st}
+async function flushRealtimeOp(id,op){
+  if(!op||navigator.onLine===false||!tenant())return false;
+  const s=await ensureSchema();
+  try{
+    await s.d.pipeline(s.c,buildStatements(s,[[id,op]]),30000);
+    await removePendingOp(id,op.rev);
+    broadcast('synced');
+    emitStatus({state:'realtime-pushed',realtimeStore:op.store});
+    return true;
+  }catch(e){
+    console.warn('[OscarSync] realtime push fallback queued',e);
+    return false;
+  }
+}
+function realtimePaths(){
+  const pre=prefix(), ranges=[];
+  for(const store of REALTIME_STORES){const p=pre+encodeURIComponent(store)+'/';ranges.push([p,p+'\uffff']);}
+  return ranges;
+}
+async function pullRealtimeSnapshot({force=false}={}){
+  if(realtimePullBusy||!bridge||!tenant()||navigator.onLine===false||document.visibilityState==='hidden')return{applied:0};
+  const now=Date.now();if(!force&&now-lastRealtimePull<2200)return{applied:0};lastRealtimePull=now;realtimePullBusy=true;
+  try{
+    await hydratePending();
+    const s=await ensureSchema(),ranges=realtimePaths(),parts=[],args=[];
+    for(const [lo,hi] of ranges){parts.push('(path>=? AND path<?)');args.push(lo,hi);}
+    const settingsPath=pathFor('settings','store_config');parts.push('path=?');args.push(settingsPath);
+    const [r]=await s.d.pipeline(s.c,[{sql:`SELECT path,payload,deleted,updated_at,sync_batch FROM ${s.table} WHERE ${parts.join(' OR ')} ORDER BY path`,args}],45000);
+    const rows=s.d.rows(r),pending=readPending(),seen=readRealtimeSeen();let applied=0;const touched=new Set();
+    suppress=true;
+    try{
+      for(const row of rows){
+        const parsed=parsePath(row.path);if(!parsed)continue;
+        const isRelevant=REALTIME_STORES.has(parsed.store)||(parsed.store==='settings'&&parsed.key==='store_config');if(!isRelevant)continue;
+        let env=null;try{env=typeof row.payload==='string'?JSON.parse(row.payload):row.payload}catch(_){env=null}
+        const remoteRev=Number(row.updated_at||env?.rev||0),id=pk(parsed.store,parsed.key),local=pending[id];
+        if(local&&Number(local.rev||0)>remoteRev)continue;
+        if(!force&&Number(seen[row.path]||0)>=remoteRev)continue;
+        const deleted=Number(row.deleted)===1||env?.deleted===true;
+        if(deleted)await bridge.deleteFromStore(parsed.store,actualKey(parsed.store,parsed.key),false);
+        else if(env&&Object.prototype.hasOwnProperty.call(env,'v'))await bridge.putInStore(parsed.store,env.v,false);
+        else if(env!=null)await bridge.putInStore(parsed.store,env,false);
+        else continue;
+        seen[row.path]=remoteRev||Date.now();applied++;touched.add(parsed.store);
+      }
+    }finally{suppress=false}
+    writeRealtimeSeen(seen);
+    if(applied){
+      try{await bridge.onApplied?.([...touched])}catch(_){}
+      try{window.dispatchEvent(new CustomEvent('oscar:sync-applied',{detail:{applied,stores:[...touched],realtime:true}}))}catch(_){}
+      broadcast('synced');
+    }
+    return{applied,changedStores:[...touched],remoteRows:rows.length,realtime:true};
+  }catch(e){
+    console.warn('[OscarSync] realtime pull warning',e);return{applied:0,error:true,message:String(e?.message||e)};
+  }finally{realtimePullBusy=false}
+}
 async function pushPending(){
   await hydratePending();const all=Object.entries(readPending());if(!all.length)return{uploaded:0,remaining:0};const s=await ensureSchema();let uploaded=0;
   for(let i=0;i<all.length;i+=60){const batch=all.slice(i,i+60);try{
@@ -90,16 +159,16 @@ async function pushPending(){
 }
 async function applyRows(rows,batch){if(!bridge)return{applied:0};await hydratePending();const pending=readPending();let applied=0;const touched=new Set();suppress=true;try{for(const row of rows){const parsed=parsePath(row.path);if(!parsed||!STORES.has(parsed.store))continue;let env=null;try{env=typeof row.payload==='string'?JSON.parse(row.payload):row.payload}catch(_){env=null}const remoteRev=Number(row.updated_at||env?.rev||0),id=pk(parsed.store,parsed.key),local=pending[id];if(local&&Number(local.rev||0)>remoteRev)continue;const deleted=Number(row.deleted)===1||env?.deleted===true;if(deleted)await bridge.deleteFromStore(parsed.store,actualKey(parsed.store,parsed.key),false);else if(env&&Object.prototype.hasOwnProperty.call(env,'v'))await bridge.putInStore(parsed.store,env.v,false);else continue;applied++;touched.add(parsed.store)}}finally{suppress=false}const m=readMeta();m.remoteBatch=Math.max(Number(m.remoteBatch||0),Number(batch||0));m.batchInitialized=true;m.lastPullAt=Date.now();writeMeta(m);if(applied){try{await bridge.onApplied?.([...touched])}catch(_){}try{window.dispatchEvent(new CustomEvent('oscar:sync-applied',{detail:{applied,stores:[...touched],remoteBatch:batch}}))}catch(_){}broadcast('synced')}return{applied,changedStores:[...touched]}}
 async function pullChanges({force=false}={}){const s=await ensureSchema(),m=readMeta(),remote=await remoteBatch(s),last=Number(m.remoteBatch||0),pre=prefix(),hi=pre+'\uffff';if(!force&&m.batchInitialized&&remote<=last)return{applied:0,remoteBatch:remote,remoteRows:0};let r;if(!m.batchInitialized||(force&&last===0)){[r]=await s.d.pipeline(s.c,[{sql:`SELECT path,payload,deleted,updated_at,sync_batch FROM ${s.table} WHERE path>=? AND path<? ORDER BY path`,args:[pre,hi]}],60000)}else{[r]=await s.d.pipeline(s.c,[{sql:`SELECT path,payload,deleted,updated_at,sync_batch FROM ${s.table} WHERE path>=? AND path<? AND sync_batch>? ORDER BY sync_batch,path`,args:[pre,hi,last]}],60000)}const rows=s.d.rows(r);const out=await applyRows(rows,remote);if(!rows.length){m.remoteBatch=remote;m.batchInitialized=true;m.lastPullAt=Date.now();writeMeta(m)}return{...out,remoteBatch:remote,remoteRows:rows.length}}
-async function syncNow({manual=false,force=false}={}){await hydratePending().catch(()=>{});if(busy)return{busy:true,remaining:pendingCount()};if(!tenant())return{unavailable:true};if(navigator.onLine===false){emitStatus({state:'offline'});return{offline:true,remaining:pendingCount()}}busy=true;emitStatus({state:'syncing'});try{const pushed=pendingCount()?await pushPending():{uploaded:0,remaining:0};const pulled=await pullChanges({force:!!force});const result={...pushed,...pulled,remaining:pendingCount(),success:true};emitStatus({state:'success',lastSuccessAt:Date.now(),result});return result}catch(e){console.error('[OscarSync]',e);emitStatus({state:'error',message:String(e?.message||e)});return{error:true,message:String(e?.message||e),remaining:pendingCount()}}finally{busy=false;emitStatus()}}
+async function syncNow({manual=false,force=false}={}){await hydratePending().catch(()=>{});if(busy){rerunRequested=true;return{busy:true,remaining:pendingCount()}}if(!tenant())return{unavailable:true};if(navigator.onLine===false){emitStatus({state:'offline'});return{offline:true,remaining:pendingCount()}}busy=true;emitStatus({state:'syncing'});try{const pushed=pendingCount()?await pushPending():{uploaded:0,remaining:0};const pulled=await pullChanges({force:!!force});const rt=await pullRealtimeSnapshot({force:!!force});const changedStores=[...new Set([...(pulled.changedStores||[]),...(rt.changedStores||[])])];const result={...pushed,...pulled,realtimeApplied:Number(rt.applied||0),changedStores,remaining:pendingCount(),success:true};emitStatus({state:'success',lastSuccessAt:Date.now(),result});return result}catch(e){console.error('[OscarSync]',e);emitStatus({state:'error',message:String(e?.message||e)});return{error:true,message:String(e?.message||e),remaining:pendingCount()}}finally{busy=false;emitStatus();if(rerunRequested||pendingCount()){rerunRequested=false;requestSync(25)}}}
 function requestSync(delay=120){if(!tenant()||navigator.onLine===false)return;clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncNow({force:false}).catch(()=>{}),Math.max(60,delay))}
-async function checkRemote({force=false}={}){if(busy||!tenant()||navigator.onLine===false||document.visibilityState==='hidden')return;const now=Date.now();if(!force&&now-lastProbe<1200)return;lastProbe=now;if(pendingCount())return syncNow({force:false});try{const s=await ensureSchema(),r=await remoteBatch(s),m=readMeta();if(!m.batchInitialized||r>Number(m.remoteBatch||0))return syncNow({force:false})}catch(e){emitStatus({state:'error',message:String(e?.message||e)})}}
-function startProbe(){if(probeTimer)return;const tick=async()=>{try{await checkRemote()}catch(_){}probeTimer=setTimeout(tick,1300)};probeTimer=setTimeout(tick,800)}
-async function initialize(opts={}){bridge=opts.bridge||bridge;if(!tenant()||!bridge)return{tenant:tenant(),unavailable:true};initialized=true;await hydratePending();setupBroadcast();startProbe();emitStatus({state:'ready'});if(navigator.onLine===false)return{tenant:tenant(),offline:true,remoteRows:0,remaining:pendingCount()};const pulled=await pullChanges({force:!readMeta().batchInitialized});if(pendingCount())requestSync(80);return{tenant:tenant(),...pulled,remaining:pendingCount()}}
+async function checkRemote({force=false}={}){if(busy||!tenant()||navigator.onLine===false||document.visibilityState==='hidden')return;const now=Date.now();if(!force&&now-lastProbe<350)return;lastProbe=now;if(pendingCount())return syncNow({force:false});try{const s=await ensureSchema(),r=await remoteBatch(s),m=readMeta();if(!m.batchInitialized||r>Number(m.remoteBatch||0))return syncNow({force:false});return pullRealtimeSnapshot({force:!!force})}catch(e){emitStatus({state:'error',message:String(e?.message||e)})}}
+function startProbe(){if(probeTimer)return;const tick=async()=>{try{await checkRemote()}catch(_){}probeTimer=setTimeout(tick,500)};probeTimer=setTimeout(tick,80)}
+async function initialize(opts={}){bridge=opts.bridge||bridge;if(!tenant()||!bridge)return{tenant:tenant(),unavailable:true};initialized=true;await hydratePending();setupBroadcast();startProbe();emitStatus({state:'ready'});if(navigator.onLine===false)return{tenant:tenant(),offline:true,remoteRows:0,remaining:pendingCount()};const pulled=await pullChanges({force:!readMeta().batchInitialized});const rt=await pullRealtimeSnapshot({force:true});if(pendingCount())requestSync(80);return{tenant:tenant(),...pulled,realtimeApplied:Number(rt.applied||0),changedStores:[...new Set([...(pulled.changedStores||[]),...(rt.changedStores||[])])],remaining:pendingCount()}}
 function setupBroadcast(){try{bc?.close?.();bc='BroadcastChannel'in window?new BroadcastChannel('oscar-cloud-sync-v2'):null;if(bc)bc.onmessage=e=>{const m=e.data||{};if(m.tenant!==tenant()||m.deviceId===deviceId())return;if(m.type==='local-change'||m.type==='synced')setTimeout(()=>checkRemote({force:true}),m.type==='synced'?20:120)}}catch(_){bc=null}}
-function resetForTenant(){schemaTenant='';lastProbe=0;pendingCache=null;pendingHydrated=false;hydratePromise=null;setupBroadcast();if(bridge)hydratePending().catch(()=>{});emitStatus({state:'tenant-reset'})}
+function resetForTenant(){schemaTenant='';lastProbe=0;lastRealtimePull=0;rerunRequested=false;pendingCache=null;pendingHydrated=false;hydratePromise=null;setupBroadcast();if(bridge)hydratePending().catch(()=>{});emitStatus({state:'tenant-reset'})}
 window.addEventListener('online',()=>{emitStatus({state:'online'});pendingCount()?requestSync(40):checkRemote({force:true})});
 window.addEventListener('offline',()=>emitStatus({state:'offline'}));
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(()=>checkRemote({force:true}),100)});
 window.addEventListener('focus',()=>checkRemote({force:true}));
-window.OscarCloudSync={version:VERSION,initialize,syncNow,checkRemote,requestSync,pendingCount,pendingItems,captureStoreChange,resetForTenant,get busy(){return busy},get suppress(){return suppress}};
+window.OscarCloudSync={version:VERSION,initialize,syncNow,checkRemote,pullRealtimeNow:(opts={})=>pullRealtimeSnapshot({force:true,...opts}),requestSync,pendingCount,pendingItems,captureStoreChange,resetForTenant,get busy(){return busy},get suppress(){return suppress}};
 })();

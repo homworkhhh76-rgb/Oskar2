@@ -1,0 +1,9 @@
+Oscar Accounting POS v7.9.4.6
+
+- Employee add/edit modal is bounded below the 56px app header and above the 64px mobile bottom navigation, with its own vertical scroll.
+- Oscar AI chat/voice is restricted to: create purchase invoice, add customer, receipt/payment vouchers, reports/analysis, and sales returns.
+- Removed the Undo button and undo command from the AI conversation.
+- Added PDF upload beside image upload in Oscar AI chat and Purchase AI Scan.
+- Local PDFs are sent to OpenRouter as type=file with a base64 data URL; images continue as image_url.
+- Optional fields are not requested; only mandatory data can trigger a follow-up.
+- Cache/build bumped to 7.9.4.9-flat-notifications-pagination.

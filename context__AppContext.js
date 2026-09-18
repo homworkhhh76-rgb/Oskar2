@@ -1,8 +1,8 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, migrateLegacyDatabaseIfNeeded, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js';
-import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js';
-import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js';
+import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, migrateLegacyDatabaseIfNeeded, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.11-notifications-popup';
+import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.11-notifications-popup';
+import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.11-notifications-popup';
 const AppContext = createContext(null);
 const recordTime = (item = {}) => {
     const fields = ['createdAt', 'date', 'timestamp', 'startTime', 'updatedAt'];
@@ -16,8 +16,16 @@ const recordTime = (item = {}) => {
     return idMatch ? Number(idMatch[1]) : 0;
 };
 const newestFirst = (items = []) => [...(items || [])].sort((a, b) => recordTime(b) - recordTime(a));
+const normalizeCurrencySettings = (value) => {
+    if (!value) return value;
+    const currency = String(value.currency || '').trim().toUpperCase();
+    const symbol = String(value.currencySymbol || '').trim();
+    if (currency === 'ILS' && symbol === '₪') return value;
+    return { ...value, currency: 'ILS', currencySymbol: '₪' };
+};
 export const AppProvider = ({ children }) => {
     const [isLoaded, setIsLoaded] = useState(false);
+    const [isCloudReady, setIsCloudReady] = useState(false);
     // Database state
     const [products, setProducts] = useState([]);
     const [categories, setCategories] = useState([]);
@@ -135,8 +143,13 @@ export const AppProvider = ({ children }) => {
                 const loginAccountId = window.OscarActivation?.readRuntime?.()?.account?.id;
                 setActiveEmployee((prev) => emps.find((e) => e.id === loginAccountId) || emps.find((e) => e.id === prev.id) || emps[0]);
             }
-            if (sett)
-                setSettings(sett);
+            if (sett) {
+                const normalizedSettings = normalizeCurrencySettings(sett);
+                setSettings(normalizedSettings);
+                if (normalizedSettings.currency !== sett.currency || normalizedSettings.currencySymbol !== sett.currencySymbol) {
+                    await putInStore('settings', { key: 'store_config', ...normalizedSettings });
+                }
+            }
             // Cash customer is virtual and always the POS fallback; it is never taken from the customers table.
             setSelectedCustomer((prev) => {
                 if (!prev || prev.id === CASH_CUSTOMER.id) return CASH_CUSTOMER;
@@ -174,13 +187,21 @@ export const AppProvider = ({ children }) => {
         if (wanted.has('partner_statements')) jobs.push(getAllFromStore('partner_statements').then(v => setPartnerStatements(newestFirst(v))));
         if (wanted.has('vouchers')) jobs.push(getAllFromStore('vouchers').then(v => setVouchers((v || []).sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()))));
         if (wanted.has('employees')) jobs.push(getAllFromStore('employees').then(v => { if(v?.length){ setEmployees(newestFirst(v)); const loginId=window.OscarActivation?.readRuntime?.()?.account?.id; setActiveEmployee(prev => v.find(e=>e.id===loginId)||v.find(e=>e.id===prev?.id)||v[0]); } }));
-        if (wanted.has('settings')) jobs.push(getFromStore('settings','store_config').then(v => { if(v) setSettings(v); }));
+        if (wanted.has('settings')) jobs.push(getFromStore('settings','store_config').then(async v => {
+            if (!v) return;
+            const normalizedSettings = normalizeCurrencySettings(v);
+            setSettings(normalizedSettings);
+            if (normalizedSettings.currency !== v.currency || normalizedSettings.currencySymbol !== v.currencySymbol) {
+                await putInStore('settings', { key: 'store_config', ...normalizedSettings });
+            }
+        }));
         if (wanted.has('sync_queue')) jobs.push(Promise.resolve().then(()=>setSyncQueue(window.OscarCloudSync?.pendingItems?.() || [])));
         await Promise.allSettled(jobs);
     }, []);
     // Initial load with guaranteed fallback
     useEffect(() => {
         let isMounted = true;
+        setIsCloudReady(false);
         // Safety timeout: Never let the app hang on the loading screen
         const safetyTimer = setTimeout(() => {
             if (isMounted) {
@@ -202,6 +223,7 @@ export const AppProvider = ({ children }) => {
                     }
                 });
             } catch (syncError) { console.warn('Cloud sync bootstrap warning:', syncError); }
+            if (isMounted) setIsCloudReady(true);
             // Remove the old persisted walk-in customer. Cash customer is now virtual POS-only.
             try {
                 const oldWalkIn = await getFromStore('customers', CASH_CUSTOMER.id);
@@ -227,11 +249,17 @@ export const AppProvider = ({ children }) => {
         })
             .catch((err) => {
             console.warn('Database initialization warning:', err);
-            if (isMounted) setIsLoaded(true);
+            if (isMounted) {
+                setIsCloudReady(true);
+                setIsLoaded(true);
+            }
         })
             .finally(() => {
             clearTimeout(safetyTimer);
-            if (isMounted) setIsLoaded(true);
+            if (isMounted) {
+                setIsCloudReady(true);
+                setIsLoaded(true);
+            }
         });
         // Cross-tab real-time listener
         if (syncChannel) {
@@ -441,6 +469,9 @@ export const AppProvider = ({ children }) => {
         for (const prod of products) {
             if (prod.status === 'archived' || prod.deletedAt)
                 continue;
+            const salesChannel = String(prod.salesChannel || 'both').toLowerCase();
+            if (salesChannel === 'restaurant' || salesChannel === 'restaurant_only' || salesChannel === 'raw_material' || salesChannel === 'raw' || salesChannel === 'ingredient' || prod.isRawMaterialOnly)
+                continue;
             const matchedUnit = findUnitByBarcode(prod, clean);
             if (matchedUnit) {
                 addToCart(prod, matchedUnit, 1);
@@ -453,13 +484,17 @@ export const AppProvider = ({ children }) => {
         return false;
     }, [products, addToCart, showToast, settings.scannerBeepEnabled]);
     // Create Sale Invoice (invoice discount + FIFO cost consumption)
-    const createSaleInvoice = useCallback(async (payload) => {
-        if (cart.length === 0) { showToast('السلة فارغة!', 'error'); return null; }
+    const createSaleInvoice = useCallback(async (payload = {}) => {
+        const isDirectSale = Array.isArray(payload.items) && payload.items.length > 0;
+        const saleCart = isDirectSale ? payload.items : cart;
+        if (saleCart.length === 0) { showToast('السلة فارغة!', 'error'); return null; }
         const warehouseId = settings.activeWarehouseId;
         const warehouse = warehouses.find((w) => w.id === warehouseId) || warehouses[0];
         const now = new Date().toISOString();
         const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
         const syncId = `sale-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        const recipes = await getAllFromStore('recipes').catch(() => []);
+        const recipeByProductId = new Map((recipes || []).map((r) => [r.productId || r.mealProductId, r]).filter((x) => x[0]));
         let subtotal = 0, lineDiscountTotal = 0, taxTotal = 0;
         const productCopies = products.map(p => ({...p, fifoBatches: Array.isArray(p.fifoBatches) ? p.fifoBatches.map(b=>({...b})) : []}));
         const consumeFifo = (productId, baseQty, fallbackBaseCost) => {
@@ -478,7 +513,7 @@ export const AppProvider = ({ children }) => {
             if (left > 0) totalCost += left * fallbackBaseCost;
             return totalCost;
         };
-        const invoiceItems = cart.map((item) => {
+        const invoiceItems = saleCart.map((item) => {
             const lineSubtotal = item.quantity * item.unitPrice;
             const lineDiscount = 0;
             const lineTax = lineSubtotal * (item.taxRate / 100);
@@ -486,12 +521,50 @@ export const AppProvider = ({ children }) => {
             subtotal += lineSubtotal; lineDiscountTotal += 0; taxTotal += lineTax;
             const baseQuantity = item.quantity * item.conversionFactor;
             const fallbackBaseCost = item.conversionFactor ? (item.costPriceAtSale / item.conversionFactor) : item.costPriceAtSale;
-            const fifoLineCost = consumeFifo(item.productId, baseQuantity, fallbackBaseCost || 0);
-            return { id:'item-'+Math.random().toString(36).substring(2,9), productId:item.productId, productName:item.productName, unitId:item.unitId, unitName:item.unitName, quantity:item.quantity, conversionFactor:item.conversionFactor, baseQuantity, unitPrice:item.unitPrice, discount:0, taxRate:item.taxRate, total:lineTotal, fifoCostTotal:fifoLineCost, costPriceAtSale:item.quantity>0?fifoLineCost/item.quantity:0 };
+            const recipe = recipeByProductId.get(item.productId);
+            const recipeConsumption = [];
+            let fifoLineCost = 0;
+            if (recipe && Array.isArray(recipe.ingredients || recipe.items) && (recipe.ingredients || recipe.items).length > 0) {
+                const ingredients = recipe.ingredients || recipe.items;
+                for (const ing of ingredients) {
+                    const ingProduct = productCopies.find((p) => p.id === ing.ingredientProductId || p.id === ing.productId);
+                    if (!ingProduct) continue;
+                    const ingUnits = ingProduct.units || [];
+                    const ingUnit = ingUnits.find((u) => u.id === (ing.ingredientUnitId || ing.unitId)) || ingUnits.find((u) => u.name === ing.unit) || ingUnits.find((u) => u.id === ingProduct.baseUnitId) || ingUnits.find((u) => (Number(u.conversionToBase) || 1) === 1) || ingUnits[0];
+                    const factor = Number(ing.conversionFactor ?? ingUnit?.conversionToBase ?? 1) || 1;
+                    const qtyPerMeal = Number(ing.quantity) || 0;
+                    const basePerMeal = Number(ing.baseQuantity) > 0 ? Number(ing.baseQuantity) : qtyPerMeal * factor;
+                    const requiredBaseQty = basePerMeal * item.quantity;
+                    if (requiredBaseQty <= 0) continue;
+                    const ingredientBaseCost = Number(ingProduct.costPrice) || (Number(ingUnit?.costPrice) / Math.max(1, Number(ingUnit?.conversionToBase) || 1)) || 0;
+                    const cost = consumeFifo(ingProduct.id, requiredBaseQty, ingredientBaseCost);
+                    fifoLineCost += cost;
+                    recipeConsumption.push({
+                        recipeId: recipe.id,
+                        productId: ingProduct.id,
+                        productName: ingProduct.name,
+                        unitId: ingUnit?.id || '',
+                        unitName: ingUnit?.name || ing.unit || ingProduct.baseUnitName || 'وحدة',
+                        quantityPerMeal: qtyPerMeal,
+                        conversionFactor: factor,
+                        baseQuantityPerMeal: basePerMeal,
+                        soldMealQuantity: item.quantity,
+                        baseQuantity: requiredBaseQty,
+                        fifoCostTotal: cost,
+                    });
+                }
+                if (recipeConsumption.length === 0) {
+                    fifoLineCost = consumeFifo(item.productId, baseQuantity, fallbackBaseCost || 0);
+                }
+            } else {
+                fifoLineCost = consumeFifo(item.productId, baseQuantity, fallbackBaseCost || 0);
+            }
+            return { id:'item-'+Math.random().toString(36).substring(2,9), productId:item.productId, productName:item.productName, unitId:item.unitId, unitName:item.unitName, quantity:item.quantity, conversionFactor:item.conversionFactor, baseQuantity, unitPrice:item.unitPrice, discount:0, taxRate:item.taxRate, total:lineTotal, fifoCostTotal:fifoLineCost, costPriceAtSale:item.quantity>0?fifoLineCost/item.quantity:0, isManufacturedMeal:recipeConsumption.length>0, recipeId:recipe?.id, recipeConsumption };
         });
         const beforeInvoiceDiscount = Math.max(0, subtotal - lineDiscountTotal + taxTotal);
-        const rawDiscount = Number(invoiceDiscountValue)||0;
-        const invoiceDiscountAmount = invoiceDiscountType === 'percent' ? Math.min(beforeInvoiceDiscount, beforeInvoiceDiscount*Math.max(0,Math.min(100,rawDiscount))/100) : Math.min(beforeInvoiceDiscount,Math.max(0,rawDiscount));
+        const effectiveDiscountType = payload.invoiceDiscountType || invoiceDiscountType;
+        const rawDiscount = Number(payload.invoiceDiscountValue ?? invoiceDiscountValue)||0;
+        const invoiceDiscountAmount = effectiveDiscountType === 'percent' ? Math.min(beforeInvoiceDiscount, beforeInvoiceDiscount*Math.max(0,Math.min(100,rawDiscount))/100) : Math.min(beforeInvoiceDiscount,Math.max(0,rawDiscount));
         const discountTotal = lineDiscountTotal + invoiceDiscountAmount;
         const rawGrandTotal = Math.max(0, beforeInvoiceDiscount - invoiceDiscountAmount);
         const grandTotal = settings.scaleModeEnabled ? Math.round(rawGrandTotal) : rawGrandTotal;
@@ -500,17 +573,34 @@ export const AppProvider = ({ children }) => {
         let paid = Number(payload.paidAmount)||0;
         const remaining = Math.max(0, grandTotal - paid);
         const change = Math.max(0, paid - grandTotal);
-        const saleCustomer = selectedCustomer || CASH_CUSTOMER;
+        const saleCustomer = payload.forceCashCustomer ? CASH_CUSTOMER : (payload.customerObject || (payload.customerId ? (customers.find((c) => c.id === payload.customerId) || selectedCustomer || CASH_CUSTOMER) : (selectedCustomer || CASH_CUSTOMER)));
         if ((payload.paymentType === 'debt' || payload.paymentType === 'partial') && saleCustomer.id === CASH_CUSTOMER.id) { showToast('يجب اختيار عميل مسجل للبيع الآجل أو الدفع الجزئي!', 'error'); return null; }
-        const invoice = { id:'inv-'+Date.now(), invoiceNumber, type:'sale', date:now, customerId:saleCustomer.id, customerName:saleCustomer.name, cashierId:currentUser.id, cashierName:currentUser.name, shiftId:activeShift?.id, branchId:settings.activeBranchName, warehouseId, items:invoiceItems, subtotal, lineDiscountTotal, invoiceDiscountType, invoiceDiscountValue:rawDiscount, invoiceDiscountAmount, discountTotal, taxTotal, roundingAdjustment, grandTotal, paidAmount:Math.min(paid,grandTotal), remainingAmount:remaining, changeAmount:change, paymentType:payload.paymentType, payments, status:'completed', notes:payload.notes, syncId, isSynced:false, createdAt:now };
+        const invoice = { id:'inv-'+Date.now(), invoiceNumber, type:'sale', date:now, customerId:saleCustomer.id, customerName:saleCustomer.name, cashierId:currentUser.id, cashierName:currentUser.name, shiftId:activeShift?.id, branchId:settings.activeBranchName, warehouseId, items:invoiceItems, subtotal, lineDiscountTotal, invoiceDiscountType:effectiveDiscountType, invoiceDiscountValue:rawDiscount, invoiceDiscountAmount, discountTotal, taxTotal, roundingAdjustment, grandTotal, paidAmount:Math.min(paid,grandTotal), remainingAmount:remaining, changeAmount:change, paymentType:payload.paymentType, payments, status:'completed', notes:payload.notes, syncId, isSynced:false, createdAt:now };
         await putInStore('invoices', invoice);
         const updatedStockList=[...stock], newMovements=[];
+        const deductStock = (productId, productName, baseQty, movementMeta = {}) => {
+            const stockIndex=updatedStockList.findIndex(s=>s.productId===productId&&s.warehouseId===warehouseId);
+            const currentQty=stockIndex>=0?Number(updatedStockList[stockIndex].baseQuantity)||0:0;
+            const newQty=currentQty-baseQty;
+            if(stockIndex>=0) updatedStockList[stockIndex]={...updatedStockList[stockIndex],baseQuantity:newQty}; else updatedStockList.push({productId,warehouseId,baseQuantity:newQty});
+            newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:now,productId,productName,warehouseId,warehouseName:warehouse?.name||'صالة العرض',type:movementMeta.type||'sale',unitName:movementMeta.unitName||'وحدة أساسية',quantityInUnit:movementMeta.quantityInUnit??baseQty,conversionFactor:movementMeta.conversionFactor||1,baseQuantityChange:-baseQty,newBaseBalance:newQty,referenceId:invoice.id,referenceType:'INVOICE',userId:currentUser.id,userName:currentUser.name,recipeId:movementMeta.recipeId,manufacturedProductId:movementMeta.manufacturedProductId,manufacturedProductName:movementMeta.manufacturedProductName});
+        };
         for (const item of invoiceItems) {
-            const stockIndex=updatedStockList.findIndex(s=>s.productId===item.productId&&s.warehouseId===warehouseId);
-            const currentQty=stockIndex>=0?updatedStockList[stockIndex].baseQuantity:0;
-            const newQty=currentQty-item.baseQuantity;
-            if(stockIndex>=0) updatedStockList[stockIndex]={...updatedStockList[stockIndex],baseQuantity:newQty}; else updatedStockList.push({productId:item.productId,warehouseId,baseQuantity:newQty});
-            newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:now,productId:item.productId,productName:item.productName,warehouseId,warehouseName:warehouse?.name||'صالة العرض',type:'sale',unitName:item.unitName,quantityInUnit:item.quantity,conversionFactor:item.conversionFactor,baseQuantityChange:-item.baseQuantity,newBaseBalance:newQty,referenceId:invoice.id,referenceType:'INVOICE',userId:currentUser.id,userName:currentUser.name});
+            if (item.isManufacturedMeal && Array.isArray(item.recipeConsumption) && item.recipeConsumption.length > 0) {
+                for (const ing of item.recipeConsumption) {
+                    deductStock(ing.productId, ing.productName, ing.baseQuantity, {
+                        type:'recipe_sale',
+                        unitName:ing.unitName,
+                        quantityInUnit:(Number(ing.quantityPerMeal)||0) * (Number(ing.soldMealQuantity)||0),
+                        conversionFactor:ing.conversionFactor,
+                        recipeId:item.recipeId,
+                        manufacturedProductId:item.productId,
+                        manufacturedProductName:item.productName,
+                    });
+                }
+            } else {
+                deductStock(item.productId, item.productName, item.baseQuantity, {type:'sale',unitName:item.unitName,quantityInUnit:item.quantity,conversionFactor:item.conversionFactor});
+            }
         }
         await bulkPut('stock',updatedStockList); await bulkPut('stock_movements',newMovements); await bulkPut('products',productCopies);
         const updatedAccounts=[...accounts];
@@ -525,12 +615,12 @@ export const AppProvider = ({ children }) => {
         setStockMovements(prev => [...newMovements, ...prev]);
         setProducts(productCopies);
         setAccounts(updatedAccounts);
-        if(updatedCustomer)setCustomers(prev => prev.map(c => c.id===updatedCustomer.id?updatedCustomer:c));
+        if(updatedCustomer)setCustomers(prev => prev.some(c=>c.id===updatedCustomer.id) ? prev.map(c => c.id===updatedCustomer.id?updatedCustomer:c) : [updatedCustomer,...prev]);
         if(customerStatement)setPartnerStatements(prev => [customerStatement, ...prev]);
         if(updatedShift)setShifts(prev => prev.map(x => x.id===updatedShift.id?updatedShift:x));
         setSyncQueue(window.OscarCloudSync?.pendingItems?.() || []);
-        playSuccessSound(settings.scannerBeepEnabled); clearCart(); showToast(`تم حفظ الفاتورة بنجاح [${invoiceNumber}]`,'success'); return invoice;
-    }, [cart, invoiceDiscountType, invoiceDiscountValue, settings, warehouses, products, selectedCustomer, currentUser, activeShift, stock, accounts, clearCart, showToast]);
+        playSuccessSound(settings.scannerBeepEnabled); if(!isDirectSale) clearCart(); showToast(`تم حفظ الفاتورة بنجاح [${invoiceNumber}]`,'success'); return invoice;
+    }, [cart, invoiceDiscountType, invoiceDiscountValue, settings, warehouses, products, customers, selectedCustomer, currentUser, activeShift, stock, accounts, clearCart, showToast]);
     // Create Return Invoice
     const createReturnInvoice = useCallback(async (payload) => {
         const original = invoices.find((inv) => inv.id === payload.originalInvoiceId);
@@ -569,6 +659,12 @@ export const AppProvider = ({ children }) => {
                 costPriceAtSale: costPerSoldUnit,
             });
         }
+        const refundMode = payload.refundMode === 'customer_balance' && original.customerId && original.customerId !== CASH_CUSTOMER.id ? 'customer_balance' : 'account';
+        const refundAccount = refundMode === 'account' ? accounts.find((a) => a.id === payload.refundAccountId) : null;
+        if (refundMode === 'account' && !refundAccount) {
+            showToast('اختر حساباً مالياً صالحاً لإرجاع المبلغ', 'error');
+            return null;
+        }
         const returnInvoice = {
             id: 'ret-' + Date.now(),
             invoiceNumber: returnNumber,
@@ -589,15 +685,16 @@ export const AppProvider = ({ children }) => {
             paidAmount: refundTotal,
             remainingAmount: 0,
             changeAmount: 0,
-            paymentType: 'cash',
-            payments: [
+            paymentType: refundMode === 'customer_balance' ? 'customer_balance' : 'cash',
+            refundMode,
+            payments: refundMode === 'account' ? [
                 {
-                    method: 'cash',
+                    method: refundAccount?.type === 'cash' ? 'cash' : 'account',
                     amount: refundTotal,
-                    accountId: payload.refundAccountId,
-                    accountName: accounts.find((a) => a.id === payload.refundAccountId)?.name || 'الصندوق',
+                    accountId: refundAccount?.id,
+                    accountName: refundAccount?.name || 'الصندوق',
                 },
-            ],
+            ] : [],
             status: 'completed',
             originalInvoiceId: original.id,
             notes: payload.notes,
@@ -640,29 +737,35 @@ export const AppProvider = ({ children }) => {
         }
         await bulkPut('stock', updatedStockList);
         await bulkPut('stock_movements', newMovements);
-        // Deduct from refund account
-        const acc = accounts.find((a) => a.id === payload.refundAccountId);
-        if (acc) {
-            await putInStore('accounts', {
-                ...acc,
-                balance: acc.balance - refundTotal,
-            });
-        }
-        // Update shift if cash refund
-        if (activeShift) {
-            await putInStore('shifts', {
-                ...activeShift,
-                totalCashReturns: activeShift.totalCashReturns + refundTotal,
-                expectedCash: activeShift.expectedCash - refundTotal,
-            });
+        // Financial refund: either credit the registered customer's balance or pay from a selected account.
+        if (refundMode === 'customer_balance') {
+            const cust = customers.find((c) => c.id === original.customerId);
+            if (cust) {
+                const newBalance = (Number(cust.balance) || 0) - refundTotal;
+                await putInStore('customers', { ...cust, balance: newBalance });
+                await putInStore('partner_statements', {
+                    id: 'stmt-ret-' + Date.now(), partnerType: 'customer', partnerId: cust.id, partnerName: cust.name,
+                    date: now, referenceType: 'SALES_RETURN', referenceId: returnInvoice.id, referenceNumber: returnNumber,
+                    description: `مرتجع مبيعات ${returnNumber}`, debit: 0, credit: refundTotal, runningBalance: newBalance,
+                });
+            }
+        } else if (refundAccount) {
+            await putInStore('accounts', { ...refundAccount, balance: (Number(refundAccount.balance) || 0) - refundTotal });
+            if (activeShift && refundAccount.type === 'cash') {
+                await putInStore('shifts', {
+                    ...activeShift,
+                    totalCashReturns: (Number(activeShift.totalCashReturns) || 0) + refundTotal,
+                    expectedCash: (Number(activeShift.expectedCash) || 0) - refundTotal,
+                });
+            }
         }
         await reloadData();
         showToast(`تم تسجيل المرتجع بنجاح [${returnNumber}]`, 'info');
         return returnInvoice;
-    }, [invoices, products, currentUser, activeShift, accounts, stock, warehouses, reloadData, showToast]);
+    }, [invoices, products, customers, currentUser, activeShift, accounts, stock, warehouses, reloadData, showToast]);
     // Create Purchase Invoice (local-first: durable local save first, cloud sync later)
     const createPurchaseInvoice = useCallback(async (payload) => {
-        const now=new Date().toISOString(); const invoiceNumber=`PUR-${Date.now().toString().slice(-6)}`; const syncId=`pur-${Date.now()}`;
+        const now=new Date().toISOString(); const purchaseDate=payload?.date ? new Date(`${String(payload.date).slice(0,10)}T12:00:00`).toISOString() : now; const invoiceNumber=`PUR-${Date.now().toString().slice(-6)}`; const syncId=`pur-${Date.now()}`;
         const targetWarehouse = warehouses.find(w=>w.id===payload?.warehouseId) || warehouses.find(w=>w.id===settings.activeWarehouseId) || warehouses.find(w=>w.isDefault) || warehouses.find(w=>/صالة\s*العرض/.test(String(w.name||''))) || warehouses[0];
         if(!targetWarehouse) throw new Error('لا يوجد مخزن رئيسي. أضف صالة العرض من المخازن أولاً.');
         const warehouseId=targetWarehouse.id;
@@ -672,20 +775,20 @@ export const AppProvider = ({ children }) => {
         const subtotal=items.reduce((x,i)=>x+(Number(i.total)||0),0);
         const discountTotal=Math.max(0,Math.min(subtotal,Number(payload.discountAmount)||0));
         const grandTotal=Math.max(0,subtotal-discountTotal); const paidAmount=Math.min(grandTotal,Math.max(0,Number(payload.paidAmount)||0)); const remaining=Math.max(0,grandTotal-paidAmount); const ratio=subtotal>0?grandTotal/subtotal:1;
-        const purchaseInvoice={id:'pur-'+Date.now(),invoiceNumber,date:now,supplierId:payload.supplierId,supplierName:payload.supplierName,warehouseId,warehouseName:targetWarehouse.name||'صالة العرض',items:items.map((it,idx)=>({id:`pur-it-${Date.now()}-${idx}`,...it})),subtotal,discountType:payload.discountType||'fixed',discountValue:Number(payload.discountValue)||0,discountTotal,taxTotal:0,grandTotal,paidAmount,remainingAmount:remaining,paymentType:payload.paymentType,payments,notes:payload.notes||'',syncId,isSynced:false,createdAt:now};
+        const purchaseInvoice={id:'pur-'+Date.now(),invoiceNumber,supplierInvoiceNumber:payload.supplierInvoiceNumber||'',date:purchaseDate,supplierId:payload.supplierId,supplierName:payload.supplierName,warehouseId,warehouseName:targetWarehouse.name||'صالة العرض',items:items.map((it,idx)=>({id:`pur-it-${Date.now()}-${idx}`,...it})),subtotal,discountType:payload.discountType||'fixed',discountValue:Number(payload.discountValue)||0,discountTotal,taxTotal:0,grandTotal,paidAmount,remainingAmount:remaining,paymentType:payload.paymentType,payments,notes:payload.notes||'',syncId,isSynced:false,createdAt:now};
         await putInStore('purchases',purchaseInvoice);
         const updatedProducts=products.map(p=>({...p,fifoBatches:Array.isArray(p.fifoBatches)?p.fifoBatches.map(b=>({...b})):[]})); const updatedStockList=[...stock],newMovements=[];
         for(const item of items){const pi=updatedProducts.findIndex(p=>p.id===item.productId);const si=updatedStockList.findIndex(x=>x.productId===item.productId&&x.warehouseId===warehouseId);const currentBaseStock=si>=0?Number(updatedStockList[si].baseQuantity)||0:0;const baseQty=Math.max(0,Number(item.baseQuantity)||0);const newBaseStock=currentBaseStock+baseQty;
-          if(pi>=0){const currentCost=Number(updatedProducts[pi].costPrice)||0;const unitCost=((Number(item.unitPrice)||0)*ratio)/Math.max(0.00000001,(Number(item.conversionFactor)||1));let batches=updatedProducts[pi].fifoBatches||[];if(currentBaseStock>0&&!batches.some(b=>(b.warehouseId===warehouseId||!b.warehouseId)&&Number(b.remainingBaseQty)>0)){batches.push({id:`legacy-${item.productId}-${warehouseId}`,purchaseId:'legacy',warehouseId,receivedAt:'2000-01-01T00:00:00.000Z',expiryDate:updatedProducts[pi].expiryDate||'',unitCost:currentCost,remainingBaseQty:currentBaseStock});}batches.push({id:`batch-${purchaseInvoice.id}-${item.productId}-${Math.random().toString(36).slice(2,6)}`,purchaseId:purchaseInvoice.id,warehouseId,receivedAt:now,expiryDate:item.expiryDate||updatedProducts[pi].expiryDate||'',unitCost,remainingBaseQty:baseQty});const oldVal=Math.max(0,currentBaseStock)*currentCost,newVal=baseQty*unitCost,totalUnits=Math.max(0,currentBaseStock)+baseQty,newWAC=totalUnits>0?(oldVal+newVal)/totalUnits:unitCost;updatedProducts[pi]={...updatedProducts[pi],costPrice:parseFloat(newWAC.toFixed(4)),fifoBatches:batches,updatedAt:now};}
+          if(pi>=0){const currentCost=Number(updatedProducts[pi].costPrice)||0;const unitCost=((Number(item.unitPrice)||0)*ratio)/Math.max(0.00000001,(Number(item.conversionFactor)||1));let batches=updatedProducts[pi].fifoBatches||[];if(currentBaseStock>0&&!batches.some(b=>(b.warehouseId===warehouseId||!b.warehouseId)&&Number(b.remainingBaseQty)>0)){batches.push({id:`legacy-${item.productId}-${warehouseId}`,purchaseId:'legacy',warehouseId,receivedAt:'2000-01-01T00:00:00.000Z',expiryDate:updatedProducts[pi].expiryDate||'',unitCost:currentCost,remainingBaseQty:currentBaseStock});}batches.push({id:`batch-${purchaseInvoice.id}-${item.productId}-${Math.random().toString(36).slice(2,6)}`,purchaseId:purchaseInvoice.id,warehouseId,receivedAt:purchaseDate,expiryDate:item.expiryDate||updatedProducts[pi].expiryDate||'',unitCost,remainingBaseQty:baseQty});const oldVal=Math.max(0,currentBaseStock)*currentCost,newVal=baseQty*unitCost,totalUnits=Math.max(0,currentBaseStock)+baseQty,newWAC=totalUnits>0?(oldVal+newVal)/totalUnits:unitCost;updatedProducts[pi]={...updatedProducts[pi],costPrice:parseFloat(newWAC.toFixed(4)),fifoBatches:batches,updatedAt:now};}
           if(si>=0)updatedStockList[si]={...updatedStockList[si],baseQuantity:newBaseStock};else updatedStockList.push({productId:item.productId,warehouseId,baseQuantity:newBaseStock});
-          newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:now,productId:item.productId,productName:item.productName,warehouseId,warehouseName:targetWarehouse.name||'صالة العرض',type:'purchase',unitName:item.unitName,quantityInUnit:item.quantity,conversionFactor:item.conversionFactor,baseQuantityChange:baseQty,newBaseBalance:newBaseStock,referenceId:purchaseInvoice.id,referenceType:'PURCHASE',userId:currentUser.id,userName:currentUser.name});}
+          newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:purchaseDate,productId:item.productId,productName:item.productName,warehouseId,warehouseName:targetWarehouse.name||'صالة العرض',type:'purchase',unitName:item.unitName,quantityInUnit:item.quantity,conversionFactor:item.conversionFactor,baseQuantityChange:baseQty,newBaseBalance:newBaseStock,referenceId:purchaseInvoice.id,referenceType:'PURCHASE',userId:currentUser.id,userName:currentUser.name});}
         await bulkPut('products',updatedProducts);await bulkPut('stock',updatedStockList);await bulkPut('stock_movements',newMovements);
         const updatedAccounts=[...accounts];for(const pay of payments){const ai=updatedAccounts.findIndex(a=>a.id===pay.accountId);if(ai>=0)updatedAccounts[ai]={...updatedAccounts[ai],balance:(Number(updatedAccounts[ai].balance)||0)-(Number(pay.amount)||0)};}await bulkPut('accounts',updatedAccounts);
         let updatedSupplier=null,supplierStatement=null;
-        if(remaining>0){const supp=suppliers.find(s=>s.id===payload.supplierId);if(supp){const nb=(Number(supp.balance)||0)+remaining;updatedSupplier={...supp,balance:nb};supplierStatement={id:'stmt-'+Date.now(),date:now,type:'purchase',partyType:'supplier',partyId:supp.id,referenceNumber:invoiceNumber,description:`فاتورة مشتريات رقم ${invoiceNumber}`,debit:0,credit:remaining,runningBalance:nb};await putInStore('suppliers',updatedSupplier);await putInStore('partner_statements',supplierStatement);}}
+        if(remaining>0){const supp=suppliers.find(s=>s.id===payload.supplierId) || (payload.supplierObject?.id===payload.supplierId ? payload.supplierObject : null);if(supp){const nb=(Number(supp.balance)||0)+remaining;updatedSupplier={...supp,balance:nb};supplierStatement={id:'stmt-'+Date.now(),date:purchaseDate,type:'purchase',partyType:'supplier',partyId:supp.id,referenceNumber:invoiceNumber,description:`فاتورة مشتريات رقم ${invoiceNumber}`,debit:0,credit:remaining,runningBalance:nb};await putInStore('suppliers',updatedSupplier);await putInStore('partner_statements',supplierStatement);}}
         setPurchases(prev => [purchaseInvoice, ...prev.filter(x=>x.id!==purchaseInvoice.id)]);
         setProducts(updatedProducts);setStock(updatedStockList);setStockMovements(prev=>[...newMovements,...prev]);setAccounts(updatedAccounts);
-        if(updatedSupplier)setSuppliers(prev=>prev.map(x=>x.id===updatedSupplier.id?updatedSupplier:x));if(supplierStatement)setPartnerStatements(prev=>[supplierStatement,...prev]);
+        if(updatedSupplier)setSuppliers(prev=>prev.some(x=>x.id===updatedSupplier.id)?prev.map(x=>x.id===updatedSupplier.id?updatedSupplier:x):[updatedSupplier,...prev]);if(supplierStatement)setPartnerStatements(prev=>[supplierStatement,...prev]);
         setSyncQueue(window.OscarCloudSync?.pendingItems?.() || []);
         playSuccessSound(settings.scannerBeepEnabled);showToast(`تم تسجيل فاتورة الشراء بنجاح [${invoiceNumber}]`,'success');return purchaseInvoice;
     }, [warehouses,products,stock,accounts,suppliers,currentUser,showToast,settings.activeWarehouseId,settings.scannerBeepEnabled]);
@@ -1427,16 +1530,25 @@ export const AppProvider = ({ children }) => {
         const inv = invoices.find((i) => i.id === id);
         if (!inv)
             return;
-        // 1. Revert inventory for each item
+        // 1. Revert inventory for each item.
+        // Meals linked to a recipe consume raw ingredients at sale time, so deleting
+        // the invoice must restore those exact ingredients instead of adding a fake
+        // finished-meal quantity back to stock.
         const updatedStockList = [...stock];
+        const addBackToStock = (productId, baseQty) => {
+            const qty = Math.max(0, Number(baseQty) || 0);
+            if (!productId || qty <= 0) return;
+            const stockIndex = updatedStockList.findIndex((row) => row.productId === productId && row.warehouseId === inv.warehouseId);
+            const current = stockIndex >= 0 ? Number(updatedStockList[stockIndex].baseQuantity) || 0 : 0;
+            const next = current + qty;
+            if (stockIndex >= 0) updatedStockList[stockIndex] = { ...updatedStockList[stockIndex], baseQuantity: next };
+            else updatedStockList.push({ productId, warehouseId: inv.warehouseId, baseQuantity: next });
+        };
         for (const item of inv.items) {
-            const baseQtyToAdd = item.quantity * item.conversionFactor;
-            const stockIndex = updatedStockList.findIndex((s) => s.productId === item.productId && s.warehouseId === inv.warehouseId);
-            if (stockIndex >= 0) {
-                updatedStockList[stockIndex] = {
-                    ...updatedStockList[stockIndex],
-                    baseQuantity: updatedStockList[stockIndex].baseQuantity + baseQtyToAdd,
-                };
+            if (item.isManufacturedMeal && Array.isArray(item.recipeConsumption) && item.recipeConsumption.length > 0) {
+                for (const ing of item.recipeConsumption) addBackToStock(ing.productId, ing.baseQuantity);
+            } else {
+                addBackToStock(item.productId, Number(item.baseQuantity) || (Number(item.quantity) || 0) * (Number(item.conversionFactor) || 1));
             }
         }
         await bulkPut('stock', updatedStockList);
@@ -1596,6 +1708,7 @@ export const AppProvider = ({ children }) => {
     }, [clearCart, reloadData, showToast]);
     const value = {
         isLoaded,
+        isCloudReady,
         products,
         categories,
         warehouses,
@@ -1644,6 +1757,7 @@ export const AppProvider = ({ children }) => {
         setSelectedCategory,
         currentUser,
         cart,
+        setCart,
         invoiceDiscountType,
         setInvoiceDiscountType,
         invoiceDiscountValue,

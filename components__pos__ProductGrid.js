@@ -1,8 +1,18 @@
 import React from 'react';
-import { useApp } from './context__AppContext.js';
+import { useApp } from './context__AppContext.js?v=7.9.4.11-notifications-popup';
 import { Package, Layers } from 'lucide-react';
 
 const h = React.createElement;
+
+const normalizedSalesChannel = (p) => String((p && p.salesChannel) || 'both').toLowerCase();
+const isRawMaterialOnly = (p) => {
+  const c = normalizedSalesChannel(p);
+  return c === 'raw_material' || c === 'raw' || c === 'ingredient' || !!(p && p.isRawMaterialOnly);
+};
+const isCashierVisibleProduct = (p) => {
+  const c = normalizedSalesChannel(p);
+  return !isRawMaterialOnly(p) && c !== 'restaurant' && c !== 'restaurant_only';
+};
 const unitStockLines = (baseStock, units=[]) => {
   const total = Math.max(0, Number(baseStock) || 0);
   if (!units.length) return [];
@@ -32,6 +42,7 @@ export const ProductGrid = () => {
   const { products, categories, selectedCategory, setSelectedCategory, searchQuery, addToCart, getProductStock, settings } = useApp();
   const filteredProducts = products.filter(p => {
     if (p.status === 'archived' || p.deletedAt) return false;
+    if (!isCashierVisibleProduct(p)) return false;
     if (selectedCategory && p.categoryId !== selectedCategory) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
@@ -45,10 +56,10 @@ export const ProductGrid = () => {
   });
   return h('div', { className:'flex flex-col h-full overflow-hidden text-right select-none' },
     h('div', { className:'p-2 border-b border-slate-200 bg-white overflow-x-auto flex items-center gap-1.5 custom-scrollbar shrink-0' },
-      h('button', { onClick:()=>setSelectedCategory(null), className:`px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 ${selectedCategory===null?'bg-slate-900 text-white':'bg-slate-100 text-slate-600 hover:bg-slate-200'}` }, `كافة الأصناف (${products.filter(p=>!p.deletedAt&&p.status!=='archived').length})`),
+      h('button', { onClick:()=>setSelectedCategory(null), className:`px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 ${selectedCategory===null?'bg-slate-900 text-white':'bg-slate-100 text-slate-600 hover:bg-slate-200'}` }, `كافة الأصناف (${products.filter(p=>!p.deletedAt&&p.status!=='archived'&&isCashierVisibleProduct(p)).length})`),
       ...categories.map(cat => {
         const active=selectedCategory===cat.id;
-        const count=products.filter(p=>p.categoryId===cat.id&&!p.deletedAt).length;
+        const count=products.filter(p=>p.categoryId===cat.id&&!p.deletedAt&&p.status!=='archived'&&isCashierVisibleProduct(p)).length;
         return h('button',{key:cat.id,onClick:()=>setSelectedCategory(active?null:cat.id),className:`px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 flex items-center gap-1.5 ${active?'bg-emerald-600 text-white':'bg-slate-100 text-slate-700 hover:bg-slate-200'}`},
           h('span',{className:'w-2 h-2 rounded-full shrink-0',style:{backgroundColor:cat.color||'#10b981'}}), h('span',null,cat.name), h('span',{className:`text-[10px] ${active?'text-emerald-100':'text-slate-400'}`},`(${count})`));
       })

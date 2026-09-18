@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@200;300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./app.css" />
+  <link rel="stylesheet" href="./app.css?v=7.9.4.11-notifications-popup" />
   <script type="importmap">
   {
     "imports": {
@@ -24,19 +24,88 @@
       "react-dom/client": "https://esm.sh/react-dom@19.3.0/client?external=react",
       "react/jsx-runtime": "https://esm.sh/react@19.3.0/jsx-runtime",
       "lucide-react": "https://esm.sh/lucide-react@0.546.0?external=react",
-      "jsbarcode": "https://esm.sh/jsbarcode@3.12.3"
+      "jsbarcode": "https://esm.sh/jsbarcode@3.12.3",
+      "xlsx": "https://esm.sh/xlsx@0.18.5"
     }
   }
   </script>
-  <script src="./oscar-activation-runtime.js?v=multi1"></script>
-  <script src="./oscar-cloud-sync.js?v=multi1"></script>
+  <script src="./oscar-activation-runtime.js?v=7.9.4.11-notifications-popup"></script>
+  <script src="./oscar-cloud-sync.js?v=7.9.4.11-notifications-popup"></script>
 </head>
 <body>
-  <div id="root"></div>
-  <script type="module" src="./main.js"></script>
+  <script>document.documentElement.classList.remove('dark');</script>
+  <div id="root">
+    <div dir="rtl" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f8fafc;font-family:Cairo,sans-serif;padding:24px">
+      <div style="text-align:center;color:#475569">
+        <img src="./app-icon.png" alt="" style="width:64px;height:64px;border-radius:18px;object-fit:cover;margin-bottom:12px" />
+        <div style="font-weight:900;color:#0f172a">أوسكار المحاسبي</div>
+        <div style="font-size:12px;margin-top:5px">جاري تشغيل النظام...</div>
+      </div>
+    </div>
+  </div>
+  <script type="module">
+    const OSCAR_BUILD = '7.9.4.11-notifications-popup';
+    const isLocal = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
+
+    const clearCodeCaches = async () => {
+      try {
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.filter((key) => key.startsWith('oscar-accounting-')).map((key) => caches.delete(key)));
+        }
+      } catch (_) {}
+      try {
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          if (isLocal) await Promise.all(registrations.map((registration) => registration.unregister()));
+        }
+      } catch (_) {}
+    };
+
+    const showRecovery = () => {
+      const root = document.getElementById('root');
+      if (!root) return;
+      root.innerHTML = '<div dir="rtl" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f8fafc;font-family:Cairo,sans-serif;padding:24px"><div style="max-width:420px;width:100%;text-align:center;background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:24px"><div style="font-size:34px">🔄</div><div style="font-weight:900;color:#0f172a;margin-top:8px">إعادة تحميل واجهة النظام</div><div style="font-size:12px;color:#64748b;margin-top:6px">لن يتم حذف بياناتك أو ملف دخول الشركة.</div><button id="oscar-reload" style="margin-top:16px;border:0;border-radius:12px;background:#059669;color:#fff;padding:11px 20px;font-weight:800">إعادة التحميل</button></div></div>';
+      document.getElementById('oscar-reload')?.addEventListener('click', async () => {
+        await clearCodeCaches();
+        sessionStorage.removeItem('oscar-rootfix-retry');
+        location.reload();
+      });
+    };
+
+    const boot = async () => {
+      try {
+        const markerKey = 'oscar-last-boot-build';
+        const previous = localStorage.getItem(markerKey);
+        if (previous !== OSCAR_BUILD || isLocal) {
+          await clearCodeCaches();
+          localStorage.setItem(markerKey, OSCAR_BUILD);
+        }
+      } catch (_) {}
+
+      try {
+        await import('./main.js?v=7.9.4.11-notifications-popup');
+        sessionStorage.removeItem('oscar-rootfix-retry');
+      } catch (error) {
+        try { console.error('OSCAR_BOOT_RECOVERY', error); } catch (_) {}
+        const retried = sessionStorage.getItem('oscar-rootfix-retry') === OSCAR_BUILD;
+        if (!retried) {
+          sessionStorage.setItem('oscar-rootfix-retry', OSCAR_BUILD);
+          await clearCodeCaches();
+          const url = new URL(location.href);
+          url.searchParams.set('_oscar_build', OSCAR_BUILD + '-' + Date.now());
+          location.replace(url.href);
+          return;
+        }
+        showRecovery();
+      }
+    };
+
+    boot();
+  </script>
   <script>
-    if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
-      addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=7.9-localfirst-v7', { updateViaCache: 'none' }).then(r => r.update()).catch(() => {}));
+    if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !['localhost','127.0.0.1','::1'].includes(location.hostname)) {
+      addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=7.9.4.11-notifications-popup', { updateViaCache: 'none' }).then((registration) => registration.update()).catch(() => {}));
     }
   </script>
 </body>

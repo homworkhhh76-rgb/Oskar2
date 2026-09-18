@@ -1,10 +1,12 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useEffect } from 'react';
-import { useApp } from './context__AppContext.js';
-import { SearchableDropdown } from './components__common__Dropdown.js';
+import { useApp } from './context__AppContext.js?v=7.9.4.11-notifications-popup';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.11-notifications-popup';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.11-notifications-popup';
 import { Banknote, Clock, Split, CheckCircle2, X, AlertCircle, Coins, } from 'lucide-react';
 export const PaymentModal = ({ isOpen, onClose, onSuccess }) => {
     const { cart, customers, selectedCustomer, setSelectedCustomer, accounts, settings, createSaleInvoice, setShowThermalModal, saveCustomer, showToast, invoiceDiscountType, setInvoiceDiscountType, invoiceDiscountValue, setInvoiceDiscountValue, } = useApp();
+    const { activeRestaurantOrder, closeOrderAfterPayment } = useRestaurant();
     // Grand total calculation
     const subtotal = cart.reduce((s, i) => s + (i.quantity * i.unitPrice), 0);
     const taxTotal = cart.reduce((s, i) => {
@@ -131,6 +133,9 @@ export const PaymentModal = ({ isOpen, onClose, onSuccess }) => {
                 notes,
             });
             if (inv) {
+                if (activeRestaurantOrder?.id) {
+                    try { await closeOrderAfterPayment(activeRestaurantOrder.id, inv.id); } catch (e) { console.warn('Restaurant close after payment warning', e); }
+                }
                 // Open the receipt from the already-saved local invoice first, then close payment.
                 // This prevents a slow refresh/sync from swallowing the print action.
                 if ((settings.printOnSave ?? settings.autoPrintReceipt)) setShowThermalModal(inv);

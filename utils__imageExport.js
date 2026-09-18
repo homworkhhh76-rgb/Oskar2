@@ -1,4 +1,4 @@
-import { renderElementTableCanvas, resolveExportElement } from './utils__canvasRenderer.js';
+import { renderElementTableCanvas, resolveExportElement } from './utils__canvasRenderer.js?v=7.9.4.11-notifications-popup';
 
 const safe=v=>String(v||'export').replace(/[\\/:*?"<>|]+/g,'-').trim()||'export';
 const withExt=(name,ext)=>safe(name).toLowerCase().endsWith(ext)?safe(name):safe(name)+ext;

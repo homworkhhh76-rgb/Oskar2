@@ -1,108 +1,364 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import React, { useState, useRef } from 'react';
-import { useApp } from './context__AppContext.js';
-import { SearchableDropdown } from './components__common__Dropdown.js';
-import { exportToCSV } from './utils__export.js';
-import { downloadElementAsPDF } from './utils__pdfExport.js';
-import { downloadElementAsImage } from './utils__imageExport.js';
-import { Plus, Search, Download, Trash2, Image as ImageIcon, FileSpreadsheet, Edit2, } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useApp } from './context__AppContext.js?v=7.9.4.11-notifications-popup';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.11-notifications-popup';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.11-notifications-popup';
+import { downloadProfessionalTablePDF, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.11-notifications-popup';
+import { Plus, Search, Trash2, Edit2, FileSpreadsheet, FileText, Settings2, UsersRound, Receipt, WalletCards, X } from 'lucide-react';
+
+const h = React.createElement;
+const DEFAULT_EXPENSE_CATEGORIES = [
+  'نثريات وضيافة',
+  'كهرباء ومياه',
+  'إيجار المحل',
+  'أجور ورواتب عمال',
+  'صيانة ونظافة',
+  'بضائع تالفة ومنتهية',
+  'أكياس وتغليف وطباعة',
+  'نقل وشحن',
+  'أخرى',
+];
+const dayKey = value => {
+  const d = new Date(value);
+  if (!Number.isFinite(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+const todayKey = () => dayKey(new Date());
+const monthStartKey = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}-01`;
+};
+const safePart = v => String(v || '').replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '_').trim() || 'الكل';
+const money = v => (Number(v) || 0).toFixed(2);
+const uniq = arr => [...new Set((arr || []).map(v => String(v || '').trim()).filter(Boolean))];
+const isLaborCategory = name => /(?:عمال|عامل|رواتب|أجور|اجور|أجر|اجر)/i.test(String(name || ''));
+const partyClass = v => v === 'customer' ? 'customer' : v === 'supplier' ? 'supplier' : 'other';
+const paymentClassLabel = v => v === 'sales' ? 'دفعات المبيعات' : v === 'customer' ? 'سندات قبض العملاء' : v === 'supplier' ? 'سندات قبض الموردين' : 'دفعات أخرى';
+const paymentMethodLabel = v => ({cash:'نقدي',card:'بطاقة',bank:'تحويل بنكي',wallet:'محفظة',transfer:'تحويل',credit:'آجل'}[String(v||'').toLowerCase()] || String(v||'غير محدد'));
+
 export const ExpensesView = () => {
-    const { expenses, accounts, settings, recordExpense, updateExpense, softDeleteExpense, showToast, } = useApp();
-    const [search, setSearch] = useState('');
-    const [selectedCategory, setSelectedCategory] = useState('all');
-    const tableContainerRef = useRef(null);
-    // Add Expense Modal
-    const [showAddModal, setShowAddModal] = useState(false);
-    const [editingExpense, setEditingExpense] = useState(null);
-    const [amount, setAmount] = useState(0);
-    const [category, setCategory] = useState('نثريات وضيافة');
-    const [accountId, setAccountId] = useState(accounts.find(a=>a.isDefault)?.id || accounts[0]?.id || '');
-    const [notes, setNotes] = useState('');
-    const expenseCategories = [
-        'نثريات وضيافة',
-        'كهرباء ومياه',
-        'إيجار المحل',
-        'أجور ورواتب عمال',
-        'صيانة ونظافة',
-        'بضائع تالفة ومنتهية',
-        'أكياس وتغليف وطباعة',
-        'نقل وشحن',
-        'أخرى',
-    ];
-    const activeExpenses = expenses.filter((e) => !e.deletedAt);
-    const filteredExpenses = activeExpenses.filter((e) => {
-        if (selectedCategory !== 'all' && e.category !== selectedCategory)
-            return false;
-        if (search.trim()) {
-            const q = search.toLowerCase().trim();
-            return e.category.toLowerCase().includes(q) || (e.notes && e.notes.toLowerCase().includes(q));
-        }
-        return true;
+  const {
+    expenses, vouchers, invoices, accounts, settings, recordExpense, updateExpense,
+    softDeleteExpense, updateSettings, showToast, setActiveTab
+  } = useApp();
+
+  const configuredCategories = useMemo(() => {
+    const configured = Array.isArray(settings.expenseCategories) && settings.expenseCategories.length
+      ? settings.expenseCategories : DEFAULT_EXPENSE_CATEGORIES;
+    return uniq(configured);
+  }, [settings.expenseCategories]);
+  const historicalCategories = useMemo(() => uniq((expenses || []).filter(e => !e.deletedAt).map(e => e.category)), [expenses]);
+  const filterCategories = useMemo(() => uniq([...configuredCategories, ...historicalCategories]), [configuredCategories, historicalCategories]);
+
+  const [mode, setMode] = useState('expenses');
+  const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedReceiptClass, setSelectedReceiptClass] = useState('all');
+  const [dateFrom, setDateFrom] = useState(monthStartKey());
+  const [dateTo, setDateTo] = useState(todayKey());
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingExpense, setEditingExpense] = useState(null);
+  const [amount, setAmount] = useState('');
+  const [category, setCategory] = useState(configuredCategories[0] || 'أخرى');
+  const [accountId, setAccountId] = useState(accounts.find(a => a.isDefault)?.id || accounts[0]?.id || '');
+  const [notes, setNotes] = useState('');
+  const [showTypeManager, setShowTypeManager] = useState(false);
+  const [newType, setNewType] = useState('');
+
+  useEffect(() => {
+    if (!configuredCategories.includes(category)) setCategory(configuredCategories[0] || 'أخرى');
+  }, [configuredCategories, category]);
+  useEffect(() => {
+    if (!accountId && accounts[0]?.id) setAccountId(accounts.find(a => a.isDefault)?.id || accounts[0].id);
+  }, [accounts, accountId]);
+  useEffect(() => {
+    const onAIDraft = event => {
+      const data = event?.detail || {};
+      const nextAmount = Number(data.amount || 0);
+      if (nextAmount > 0) setAmount(String(nextAmount));
+      if (data.category) {
+        const incoming = String(data.category).trim();
+        setCategory(configuredCategories.includes(incoming) ? incoming : (configuredCategories.includes('أخرى') ? 'أخرى' : configuredCategories[0]));
+      }
+      if (data.notes) setNotes(String(data.notes));
+      setEditingExpense(null);
+      setShowAddModal(true);
+    };
+    window.addEventListener('oscar:ai-expense-draft', onAIDraft);
+    return () => window.removeEventListener('oscar:ai-expense-draft', onAIDraft);
+  }, [configuredCategories]);
+
+  const inPeriod = value => {
+    const key = dayKey(value);
+    if (!key) return false;
+    if (dateFrom && key < dateFrom) return false;
+    if (dateTo && key > dateTo) return false;
+    return true;
+  };
+  const q = search.trim().toLowerCase();
+  const activeExpenses = useMemo(() => (expenses || []).filter(e => !e.deletedAt), [expenses]);
+  const periodExpenses = activeExpenses.filter(e => inPeriod(e.date));
+  const filteredExpenses = periodExpenses.filter(e => {
+    if (mode === 'labor' && !isLaborCategory(e.category)) return false;
+    if (selectedCategory !== 'all' && e.category !== selectedCategory) return false;
+    if (!q) return true;
+    return String(e.category || '').toLowerCase().includes(q) || String(e.notes || '').toLowerCase().includes(q) || String(e.accountName || '').toLowerCase().includes(q);
+  });
+  const incomingPayments = useMemo(() => {
+    const rows = [];
+    for (const inv of (invoices || [])) {
+      if (inv?.deletedAt || inv?.type !== 'sale' || !inPeriod(inv.date)) continue;
+      const breakdown = Array.isArray(inv.payments) ? inv.payments.filter(p => Number(p?.amount) > 0) : [];
+      if (breakdown.length) {
+        breakdown.forEach((p, idx) => {
+          const account = accounts.find(a => a.id === p.accountId);
+          rows.push({
+            id:`sale-${inv.id}-${idx}`, date:inv.date, classId:'sales', reference:inv.invoiceNumber || inv.id,
+            partyName:inv.customerName || 'زبون نقدي', amount:Number(p.amount)||0, accountName:account?.name || p.accountName || 'حساب مالي',
+            method:paymentMethodLabel(p.method), notes:inv.notes || '', source:'فاتورة مبيعات'
+          });
+        });
+      } else if (Number(inv.paidAmount) > 0) {
+        rows.push({
+          id:`sale-${inv.id}`, date:inv.date, classId:'sales', reference:inv.invoiceNumber || inv.id,
+          partyName:inv.customerName || 'زبون نقدي', amount:Number(inv.paidAmount)||0, accountName:'حساب البيع',
+          method:inv.paymentType === 'cash' ? 'نقدي' : inv.paymentType === 'partial' ? 'دفع جزئي' : paymentMethodLabel(inv.paymentType), notes:inv.notes || '', source:'فاتورة مبيعات'
+        });
+      }
+    }
+    for (const v of (vouchers || [])) {
+      if (v?.deletedAt || v?.type !== 'receipt' || !inPeriod(v.date)) continue;
+      rows.push({
+        id:`voucher-${v.id}`, date:v.date, classId:partyClass(v.partyType), reference:v.voucherNumber || v.id,
+        partyName:v.partyName || '-', amount:Number(v.amount)||0, accountName:v.accountName || 'حساب مالي',
+        method:'سند قبض', notes:v.notes || '', source:'سند قبض'
+      });
+    }
+    return rows.sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime());
+  }, [invoices, vouchers, accounts, dateFrom, dateTo]);
+  const filteredReceipts = incomingPayments.filter(v => {
+    if (selectedReceiptClass !== 'all' && v.classId !== selectedReceiptClass) return false;
+    if (!q) return true;
+    return String(v.partyName || '').toLowerCase().includes(q) || String(v.notes || '').toLowerCase().includes(q) || String(v.reference || '').toLowerCase().includes(q) || String(v.accountName || '').toLowerCase().includes(q) || String(v.method || '').toLowerCase().includes(q);
+  });
+
+  const expensePager = usePagination(filteredExpenses, 50, `${mode}|${search}|${selectedCategory}|${dateFrom}|${dateTo}`);
+  const receiptPager = usePagination(filteredReceipts, 50, `${mode}|${search}|${selectedReceiptClass}|${dateFrom}|${dateTo}`);
+
+  const total = mode === 'receipts'
+    ? filteredReceipts.reduce((s, v) => s + (Number(v.amount) || 0), 0)
+    : filteredExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const count = mode === 'receipts' ? filteredReceipts.length : filteredExpenses.length;
+  const receiptSummary = useMemo(() => {
+    const base = { sales:0, customer:0, supplier:0, other:0 };
+    incomingPayments.forEach(v => { base[v.classId] = (base[v.classId] || 0) + (Number(v.amount) || 0); });
+    return base;
+  }, [incomingPayments]);
+
+  const periodLabel = dateFrom || dateTo
+    ? `الفترة: ${dateFrom || 'البداية'} إلى ${dateTo || 'اليوم'}`
+    : 'كافة الفترات';
+  const reportMeta = () => {
+    if (mode === 'receipts') {
+      const cls = selectedReceiptClass === 'all' ? 'كل الدفعات المدخلة' : paymentClassLabel(selectedReceiptClass);
+      return {
+        title: `كشف الدفعات المدخلة - ${cls}`,
+        filename: `كشف_الدفعات_المدخلة_${safePart(cls)}_${safePart(dateFrom || 'الكل')}_${safePart(dateTo || 'الكل')}`,
+        headers: ['المرجع','التاريخ','التصنيف','الجهة','المبلغ','طريقة الدفع','الحساب المودع فيه','البيان'],
+        rows: filteredReceipts.map(v => [v.reference || '-', new Date(v.date).toLocaleString('ar-EG'), paymentClassLabel(v.classId), v.partyName || '-', Number(v.amount)||0, v.method || '-', v.accountName || 'حساب مالي', v.notes || '']),
+      };
+    }
+    const selectedText = selectedCategory === 'all' ? (mode === 'labor' ? 'كل بنود العمال والأجور' : 'كل أنواع المصروفات') : selectedCategory;
+    return {
+      title: mode === 'labor' ? `كشف العمال والأجور - ${selectedText}` : `كشف المصروفات - ${selectedText}`,
+      filename: `${mode === 'labor' ? 'كشف_العمال' : 'كشف_المصروفات'}_${safePart(selectedText)}_${safePart(dateFrom || 'الكل')}_${safePart(dateTo || 'الكل')}`,
+      headers: ['التاريخ','نوع المصروف','المبلغ','الحساب المسدد منه','البيان'],
+      rows: filteredExpenses.map(e => [new Date(e.date).toLocaleString('ar-EG'), e.category || '-', Number(e.amount)||0, e.accountName || '-', e.notes || '']),
+    };
+  };
+  const exportPDF = async () => {
+    if (!count) return showToast('لا توجد بيانات ضمن الفلترة الحالية', 'warning');
+    const r = reportMeta();
+    const ok = await downloadProfessionalTablePDF({
+      title:r.title,
+      subtitle:`${periodLabel} • عدد الحركات: ${count} • الإجمالي: ${money(total)} ${settings.currencySymbol}`,
+      headers:r.headers, rows:r.rows, settings, orientation:'landscape', filename:`${r.filename}.pdf`
     });
-    const totalExpenseAmount = activeExpenses.reduce((sum, e) => sum + e.amount, 0);
-    const handleSaveExpense = async (e) => {
-        e.preventDefault();
-        if (amount <= 0) {
-            showToast('يرجى إدخال مبلغ مصروف صحيح', 'warning');
-            return;
-        }
-        if (editingExpense) {
-            const account = accounts.find((a) => a.id === accountId);
-            if (!account) {
-                showToast('يرجى اختيار حساب مالي صالح', 'error');
-                return;
-            }
-            await updateExpense({
-                ...editingExpense,
-                amount,
-                category,
-                accountId,
-                accountName: account.name,
-                notes,
-            });
-        }
-        else {
-            await recordExpense({
-                amount,
-                category,
-                accountId,
-                notes,
-            });
-        }
-        setShowAddModal(false);
-        setEditingExpense(null);
-        setAmount(0);
-        setNotes('');
-    };
-    const handleExportCSV = () => {
-        const headers = ['التاريخ', 'بند المصروف', 'المبلغ', 'الحساب المسدد منه', 'ملاحظات'];
-        const rows = filteredExpenses.map((e) => [
-            new Date(e.date).toLocaleDateString('ar-EG'),
-            e.category,
-            e.amount,
-            e.accountName,
-            e.notes || '',
-        ]);
-        exportToCSV('سجل_المصروفات_اليومية', headers, rows);
-    };
-    const handleExportPDF = async () => {
-        if (!tableContainerRef.current)
-            return;
-        await downloadElementAsPDF('expenses-table-card', `سجل_المصروفات_${new Date().toISOString().slice(0, 10)}.pdf`);
-        showToast('تم تصدير كشف المصروفات كـ PDF بنجاح', 'success');
-    };
-    const handleExportImage = async () => {
-        if (!tableContainerRef.current)
-            return;
-        await downloadElementAsImage('expenses-table-card', `سجل_المصروفات_${new Date().toISOString().slice(0, 10)}.png`);
-        showToast('تم تصدير كشف المصروفات كصورة بنجاح', 'success');
-    };
-    return (_jsxs("div", { id: "expenses-screen", className: "p-4 sm:p-6 space-y-4 max-w-7xl mx-auto text-right select-none", children: [_jsxs("div", { className: "flex flex-col sm:flex-row sm:items-center justify-between gap-4", children: [_jsxs("div", { children: [_jsx("h2", { className: "text-xl font-black text-slate-900 dark:text-white", children: "\u0627\u0644\u0645\u0635\u0631\u0648\u0641\u0627\u062a \u0627\u0644\u064a\u0648\u0645\u064a\u0629 \u0648\u0627\u0644\u0646\u062b\u0631\u064a\u0627\u062a" }), _jsxs("p", { className: "text-xs text-slate-500 mt-0.5", children: ["\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0645\u0635\u0631\u0648\u0641\u0627\u062a \u0627\u0644\u0645\u0633\u062c\u0644\u0629:", ' ', _jsxs("strong", { className: "text-rose-600 font-mono text-sm", children: [totalExpenseAmount.toFixed(2), " ", settings.currencySymbol] })] })] }), _jsxs("div", { className: "flex items-center gap-2 flex-wrap self-start sm:self-auto", children: [_jsxs("button", { onClick: () => { setEditingExpense(null); setAmount(0); setNotes(''); setShowAddModal(true); }, className: "flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs", children: [_jsx(Plus, { className: "w-4 h-4" }), _jsx("span", { children: "\u062a\u0633\u062c\u064a\u0644 \u0645\u0635\u0631\u0648\u0641 \u062c\u062f\u064a\u062f" })] }), _jsxs("button", { onClick: handleExportPDF, className: "flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 transition shadow-xs", title: "\u062a\u0646\u0632\u064a\u0644 \u0643\u0640 PDF", children: [_jsx(Download, { className: "w-4 h-4 text-rose-600" }), _jsx("span", { children: "PDF" })] }), _jsxs("button", { onClick: handleExportImage, className: "flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 transition shadow-xs", title: "\u062a\u0646\u0632\u064a\u0644 \u0643\u0635\u0648\u0631\u0629", children: [_jsx(ImageIcon, { className: "w-4 h-4 text-blue-600" }), _jsx("span", { children: "\u0635\u0648\u0631\u0629" })] }), _jsxs("button", { onClick: handleExportCSV, className: "flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 transition shadow-xs", children: [_jsx(FileSpreadsheet, { className: "w-4 h-4 text-emerald-600" }), _jsx("span", { children: "Excel" })] })] })] }), _jsxs("div", { className: "p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-wrap items-center justify-between gap-3", children: [_jsxs("div", { className: "flex-1 max-w-md relative", children: [_jsx(Search, { className: "absolute right-3 top-2.5 w-4 h-4 text-slate-400" }), _jsx("input", { type: "text", value: search, onChange: (e) => setSearch(e.target.value), placeholder: "\u0628\u062d\u062b \u0641\u064a \u0627\u0644\u0645\u0635\u0631\u0648\u0641\u0627\u062a \u0648\u0627\u0644\u0645\u0644\u0627\u062d\u0638\u0627\u062a...", className: "w-full pr-9 pl-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800" })] }), _jsx("div", { className: "min-w-[180px]", children: _jsx(SearchableDropdown, { id: "expense-filter-category", options: [{id:"all",label:"\u0643\u0627\u0641\u0629 \u0627\u0644\u0628\u0646\u0648\u062f"}, ...expenseCategories.map((c) => ({ id:c, label:c }))], selectedId: selectedCategory, onSelect: setSelectedCategory, placeholder: "\u0627\u0628\u062d\u062b \u0639\u0646 \u0627\u0644\u0628\u0646\u062f..." }) })] }), _jsx("div", { id: "expenses-table-card", ref: tableContainerRef, className: "rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden", children: _jsx("div", { className: "overflow-x-auto max-w-full slim-scrollbar", children: filteredExpenses.length === 0 ? (_jsx("div", { className: "p-12 text-center text-xs text-slate-400", children: "\u0644\u0627 \u062a\u0648\u062c\u062f \u0645\u0635\u0631\u0648\u0641\u0627\u062a \u0645\u0633\u062c\u0644\u0629" })) : (_jsxs("table", { className: "w-full text-xs text-right whitespace-nowrap min-w-[720px]", children: [_jsx("thead", { children: _jsxs("tr", { className: "border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 text-slate-500 font-semibold", children: [_jsx("th", { className: "p-3", children: "\u0627\u0644\u062a\u0627\u0631\u064a\u062e \u0648\u0627\u0644\u0648\u0642\u062a" }), _jsx("th", { className: "p-3", children: "\u0628\u0646\u062f \u0627\u0644\u0645\u0635\u0631\u0648\u0641" }), _jsx("th", { className: "p-3", children: "\u0627\u0644\u062d\u0633\u0627\u0628 \u0627\u0644\u0645\u0627\u0644\u064a \u0627\u0644\u0645\u0633\u062f\u062f \u0645\u0646\u0647" }), _jsx("th", { className: "p-3", children: "\u0627\u0644\u0628\u064a\u0627\u0646 \u0648\u0627\u0644\u0645\u0644\u0627\u062d\u0638\u0627\u062a" }), _jsx("th", { className: "p-3 text-left", children: "\u0627\u0644\u0645\u0628\u0644\u063a" }), _jsx("th", { className: "p-3 text-center", children: "\u0625\u062c\u0631\u0627\u0621\u0627\u062a" })] }) }), _jsx("tbody", { className: "divide-y divide-slate-100 dark:divide-slate-800", children: filteredExpenses.map((exp) => (_jsxs("tr", { className: "hover:bg-slate-50/50", children: [_jsxs("td", { className: "p-3 text-slate-500", children: [new Date(exp.date).toLocaleDateString('ar-EG'), " - ", new Date(exp.date).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })] }), _jsx("td", { className: "p-3 font-bold text-slate-800 dark:text-slate-200", children: exp.category }), _jsx("td", { className: "p-3 text-slate-500", children: exp.accountName }), _jsx("td", { className: "p-3 text-slate-400", children: exp.notes || '-' }), _jsxs("td", { className: "p-3 text-left font-mono font-bold text-rose-600", children: [exp.amount.toFixed(2), " ", settings.currencySymbol] }), _jsx("td", { className: "p-3 text-center", children: _jsxs("div", { className: "inline-flex items-center gap-1", children: [_jsx("button", { onClick: () => {
-                                                            setEditingExpense(exp);
-                                                            setAmount(exp.amount);
-                                                            setCategory(exp.category);
-                                                            setAccountId(exp.accountId);
-                                                            setNotes(exp.notes || '');
-                                                            setShowAddModal(true);
-                                                        }, className: "p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded", title: "\u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0645\u0635\u0631\u0648\u0641", children: _jsx(Edit2, { className: "w-3.5 h-3.5" }) }), _jsx("button", { onClick: () => softDeleteExpense(exp.id), className: "p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded", title: "\u0646\u0642\u0644 \u0644\u0633\u0644\u0629 \u0627\u0644\u0645\u062d\u0630\u0648\u0641\u0627\u062a \u0648\u0625\u0644\u063a\u0627\u0621 \u0623\u062b\u0631\u0647 \u0627\u0644\u0645\u0627\u0644\u064a", children: _jsx(Trash2, { className: "w-3.5 h-3.5" }) })] }) })] }, exp.id))) })] })) }) }), showAddModal && (_jsx("div", { className: "fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in", children: _jsxs("form", { onSubmit: handleSaveExpense, className: "w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 shadow-2xl p-5 space-y-4 border text-right", children: [_jsx("h3", { className: "text-sm font-bold text-slate-900 dark:text-white", children: editingExpense ? 'تعديل المصروف' : 'تسجيل مصروف جديد' }), _jsxs("div", { children: [_jsx("label", { className: "text-xs font-semibold block mb-1", children: "\u0627\u0644\u0645\u0628\u0644\u063a \u0627\u0644\u0645\u0635\u0631\u0648\u0641 *" }), _jsx("input", { type: "number", step: "any", min: "0.01", required: true, value: amount || '', onChange: (e) => setAmount(parseFloat(e.target.value) || 0), placeholder: "0.00", className: "w-full px-3 py-2 text-sm font-mono font-bold border rounded-lg" })] }), _jsxs("div", { children: [_jsx("label", { className: "text-xs font-semibold block mb-1", children: "\u0628\u0646\u062f \u0627\u0644\u0645\u0635\u0631\u0648\u0641:" }), _jsx(SearchableDropdown, { id: "expense-category", options: expenseCategories.map((c) => ({ id: c, label: c })), selectedId: category, onSelect: setCategory, placeholder: "\u0627\u0628\u062d\u062b \u0639\u0646 \u0628\u0646\u062f \u0627\u0644\u0645\u0635\u0631\u0648\u0641..." })] }), _jsxs("div", { children: [_jsx("label", { className: "text-xs font-semibold block mb-1", children: "\u0635\u0631\u0641 \u0645\u0646 \u0627\u0644\u062d\u0633\u0627\u0628:" }), _jsx(SearchableDropdown, { id: "expense-account", options: accounts.map((a) => ({ id: a.id, label: a.name, subLabel: `\u0627\u0644\u0631\u0635\u064a\u062f: ${a.balance} ${settings.currencySymbol}` })), selectedId: accountId, onSelect: setAccountId, placeholder: "\u0627\u0628\u062d\u062b \u0639\u0646 \u0627\u0644\u062d\u0633\u0627\u0628..." })] }), _jsxs("div", { children: [_jsx("label", { className: "text-xs font-semibold block mb-1", children: "\u0628\u064a\u0627\u0646 \u062a\u0641\u0635\u064a\u0644\u064a / \u0645\u0644\u0627\u062d\u0638\u0627\u062a:" }), _jsx("input", { type: "text", placeholder: "\u062a\u0641\u0627\u0635\u064a\u0644 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629 \u0623\u0648 \u0633\u0628\u0628 \u0627\u0644\u0635\u0631\u0641...", value: notes, onChange: (e) => setNotes(e.target.value), className: "w-full px-3 py-1.5 text-xs border rounded-lg" })] }), _jsxs("div", { className: "flex justify-between pt-2 border-t", children: [_jsx("button", { type: "button", onClick: () => { setShowAddModal(false); setEditingExpense(null); }, className: "px-3 py-1.5 text-xs text-slate-500", children: "\u0625\u0644\u063a\u0627\u0621" }), _jsx("button", { type: "submit", className: "px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md", children: editingExpense ? 'حفظ التعديل' : 'تأكيد تسجيل المصروف' })] })] }) }))] }));
+    showToast(ok ? 'تم تنزيل كشف PDF حسب الفلترة الحالية' : 'تعذر إنشاء ملف PDF', ok ? 'success' : 'error');
+  };
+  const exportExcel = async () => {
+    if (!count) return showToast('لا توجد بيانات ضمن الفلترة الحالية', 'warning');
+    const r = reportMeta();
+    const ok = await downloadProfessionalTableExcel({
+      title:r.title,
+      subtitle:`${periodLabel} • عدد الحركات: ${count} • الإجمالي: ${money(total)} ${settings.currencySymbol}`,
+      headers:r.headers, rows:r.rows, settings, filename:`${r.filename}.xls`,
+      extraTopRows:[[mode === 'receipts' ? 'التصنيف' : 'نوع المصروف', mode === 'receipts' ? (selectedReceiptClass === 'all' ? 'الكل' : paymentClassLabel(selectedReceiptClass)) : (selectedCategory === 'all' ? 'الكل' : selectedCategory), 'من', dateFrom || '-', 'إلى', dateTo || '-']]
+    });
+    showToast(ok ? 'تم تنزيل كشف Excel حسب الفلترة الحالية' : 'تعذر إنشاء ملف Excel', ok ? 'success' : 'error');
+  };
+
+  const setQuickRange = kind => {
+    if (kind === 'all') { setDateFrom(''); setDateTo(''); return; }
+    if (kind === 'today') { const t=todayKey(); setDateFrom(t); setDateTo(t); return; }
+    if (kind === 'month') { setDateFrom(monthStartKey()); setDateTo(todayKey()); }
+  };
+  const openNewExpense = () => {
+    setEditingExpense(null);
+    setAmount('');
+    setNotes('');
+    if (mode === 'labor') {
+      const labor = configuredCategories.find(isLaborCategory) || configuredCategories[0] || 'أخرى';
+      setCategory(labor);
+    } else setCategory(configuredCategories[0] || 'أخرى');
+    setAccountId(accounts.find(a=>a.isDefault)?.id || accounts[0]?.id || '');
+    setShowAddModal(true);
+  };
+  const editExpense = exp => {
+    setEditingExpense(exp);
+    setAmount(String(exp.amount || ''));
+    setCategory(exp.category || configuredCategories[0] || 'أخرى');
+    setAccountId(exp.accountId || accounts.find(a=>a.isDefault)?.id || accounts[0]?.id || '');
+    setNotes(exp.notes || '');
+    setShowAddModal(true);
+  };
+  const saveExpense = async e => {
+    e.preventDefault();
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) return showToast('يرجى إدخال مبلغ مصروف صحيح', 'warning');
+    const account = accounts.find(a => a.id === accountId);
+    if (!account) return showToast('يرجى اختيار حساب مالي صالح', 'warning');
+    if (editingExpense) await updateExpense({ ...editingExpense, amount:numericAmount, category, accountId, accountName:account.name, notes });
+    else await recordExpense({ amount:numericAmount, category, accountId, notes });
+    setShowAddModal(false); setEditingExpense(null); setAmount(''); setNotes('');
+  };
+  const addExpenseType = async e => {
+    e.preventDefault();
+    const name = newType.trim();
+    if (!name) return;
+    if (configuredCategories.some(x => x.toLowerCase() === name.toLowerCase())) return showToast('هذا النوع موجود بالفعل', 'warning');
+    await updateSettings({ expenseCategories:[...configuredCategories, name] });
+    setNewType('');
+  };
+  const removeExpenseType = async name => {
+    const next = configuredCategories.filter(x => x !== name);
+    if (!next.length) return showToast('يجب إبقاء نوع مصروف واحد على الأقل', 'warning');
+    await updateSettings({ expenseCategories:next });
+    if (category === name) setCategory(next[0]);
+    if (selectedCategory === name) setSelectedCategory('all');
+  };
+
+  const modeButton = (id, label, Icon) => h('button', {
+    type:'button', onClick:()=>{ setMode(id); setSearch(''); setSelectedCategory('all'); setSelectedReceiptClass('all'); },
+    className:`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition ${mode===id?'bg-emerald-600 text-white border-emerald-600 shadow-sm':'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`
+  }, h(Icon,{className:'w-4 h-4'}), label);
+
+  const expenseRows = expensePager.pageItems.map(exp => h('tr',{key:exp.id,className:'border-b border-slate-100 hover:bg-slate-50/70'},
+    h('td',{className:'p-3 text-slate-500'},new Date(exp.date).toLocaleString('ar-EG')),
+    h('td',{className:'p-3 font-bold'},exp.category || '-'),
+    h('td',{className:'p-3 font-mono font-black text-rose-600'},`${money(exp.amount)} ${settings.currencySymbol}`),
+    h('td',{className:'p-3'},exp.accountName || '-'),
+    h('td',{className:'p-3 max-w-[260px] truncate',title:exp.notes||''},exp.notes || '-'),
+    h('td',{className:'p-3'},h('div',{className:'flex gap-1 justify-end'},
+      h('button',{type:'button',onClick:()=>editExpense(exp),className:'p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50',title:'تعديل'},h(Edit2,{className:'w-3.5 h-3.5'})),
+      h('button',{type:'button',onClick:()=>softDeleteExpense(exp.id),className:'p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50',title:'حذف'},h(Trash2,{className:'w-3.5 h-3.5'}))
+    ))
+  ));
+  const receiptRows = receiptPager.pageItems.map(v => h('tr',{key:v.id,className:'border-b border-slate-100 hover:bg-slate-50/70'},
+    h('td',{className:'p-3 font-mono font-bold'},v.reference || '-'),
+    h('td',{className:'p-3 text-slate-500'},new Date(v.date).toLocaleString('ar-EG')),
+    h('td',{className:'p-3'},h('span',{className:'px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-bold'},paymentClassLabel(v.classId))),
+    h('td',{className:'p-3 font-bold'},v.partyName || '-'),
+    h('td',{className:'p-3 font-mono font-black text-emerald-700'},`${money(v.amount)} ${settings.currencySymbol}`),
+    h('td',{className:'p-3'},v.method || '-'),
+    h('td',{className:'p-3'},v.accountName || 'حساب مالي'),
+    h('td',{className:'p-3 max-w-[260px] truncate',title:v.notes||''},v.notes || '-')
+  ));
+
+  return h('div',{id:'expenses-screen',className:'p-4 sm:p-6 space-y-4 max-w-7xl mx-auto text-right select-none'},
+    h('div',{className:'flex flex-col lg:flex-row lg:items-center justify-between gap-3'},
+      h('div',null,
+        h('h2',{className:'text-xl font-black text-slate-900'},'المصروفات والكشوفات'),
+        h('p',{className:'text-xs text-slate-500 mt-1'},'كشوفات مصنفة حسب النوع والفترة والفلترة، مع تنزيل PDF وExcel احترافي')
+      ),
+      h('div',{className:'flex flex-wrap items-center gap-2'},
+        mode !== 'receipts' && h('button',{type:'button',onClick:openNewExpense,className:'flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-sm'},h(Plus,{className:'w-4 h-4'}),'تسجيل مصروف'),
+        mode === 'expenses' && h('button',{type:'button',onClick:()=>setShowTypeManager(true),className:'flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-bold'},h(Settings2,{className:'w-4 h-4'}),'أنواع المصروف'),
+        h('button',{type:'button',onClick:exportPDF,className:'flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold'},h(FileText,{className:'w-4 h-4 text-rose-600'}),'PDF'),
+        h('button',{type:'button',onClick:exportExcel,className:'flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold'},h(FileSpreadsheet,{className:'w-4 h-4 text-emerald-600'}),'Excel')
+      )
+    ),
+
+    h('div',{className:'grid grid-cols-3 gap-2'},
+      modeButton('expenses','المصروفات',Receipt),
+      modeButton('labor','كشف العمال / الأجور',UsersRound),
+      modeButton('receipts','الدفعات المدخلة',WalletCards)
+    ),
+
+    h('div',{className:'rounded-2xl bg-white border border-slate-200 shadow-sm p-3 space-y-3'},
+      h('div',{className:'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 items-end'},
+        h('div',{className:'relative lg:col-span-2'},
+          h('label',{className:'block text-[10px] text-slate-500 font-bold mb-1'},'بحث داخل الكشف'),
+          h(Search,{className:'absolute right-3 top-8 w-4 h-4 text-slate-400'}),
+          h('input',{value:search,onChange:e=>setSearch(e.target.value),placeholder:mode==='receipts'?'ابحث بالجهة أو رقم السند أو البيان...':'ابحث بالنوع أو البيان أو الحساب...',className:'w-full pr-9 pl-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50'})
+        ),
+        mode === 'receipts'
+          ? h('div',null,h('label',{className:'block text-[10px] text-slate-500 font-bold mb-1'},'تصنيف الدفعة'),h(SearchableDropdown,{id:'receipt-class-filter',options:[{id:'all',label:'كل الدفعات'},{id:'sales',label:'دفعات المبيعات'},{id:'customer',label:'سندات قبض العملاء'},{id:'supplier',label:'سندات قبض الموردين'},{id:'other',label:'دفعات أخرى'}],selectedId:selectedReceiptClass,onSelect:setSelectedReceiptClass,placeholder:'التصنيف'}))
+          : h('div',null,h('label',{className:'block text-[10px] text-slate-500 font-bold mb-1'},'نوع المصروف'),h(SearchableDropdown,{id:'expense-category-filter',options:[{id:'all',label:mode==='labor'?'كل بنود العمال والأجور':'كل أنواع المصروفات'},...filterCategories.filter(c=>mode!=='labor'||isLaborCategory(c)).map(c=>({id:c,label:c}))],selectedId:selectedCategory,onSelect:setSelectedCategory,placeholder:'نوع المصروف'})),
+        h('div',null,h('label',{className:'block text-[10px] text-slate-500 font-bold mb-1'},'من تاريخ'),h('input',{type:'date',value:dateFrom,onChange:e=>setDateFrom(e.target.value),className:'w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white'})),
+        h('div',null,h('label',{className:'block text-[10px] text-slate-500 font-bold mb-1'},'إلى تاريخ'),h('input',{type:'date',value:dateTo,onChange:e=>setDateTo(e.target.value),className:'w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white'}))
+      ),
+      h('div',{className:'flex flex-wrap gap-2 justify-between items-center border-t border-slate-100 pt-3'},
+        h('div',{className:'flex gap-1.5'},
+          h('button',{type:'button',onClick:()=>setQuickRange('today'),className:'px-3 py-1.5 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-600'},'اليوم'),
+          h('button',{type:'button',onClick:()=>setQuickRange('month'),className:'px-3 py-1.5 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-600'},'هذا الشهر'),
+          h('button',{type:'button',onClick:()=>setQuickRange('all'),className:'px-3 py-1.5 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-600'},'كل الفترات')
+        ),
+        h('div',{className:'text-xs font-bold text-slate-600'},`${periodLabel} • ${count} حركة • الإجمالي: `,h('span',{className:mode==='receipts'?'text-emerald-700 font-mono':'text-rose-600 font-mono'},`${money(total)} ${settings.currencySymbol}`))
+      )
+    ),
+
+    mode === 'receipts' && h('div',{className:'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3'},
+      [['sales','دفعات المبيعات'],['customer','سندات قبض العملاء'],['supplier','سندات قبض الموردين'],['other','دفعات أخرى']].map(([key,label])=>h('button',{key,onClick:()=>setSelectedReceiptClass(key),className:`text-right p-3 rounded-2xl border bg-white shadow-sm ${selectedReceiptClass===key?'border-emerald-500 ring-1 ring-emerald-100':'border-slate-200'}`},h('div',{className:'text-[11px] text-slate-500 font-bold'},label),h('div',{className:'mt-1 text-lg font-black font-mono text-emerald-700'},`${money(receiptSummary[key])} ${settings.currencySymbol}`)))
+    ),
+
+    h('div',{className:'rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden'},
+      h('div',{className:'overflow-x-auto slim-scrollbar'},
+        count === 0 ? h('div',{className:'p-12 text-center text-xs text-slate-400'},'لا توجد حركات ضمن الفترة والفلترة المحددة') :
+        mode === 'receipts'
+          ? h('table',{className:'w-full text-xs text-right whitespace-nowrap min-w-[1050px]'},
+              h('thead',null,h('tr',{className:'bg-slate-50 text-slate-500 border-b'},['المرجع','التاريخ','التصنيف','الجهة','المبلغ','طريقة الدفع','الحساب المودع فيه','البيان'].map(x=>h('th',{key:x,className:'p-3'},x)))),
+              h('tbody',null,receiptRows)
+            )
+          : h('table',{className:'w-full text-xs text-right whitespace-nowrap min-w-[850px]'},
+              h('thead',null,h('tr',{className:'bg-slate-50 text-slate-500 border-b'},['التاريخ','نوع المصروف','المبلغ','الحساب المسدد منه','البيان','إجراءات'].map(x=>h('th',{key:x,className:'p-3'},x)))),
+              h('tbody',null,expenseRows)
+            )
+      ),
+      h(Pagination,{pager:mode==='receipts'?receiptPager:expensePager})
+    ),
+
+    mode === 'receipts' && h('div',{className:'flex justify-end'},h('button',{type:'button',onClick:()=>setActiveTab?.('vouchers'),className:'text-xs font-bold text-emerald-700 hover:underline'},'فتح سندات القبض والصرف ←')),
+
+    showAddModal && h('div',{className:'fixed inset-0 z-[70] bg-black/60 p-3 flex items-center justify-center',onClick:()=>setShowAddModal(false)},
+      h('form',{onSubmit:saveExpense,onClick:e=>e.stopPropagation(),className:'w-full max-w-md rounded-2xl bg-white shadow-2xl p-5 space-y-4 text-right max-h-[calc(100dvh-130px)] overflow-y-auto'},
+        h('div',{className:'flex justify-between items-center'},h('h3',{className:'text-sm font-black'},editingExpense?'تعديل المصروف':'تسجيل مصروف جديد'),h('button',{type:'button',onClick:()=>setShowAddModal(false),className:'p-1.5 rounded-lg hover:bg-slate-100'},h(X,{className:'w-4 h-4'}))),
+        h('div',null,h('label',{className:'text-xs font-bold block mb-1'},'المبلغ *'),h('input',{type:'number',step:'any',min:'0.01',required:true,value:amount,onChange:e=>setAmount(e.target.value),className:'w-full px-3 py-2 text-sm font-mono font-bold border rounded-xl'})),
+        h('div',null,h('label',{className:'text-xs font-bold block mb-1'},'نوع المصروف *'),h(SearchableDropdown,{id:'expense-category-editor',options:configuredCategories.map(c=>({id:c,label:c})),selectedId:category,onSelect:setCategory,placeholder:'اختر نوع المصروف'})),
+        h('div',null,h('label',{className:'text-xs font-bold block mb-1'},'صرف من الحساب *'),h(SearchableDropdown,{id:'expense-account-editor',options:accounts.map(a=>({id:a.id,label:a.name,subLabel:`الرصيد: ${money(a.balance)} ${settings.currencySymbol}`})),selectedId:accountId,onSelect:setAccountId,placeholder:'اختر الحساب'})),
+        h('div',null,h('label',{className:'text-xs font-bold block mb-1'},'البيان / الملاحظات'),h('input',{type:'text',value:notes,onChange:e=>setNotes(e.target.value),placeholder:'تفاصيل المصروف...',className:'w-full px-3 py-2 text-xs border rounded-xl'})),
+        h('div',{className:'flex justify-between pt-2 border-t'},h('button',{type:'button',onClick:()=>setShowAddModal(false),className:'px-3 py-2 text-xs text-slate-500'},'إلغاء'),h('button',{type:'submit',className:'px-5 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold'},editingExpense?'حفظ التعديل':'تأكيد التسجيل'))
+      )
+    ),
+
+    showTypeManager && h('div',{className:'fixed inset-0 z-[75] bg-black/60 p-3 flex items-center justify-center',onClick:()=>setShowTypeManager(false)},
+      h('div',{onClick:e=>e.stopPropagation(),className:'w-full max-w-md rounded-2xl bg-white shadow-2xl p-5 text-right max-h-[calc(100dvh-130px)] overflow-y-auto'},
+        h('div',{className:'flex justify-between items-center mb-4'},h('div',null,h('h3',{className:'text-sm font-black'},'إدارة أنواع المصروف'),h('p',{className:'text-[10px] text-slate-500 mt-1'},'الأنواع الجديدة تتزامن ضمن إعدادات الشركة، والحركات القديمة تبقى محفوظة.')),h('button',{type:'button',onClick:()=>setShowTypeManager(false),className:'p-1.5 rounded-lg hover:bg-slate-100'},h(X,{className:'w-4 h-4'}))),
+        h('form',{onSubmit:addExpenseType,className:'flex gap-2 mb-4'},h('input',{value:newType,onChange:e=>setNewType(e.target.value),placeholder:'مثال: وقود، مواصلات، أجور يومية...',className:'flex-1 px-3 py-2 text-xs border rounded-xl'}),h('button',{type:'submit',className:'px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold'},'إضافة')),
+        h('div',{className:'space-y-2'},configuredCategories.map(name=>h('div',{key:name,className:'flex justify-between items-center p-2.5 rounded-xl border border-slate-200 bg-slate-50'},h('span',{className:'text-xs font-bold'},name),h('button',{type:'button',onClick:()=>removeExpenseType(name),className:'p-1.5 rounded-lg text-rose-600 hover:bg-rose-50',title:'حذف النوع من القائمة'},h(Trash2,{className:'w-3.5 h-3.5'})))))
+      )
+    )
+  );
 };

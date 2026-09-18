@@ -1,156 +1,259 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState } from 'react';
-import { useApp } from './context__AppContext.js';
-import { Users, UserPlus, ShieldCheck, Trash2, Edit2, CheckCircle2, XCircle, UserCheck, AlertCircle, X, Download, FileKey, } from 'lucide-react';
+import { useApp } from './context__AppContext.js?v=7.9.4.11-notifications-popup';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.11-notifications-popup';
+import {
+  Users, UserPlus, ShieldCheck, Trash2, Edit2, UserCheck, Download,
+  UtensilsCrossed, ChefHat, LayoutGrid, Scale, X
+} from 'lucide-react';
+
+const h = React.createElement;
+
 const defaultPermissions = {
-    canDiscount: true,
-    canEditPrice: false,
-    canDeleteInvoice: false,
-    canDeleteProducts: false,
-    canManagePurchases: false,
-    canManageVouchers: true,
-    canManageInventory: false,
-    canViewReports: false,
-    canAccessSettings: false,
+  canDiscount: true,
+  canEditPrice: false,
+  canDeleteInvoice: false,
+  canDeleteProducts: false,
+  canManagePurchases: false,
+  canManageVouchers: true,
+  canManageInventory: false,
+  canViewReports: false,
+  canAccessSettings: false,
+  canAccessRestaurantTables: false,
+  canAccessRestaurantWaiter: false,
+  canAccessRestaurantKitchen: false,
+  canAccessRestaurantOrders: false,
+  canAccessRestaurantWaste: false,
 };
+
+const allPermissions = Object.fromEntries(Object.keys(defaultPermissions).map(k => [k, true]));
+const restaurantPermissionLabels = {
+  canAccessRestaurantTables: 'الطاولات والصالات',
+  canAccessRestaurantWaiter: 'واجهة الجرسون',
+  canAccessRestaurantKitchen: 'شاشة المطبخ',
+  canAccessRestaurantWaste: 'الوصفات والهالك',
+};
+
+const presetForRole = role => {
+  if (role === 'admin') return { roleName: 'مدير عام', permissions: { ...allPermissions } };
+  if (role === 'waiter') return {
+    roleName: 'جرسون',
+    permissions: { ...defaultPermissions, canManageVouchers: false, canDiscount: false, canAccessRestaurantTables: true, canAccessRestaurantWaiter: true }
+  };
+  if (role === 'kitchen') return {
+    roleName: 'موظف مطبخ',
+    permissions: { ...defaultPermissions, canManageVouchers: false, canDiscount: false, canAccessRestaurantKitchen: true }
+  };
+  if (role === 'accountant') return {
+    roleName: 'محاسب',
+    permissions: { ...defaultPermissions, canManagePurchases: true, canManageVouchers: true, canViewReports: true }
+  };
+  if (role === 'inventory_mgr') return {
+    roleName: 'مسؤول مخزون',
+    permissions: { ...defaultPermissions, canDiscount: false, canManageVouchers: false, canManagePurchases: true, canManageInventory: true }
+  };
+  if (role === 'cashier') return { roleName: 'كاشير', permissions: { ...defaultPermissions } };
+  return null;
+};
+
 export const EmployeesView = () => {
-    const { employees, activeEmployee, setActiveEmployee, saveEmployee, deleteEmployee, showToast, } = useApp();
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingEmployee, setEditingEmployee] = useState(null);
-    const [deleteConfirmId, setDeleteConfirmId] = useState(null);
-    // Form states
-    const [name, setName] = useState('');
-    const [phone, setPhone] = useState('');
-    const [role, setRole] = useState('cashier');
-    const [roleName, setRoleName] = useState('كاشير');
-    const [pin, setPin] = useState('');
-    const [active, setActive] = useState(true);
-    const [permissions, setPermissions] = useState({ ...defaultPermissions });
-    const handleOpenAdd = () => {
-        setEditingEmployee(null);
-        setName('');
-        setPhone('');
-        setRole('cashier');
-        setRoleName('كاشير');
-        setPin('');
-        setActive(true);
-        setPermissions({ ...defaultPermissions });
-        setIsModalOpen(true);
-    };
-    const handleOpenEdit = (emp) => {
-        setEditingEmployee(emp);
-        setName(emp.name);
-        setPhone(emp.phone || '');
-        setRole(emp.role);
-        setRoleName(emp.roleName);
-        setPin(emp.pin || '');
-        setActive(emp.active);
-        setPermissions({ ...emp.permissions });
-        setIsModalOpen(true);
-    };
-    const handleRolePresetChange = (selectedRole) => {
-        setRole(selectedRole);
-        if (selectedRole === 'admin') {
-            setRoleName('مدير عام');
-            setPermissions({
-                canDiscount: true,
-                canEditPrice: true,
-                canDeleteInvoice: true,
-                canDeleteProducts: true,
-                canManagePurchases: true,
-                canManageVouchers: true,
-                canManageInventory: true,
-                canViewReports: true,
-                canAccessSettings: true,
-            });
-        }
-        else if (selectedRole === 'cashier') {
-            setRoleName('كاشير');
-            setPermissions({
-                canDiscount: true,
-                canEditPrice: false,
-                canDeleteInvoice: false,
-                canDeleteProducts: false,
-                canManagePurchases: false,
-                canManageVouchers: true,
-                canManageInventory: false,
-                canViewReports: false,
-                canAccessSettings: false,
-            });
-        }
-        else if (selectedRole === 'accountant') {
-            setRoleName('محاسب');
-            setPermissions({
-                canDiscount: true,
-                canEditPrice: false,
-                canDeleteInvoice: false,
-                canDeleteProducts: false,
-                canManagePurchases: true,
-                canManageVouchers: true,
-                canManageInventory: false,
-                canViewReports: true,
-                canAccessSettings: false,
-            });
-        }
-        else if (selectedRole === 'inventory_mgr') {
-            setRoleName('مسؤول مخزون');
-            setPermissions({
-                canDiscount: false,
-                canEditPrice: false,
-                canDeleteInvoice: false,
-                canDeleteProducts: false,
-                canManagePurchases: true,
-                canManageVouchers: false,
-                canManageInventory: true,
-                canViewReports: false,
-                canAccessSettings: false,
-            });
-        }
-        else {
-            setRoleName('مخصص');
-        }
-    };
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!name.trim()) {
-            showToast('يرجى كتابة اسم الموظف', 'error');
-            return;
-        }
-        const employeeData = {
-            id: editingEmployee ? editingEmployee.id : `emp-${Date.now()}`,
-            name: name.trim(),
-            phone: phone.trim() || undefined,
-            role,
-            roleName: roleName.trim() || 'موظف',
-            pin: pin.trim() || undefined,
-            permissions,
-            active,
-            createdAt: editingEmployee ? editingEmployee.createdAt : new Date().toISOString(),
-        };
-        await saveEmployee(employeeData);
-        setIsModalOpen(false);
-    };
-    const handleSwitchActiveEmployee = (emp) => {
-        setActiveEmployee(emp);
-        showToast(`تم تسجيل الدخول بحساب: ${emp.name} (${emp.roleName})`, 'success');
-    };
-    const downloadLoginFile = async (emp) => {
-        try {
-            if (!emp.active) throw new Error('فعّل حساب الموظف أولاً.');
-            let current = emp;
-            if (!current.authVersion) { current = { ...current, authVersion: `AUTH-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, updatedAt: new Date().toISOString() }; await saveEmployee(current); }
-            const syncResult = await window.OscarCloudSync?.syncNow?.({ force:true });
-            if (syncResult?.error || window.OscarCloudSync?.pendingCount?.()) throw new Error('لم تكتمل مزامنة الموظف بعد. أعد المحاولة بعد الاتصال.');
-            await window.OscarActivation?.prepareVerifiedRoleFile?.('employee', current, `${current.name}-دخول.mzauth`);
-            showToast('تم إنشاء ملف دخول الموظف بنجاح', 'success');
-        } catch (e) { showToast(String(e?.message || e), 'error'); }
-    };
-    return (_jsxs("div", { id: "employees-view-container", className: "p-3 sm:p-5 space-y-4 max-w-7xl mx-auto select-none min-h-[calc(100vh-4rem)]", children: [_jsxs("div", { className: "flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs", children: [_jsxs("div", { children: [_jsxs("div", { className: "flex items-center gap-2", children: [_jsx("div", { className: "p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600", children: _jsx(Users, { className: "w-5 h-5" }) }), _jsx("h1", { className: "text-lg font-black text-slate-900 dark:text-white tracking-tight", children: "\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u0645\u0648\u0638\u0641\u064A\u0646 \u0648\u0627\u0644\u0643\u0627\u062F\u0631 \u0648\u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0627\u062A" })] }), _jsx("p", { className: "text-xs text-slate-500 dark:text-slate-400 mt-1", children: "\u0625\u0636\u0627\u0641\u0629 \u0645\u0648\u0638\u0641\u064A\u0646 \u0648\u062A\u062D\u062F\u064A\u062F \u0635\u0644\u0627\u062D\u064A\u0627\u062A \u062F\u0642\u064A\u0642\u0629 (\u0627\u0644\u062E\u0635\u0645\u060C \u062A\u0639\u062F\u064A\u0644 \u0627\u0644\u0623\u0633\u0639\u0627\u0631\u060C \u062D\u0630\u0641 \u0627\u0644\u0641\u0648\u0627\u062A\u064A\u0631\u060C \u0627\u0644\u062A\u0642\u0627\u0631\u064A\u0631\u060C \u0627\u0644\u0633\u0646\u062F\u0627\u062A \u0648\u0627\u0644\u0645\u0634\u062A\u0631\u064A\u0627\u062A)" })] }), _jsx("div", { className: "flex items-center gap-2", children: _jsxs("button", { onClick: handleOpenAdd, className: "flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition", children: [_jsx(UserPlus, { className: "w-4 h-4" }), _jsx("span", { children: "\u0625\u0636\u0627\u0641\u0629 \u0645\u0648\u0638\u0641 \u062C\u062F\u064A\u062F" })] }) })] }), activeEmployee && (_jsxs("div", { className: "p-4 rounded-2xl bg-gradient-to-r from-emerald-600/10 via-emerald-50 to-transparent dark:from-emerald-950/40 dark:via-slate-900 dark:to-transparent border border-emerald-200 dark:border-emerald-800/60 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3", children: [_jsxs("div", { className: "flex items-center gap-3", children: [_jsx("div", { className: "w-11 h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black text-base shadow-sm", children: _jsx(UserCheck, { className: "w-6 h-6" }) }), _jsxs("div", { children: [_jsxs("div", { className: "flex items-center gap-2", children: [_jsx("span", { className: "text-xs text-emerald-700 dark:text-emerald-400 font-bold", children: "\u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u0627\u0644\u0646\u0634\u0637 \u062D\u0627\u0644\u064A\u0627\u064B \u0641\u064A \u0627\u0644\u0646\u0638\u0627\u0645:" }), _jsx("span", { className: "px-2 py-0.5 rounded-md bg-emerald-600 text-white font-black text-[10px]", children: activeEmployee.roleName })] }), _jsx("h2", { className: "text-base font-black text-slate-900 dark:text-white", children: activeEmployee.name })] })] }), _jsxs("div", { className: "flex flex-wrap items-center gap-1.5 text-[11px]", children: [_jsx("span", { className: "font-semibold text-slate-500", children: "\u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0627\u062A \u0627\u0644\u0646\u0634\u0637\u0629:" }), activeEmployee.permissions.canDiscount && (_jsx("span", { className: "px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300", children: "\u0645\u0646\u062D \u062E\u0635\u0645" })), activeEmployee.permissions.canEditPrice && (_jsx("span", { className: "px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300", children: "\u062A\u0639\u062F\u064A\u0644 \u0627\u0644\u0633\u0639\u0631" })), activeEmployee.permissions.canDeleteInvoice && (_jsx("span", { className: "px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300", children: "\u0625\u0644\u063A\u0627\u0621 \u0641\u0648\u0627\u062A\u064A\u0631" })), activeEmployee.permissions.canManageVouchers && (_jsx("span", { className: "px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300", children: "\u0627\u0644\u0633\u0646\u062F\u0627\u062A" })), activeEmployee.permissions.canViewReports && (_jsx("span", { className: "px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300", children: "\u0627\u0644\u062A\u0642\u0627\u0631\u064A\u0631" }))] })] })), _jsx("div", { className: "bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden", children: _jsx("div", { className: "overflow-x-auto max-w-full slim-scrollbar", children: _jsxs("table", { className: "w-full text-right text-xs whitespace-nowrap min-w-[720px]", children: [_jsx("thead", { className: "bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-bold", children: _jsxs("tr", { children: [_jsx("th", { className: "py-3 px-3.5", children: "\u0627\u0644\u0645\u0648\u0638\u0641" }), _jsx("th", { className: "py-3 px-3", children: "\u0627\u0644\u0645\u0633\u0645\u0649 \u0627\u0644\u0648\u0638\u064A\u0641\u064A" }), _jsx("th", { className: "py-3 px-3", children: "\u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062A\u0641" }), _jsx("th", { className: "py-3 px-3", children: "\u0631\u0645\u0632 PIN" }), _jsx("th", { className: "py-3 px-3", children: "\u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0627\u062A \u0627\u0644\u0645\u0645\u0646\u0648\u062D\u0629" }), _jsx("th", { className: "py-3 px-3", children: "\u0627\u0644\u062D\u0627\u0644\u0629" }), _jsx("th", { className: "py-3 px-3.5 text-center", children: "\u0627\u0644\u0625\u062C\u0631\u0627\u0621\u0627\u062A \u0648\u0627\u0644\u062A\u0628\u062F\u064A\u0644" })] }) }), _jsx("tbody", { className: "divide-y divide-slate-100 dark:divide-slate-800 text-slate-800 dark:text-slate-200", children: employees.length === 0 ? (_jsx("tr", { children: _jsxs("td", { colSpan: 7, className: "py-12 text-center text-slate-400", children: [_jsx(Users, { className: "w-8 h-8 mx-auto mb-2 opacity-30" }), _jsx("p", { className: "font-bold", children: "\u0644\u0627 \u064A\u0648\u062C\u062F \u0645\u0648\u0638\u0641\u0648\u0646 \u0645\u0633\u062C\u0644\u0648\u0646" })] }) })) : (employees.map((emp) => {
-                                    const isActiveUser = activeEmployee?.id === emp.id;
-                                    const perms = emp.permissions || defaultPermissions;
-                                    return (_jsxs("tr", { className: `hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition ${isActiveUser ? 'bg-emerald-50/40 dark:bg-emerald-950/20' : ''}`, children: [_jsx("td", { className: "py-3 px-3.5", children: _jsxs("div", { className: "flex items-center gap-2", children: [_jsx("div", { className: "w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-700 dark:text-slate-300", children: emp.name.slice(0, 1) }), _jsxs("div", { children: [_jsxs("div", { className: "font-bold text-slate-900 dark:text-white flex items-center gap-1.5", children: [_jsx("span", { children: emp.name }), isActiveUser && (_jsx("span", { className: "text-[10px] bg-emerald-600 text-white px-1.5 py-0.2 rounded font-black", children: "\u0627\u0644\u062D\u0627\u0644\u064A" }))] }), _jsxs("span", { className: "text-[10px] text-slate-400", children: ["\u0645\u0633\u062C\u0644 \u0645\u0646\u0630 ", new Date(emp.createdAt).toLocaleDateString('ar-EG')] })] })] }) }), _jsx("td", { className: "py-3 px-3", children: _jsx("span", { className: "inline-block px-2 py-0.5 rounded-md font-bold text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300", children: emp.roleName }) }), _jsx("td", { className: "py-3 px-3 font-mono text-slate-600 dark:text-slate-400", children: emp.phone || '-' }), _jsx("td", { className: "py-3 px-3 font-mono text-slate-600 dark:text-slate-400", children: emp.pin ? '••••' : 'بدون PIN' }), _jsx("td", { className: "py-3 px-3", children: _jsxs("div", { className: "flex items-center gap-1 flex-wrap max-w-xs", children: [perms.canDiscount && (_jsx("span", { className: "px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300", children: "\u062E\u0635\u0645" })), perms.canEditPrice && (_jsx("span", { className: "px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300", children: "\u062A\u0639\u062F\u064A\u0644 \u0633\u0639\u0631" })), perms.canDeleteInvoice && (_jsx("span", { className: "px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300", children: "\u062D\u0630\u0641 \u0641\u0648\u0627\u062A\u064A\u0631" })), perms.canManagePurchases && (_jsx("span", { className: "px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300", children: "\u0645\u0634\u062A\u0631\u064A\u0627\u062A" })), perms.canManageVouchers && (_jsx("span", { className: "px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300", children: "\u0633\u0646\u062F\u0627\u062A" })), perms.canViewReports && (_jsx("span", { className: "px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300", children: "\u062A\u0642\u0627\u0631\u064A\u0631" }))] }) }), _jsx("td", { className: "py-3 px-3", children: emp.active ? (_jsxs("span", { className: "inline-flex items-center gap-1 text-emerald-600 font-bold text-[11px]", children: [_jsx(CheckCircle2, { className: "w-3.5 h-3.5" }), _jsx("span", { children: "\u0646\u0634\u0637" })] })) : (_jsxs("span", { className: "inline-flex items-center gap-1 text-slate-400 font-bold text-[11px]", children: [_jsx(XCircle, { className: "w-3.5 h-3.5" }), _jsx("span", { children: "\u0645\u0639\u0637\u0644" })] })) }), _jsx("td", { className: "py-3 px-3.5 text-center", children: _jsxs("div", { className: "inline-flex items-center gap-1.5", children: [!isActiveUser && (_jsx("button", { onClick: () => handleSwitchActiveEmployee(emp), className: "px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 text-[11px] font-bold border border-emerald-200 dark:border-emerald-800 transition", title: "\u0627\u0644\u062A\u0628\u062F\u064A\u0644 \u0625\u0644\u0649 \u0647\u0630\u0627 \u0627\u0644\u0645\u0648\u0638\u0641 \u0643\u0643\u0627\u0634\u064A\u0631 \u062D\u0627\u0644\u064A", children: "\u062A\u0633\u062C\u064A\u0644 \u062F\u062E\u0648\u0644" })), _jsx("button", { onClick: () => handleOpenEdit(emp), className: "p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition", title: "\u062A\u0639\u062F\u064A\u0644 \u0628\u064A\u0627\u0646\u0627\u062A \u0648\u0635\u0644\u0627\u062D\u064A\u0627\u062A \u0627\u0644\u0645\u0648\u0638\u0641", children: _jsx(Edit2, { className: "w-3.5 h-3.5" }) }), _jsx("button", { onClick: () => downloadLoginFile(emp), className: "p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50", title: "تنزيل ملف الدخول .mzauth", children: _jsx(FileKey, { className: "w-4 h-4" }) }), _jsx("button", { onClick: () => setDeleteConfirmId(emp.id), className: "p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-600 transition", title: "\u062D\u0630\u0641 \u0627\u0644\u0645\u0648\u0638\u0641", children: _jsx(Trash2, { className: "w-3.5 h-3.5" }) })] }) })] }, emp.id));
-                                })) })] }) }) }), isModalOpen && (_jsx("div", { className: "fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in overflow-y-auto", children: _jsxs("div", { className: "w-full max-w-lg rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-5 text-right my-8 max-h-[90vh] overflow-y-auto custom-scrollbar", children: [_jsxs("div", { className: "flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800", children: [_jsxs("div", { className: "flex items-center gap-2", children: [_jsx("div", { className: "p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600", children: _jsx(ShieldCheck, { className: "w-5 h-5" }) }), _jsxs("div", { children: [_jsx("h3", { className: "font-black text-slate-900 dark:text-white text-base", children: editingEmployee ? 'تعديل بيانات وصلاحيات الموظف' : 'إضافة موظف جديد' }), _jsx("p", { className: "text-[11px] text-slate-400", children: "\u062D\u062F\u062F \u0645\u0633\u0645\u0649 \u0627\u0644\u0645\u0648\u0638\u0641 \u0648\u0631\u0642\u0645 PIN \u0648\u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0627\u062A \u0627\u0644\u0645\u062E\u0648\u0644 \u0628\u0647\u0627 \u062F\u0627\u062E\u0644 \u0627\u0644\u0645\u062A\u062C\u0631" })] })] }), _jsx("button", { onClick: () => setIsModalOpen(false), className: "p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200", children: _jsx(X, { className: "w-5 h-5" }) })] }), _jsxs("form", { onSubmit: handleSubmit, className: "space-y-4 mt-4 text-xs", children: [_jsxs("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-3", children: [_jsxs("div", { children: [_jsx("label", { className: "block font-bold text-slate-700 dark:text-slate-300 mb-1", children: "\u0627\u0633\u0645 \u0627\u0644\u0645\u0648\u0638\u0641 *:" }), _jsx("input", { type: "text", required: true, value: name, onChange: (e) => setName(e.target.value), placeholder: "\u0645\u062B\u0627\u0644: \u0623\u062D\u0645\u062F \u0645\u0635\u0637\u0641\u0649", className: "w-full p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-semibold focus:outline-none focus:border-emerald-500" })] }), _jsxs("div", { children: [_jsx("label", { className: "block font-bold text-slate-700 dark:text-slate-300 mb-1", children: "\u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062A\u0641:" }), _jsx("input", { type: "text", value: phone, onChange: (e) => setPhone(e.target.value), placeholder: "05xxxxxxxx", className: "w-full p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:border-emerald-500" })] })] }), _jsxs("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-3", children: [_jsxs("div", { children: [_jsx("label", { className: "block font-bold text-slate-700 dark:text-slate-300 mb-1", children: "\u0627\u0644\u062F\u0648\u0631 / \u0627\u0644\u0642\u0627\u0644\u0628 \u0627\u0644\u062C\u0627\u0647\u0632:" }), _jsxs("select", { value: role, onChange: (e) => handleRolePresetChange(e.target.value), className: "w-full p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-semibold focus:outline-none focus:border-emerald-500", children: [_jsx("option", { value: "cashier", children: "\u0643\u0627\u0634\u064A\u0631 \u0646\u0642\u0637\u0629 \u0628\u064A\u0639" }), _jsx("option", { value: "admin", children: "\u0645\u062F\u064A\u0631 \u0639\u0627\u0645 (\u0643\u0627\u0641\u0629 \u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0627\u062A)" }), _jsx("option", { value: "accountant", children: "\u0645\u062D\u0627\u0633\u0628 (\u0645\u0627\u0644\u064A\u0629 \u0648\u0633\u0646\u062F\u0627\u062A \u0648\u062A\u0642\u0627\u0631\u064A\u0631)" }), _jsx("option", { value: "inventory_mgr", children: "\u0645\u0633\u0624\u0648\u0644 \u0645\u062E\u0627\u0632\u0646 \u0648\u062A\u0648\u0631\u064A\u062F" }), _jsx("option", { value: "custom", children: "\u0645\u062E\u0635\u0635 (\u062A\u062D\u062F\u064A\u062F \u064A\u062F\u0648\u064A)" })] })] }), _jsxs("div", { children: [_jsx("label", { className: "block font-bold text-slate-700 dark:text-slate-300 mb-1", children: "\u0631\u0645\u0632 \u0627\u0644\u062F\u062E\u0648\u0644 \u0627\u0644\u0633\u0631\u064A\u0639 (PIN):" }), _jsx("input", { type: "password", maxLength: 6, value: pin, onChange: (e) => setPin(e.target.value), placeholder: "\u0645\u062B\u0627\u0644: 1234 (\u0627\u062E\u062A\u064A\u0627\u0631\u064A)", className: "w-full p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono focus:outline-none focus:border-emerald-500" })] })] }), _jsxs("div", { children: [_jsx("label", { className: "block font-bold text-slate-700 dark:text-slate-300 mb-1", children: "\u0627\u0644\u0645\u0633\u0645\u0649 \u0627\u0644\u0648\u0638\u064A\u0641\u064A \u0627\u0644\u0645\u0639\u0631\u0648\u0636:" }), _jsx("input", { type: "text", value: roleName, onChange: (e) => setRoleName(e.target.value), className: "w-full p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-semibold focus:outline-none focus:border-emerald-500" })] }), _jsxs("div", { className: "p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/40 space-y-2.5", children: [_jsxs("div", { className: "flex items-center justify-between pb-1 border-b border-slate-200 dark:border-slate-700", children: [_jsx("span", { className: "font-bold text-slate-800 dark:text-slate-200 text-xs", children: "\u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0627\u062A \u0627\u0644\u0645\u0645\u0646\u0648\u062D\u0629 \u0644\u0644\u0645\u0648\u0638\u0641:" }), _jsx("span", { className: "text-[10px] text-slate-400", children: "\u062D\u062F\u062F \u0645\u0627 \u064A\u062D\u0642 \u0644\u0647 \u0641\u0639\u0644\u0647" })] }), _jsxs("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1", children: [_jsxs("label", { className: "flex items-center gap-2 p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-800 cursor-pointer", children: [_jsx("input", { type: "checkbox", checked: permissions.canDiscount, onChange: (e) => setPermissions({ ...permissions, canDiscount: e.target.checked }), className: "rounded text-emerald-600" }), _jsx("span", { className: "text-slate-700 dark:text-slate-300 font-medium", children: "\u0627\u0644\u0633\u0645\u0627\u062D \u0628\u0645\u0646\u062D \u062E\u0635\u0645 \u0641\u064A \u0627\u0644\u0633\u0644\u0629" })] }), _jsxs("label", { className: "flex items-center gap-2 p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-800 cursor-pointer", children: [_jsx("input", { type: "checkbox", checked: permissions.canEditPrice, onChange: (e) => setPermissions({ ...permissions, canEditPrice: e.target.checked }), className: "rounded text-emerald-600" }), _jsx("span", { className: "text-slate-700 dark:text-slate-300 font-medium", children: "\u0627\u0644\u0633\u0645\u0627\u062D \u0628\u062A\u0639\u062F\u064A\u0644 \u0633\u0639\u0631 \u0627\u0644\u0628\u064A\u0639" })] }), _jsxs("label", { className: "flex items-center gap-2 p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-800 cursor-pointer", children: [_jsx("input", { type: "checkbox", checked: permissions.canDeleteInvoice, onChange: (e) => setPermissions({ ...permissions, canDeleteInvoice: e.target.checked }), className: "rounded text-rose-600" }), _jsx("span", { className: "text-slate-700 dark:text-slate-300 font-medium", children: "\u0627\u0644\u0633\u0645\u0627\u062D \u0628\u062D\u0630\u0641 \u0648\u0625\u0644\u063A\u0627\u0621 \u0627\u0644\u0641\u0648\u0627\u062A\u064A\u0631" })] }), _jsxs("label", { className: "flex items-center gap-2 p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-800 cursor-pointer", children: [_jsx("input", { type: "checkbox", checked: permissions.canDeleteProducts, onChange: (e) => setPermissions({ ...permissions, canDeleteProducts: e.target.checked }), className: "rounded text-rose-600" }), _jsx("span", { className: "text-slate-700 dark:text-slate-300 font-medium", children: "\u0627\u0644\u0633\u0645\u0627\u062D \u0628\u062D\u0630\u0641 \u0627\u0644\u0623\u0635\u0646\u0627\u0641" })] }), _jsxs("label", { className: "flex items-center gap-2 p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-800 cursor-pointer", children: [_jsx("input", { type: "checkbox", checked: permissions.canManageVouchers, onChange: (e) => setPermissions({ ...permissions, canManageVouchers: e.target.checked }), className: "rounded text-emerald-600" }), _jsx("span", { className: "text-slate-700 dark:text-slate-300 font-medium", children: "\u0633\u0646\u062F\u0627\u062A \u0627\u0644\u0642\u0628\u0636 \u0648\u0627\u0644\u0635\u0631\u0641" })] }), _jsxs("label", { className: "flex items-center gap-2 p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-800 cursor-pointer", children: [_jsx("input", { type: "checkbox", checked: permissions.canManagePurchases, onChange: (e) => setPermissions({ ...permissions, canManagePurchases: e.target.checked }), className: "rounded text-emerald-600" }), _jsx("span", { className: "text-slate-700 dark:text-slate-300 font-medium", children: "\u0627\u0644\u0645\u0634\u062A\u0631\u064A\u0627\u062A \u0648\u062A\u0648\u0631\u064A\u062F \u0627\u0644\u0628\u0636\u0627\u0639\u0629" })] }), _jsxs("label", { className: "flex items-center gap-2 p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-800 cursor-pointer", children: [_jsx("input", { type: "checkbox", checked: permissions.canManageInventory, onChange: (e) => setPermissions({ ...permissions, canManageInventory: e.target.checked }), className: "rounded text-emerald-600" }), _jsx("span", { className: "text-slate-700 dark:text-slate-300 font-medium", children: "\u0627\u0644\u062C\u0631\u062F \u0648\u062A\u062D\u0648\u064A\u0644\u0627\u062A \u0627\u0644\u0645\u062E\u0627\u0632\u0646" })] }), _jsxs("label", { className: "flex items-center gap-2 p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-800 cursor-pointer", children: [_jsx("input", { type: "checkbox", checked: permissions.canViewReports, onChange: (e) => setPermissions({ ...permissions, canViewReports: e.target.checked }), className: "rounded text-emerald-600" }), _jsx("span", { className: "text-slate-700 dark:text-slate-300 font-medium", children: "\u0627\u0644\u062A\u0642\u0627\u0631\u064A\u0631 \u0648\u0627\u0644\u0623\u0631\u0628\u0627\u062D \u0627\u0644\u0645\u0627\u0644\u064A\u0629" })] }), _jsxs("label", { className: "flex items-center gap-2 p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-800 cursor-pointer", children: [_jsx("input", { type: "checkbox", checked: permissions.canAccessSettings, onChange: (e) => setPermissions({ ...permissions, canAccessSettings: e.target.checked }), className: "rounded text-emerald-600" }), _jsx("span", { className: "text-slate-700 dark:text-slate-300 font-medium", children: "\u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0627\u0644\u0646\u0638\u0627\u0645 \u0648\u0627\u0644\u0646\u0633\u062E \u0627\u0644\u0627\u062D\u062A\u064A\u0627\u0637\u064A" })] })] })] }), _jsxs("div", { className: "flex items-center gap-2", children: [_jsx("input", { type: "checkbox", id: "emp-status-checkbox", checked: active, onChange: (e) => setActive(e.target.checked), className: "rounded text-emerald-600" }), _jsx("label", { htmlFor: "emp-status-checkbox", className: "font-bold text-slate-700 dark:text-slate-300", children: "\u062D\u0633\u0627\u0628 \u0627\u0644\u0645\u0648\u0638\u0641 \u0646\u0634\u0637 \u0648\u064A\u0645\u0643\u0646\u0647 \u0627\u0644\u0639\u0645\u0644 \u0639\u0644\u0649 \u0627\u0644\u0646\u0638\u0627\u0645" })] }), _jsxs("div", { className: "flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800", children: [_jsx("button", { type: "button", onClick: () => setIsModalOpen(false), className: "px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold transition", children: "\u0625\u0644\u063A\u0627\u0621" }), _jsx("button", { type: "submit", className: "px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black shadow-md shadow-emerald-600/20 transition", children: "\u062D\u0641\u0638 \u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0645\u0648\u0638\u0641" })] })] })] }) })), deleteConfirmId && (_jsx("div", { className: "fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in", children: _jsxs("div", { className: "w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl p-5 text-right", children: [_jsxs("div", { className: "flex items-center gap-2 text-rose-600 mb-2", children: [_jsx(AlertCircle, { className: "w-5 h-5" }), _jsx("h3", { className: "font-bold text-base", children: "\u062A\u0623\u0643\u064A\u062F \u062D\u0630\u0641 \u0627\u0644\u0645\u0648\u0638\u0641" })] }), _jsx("p", { className: "text-xs text-slate-500 dark:text-slate-400", children: "\u0647\u0644 \u0623\u0646\u062A \u0645\u062A\u0623\u0643\u062F \u0645\u0646 \u062D\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0645\u0648\u0638\u0641 \u0645\u0646 \u0633\u062C\u0644\u0627\u062A \u0627\u0644\u0646\u0638\u0627\u0645\u061F" }), _jsxs("div", { className: "flex items-center justify-end gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-slate-800", children: [_jsx("button", { onClick: () => setDeleteConfirmId(null), className: "px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300", children: "\u062A\u0631\u0627\u062C\u0639" }), _jsx("button", { onClick: async () => {
-                                        await deleteEmployee(deleteConfirmId);
-                                        setDeleteConfirmId(null);
-                                    }, className: "px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition", children: "\u0646\u0639\u0645\u060C \u0627\u062D\u0630\u0641" })] })] }) }))] }));
+  const { employees, activeEmployee, setActiveEmployee, saveEmployee, deleteEmployee, showToast } = useApp();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState(null);
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [role, setRole] = useState('cashier');
+  const [roleName, setRoleName] = useState('كاشير');
+  const [pin, setPin] = useState('');
+  const [active, setActive] = useState(true);
+  const [permissions, setPermissions] = useState({ ...defaultPermissions });
+
+  const openAdd = () => {
+    setEditingEmployee(null);
+    setName(''); setPhone(''); setRole('cashier'); setRoleName('كاشير'); setPin(''); setActive(true);
+    setPermissions({ ...defaultPermissions });
+    setIsModalOpen(true);
+  };
+  const openEdit = emp => {
+    setEditingEmployee(emp);
+    setName(emp.name || ''); setPhone(emp.phone || ''); setRole(emp.role || 'custom'); setRoleName(emp.roleName || 'موظف'); setPin(emp.pin || ''); setActive(emp.active !== false);
+    setPermissions({ ...defaultPermissions, ...(emp.permissions || {}) });
+    setIsModalOpen(true);
+  };
+  const changeRole = selectedRole => {
+    setRole(selectedRole);
+    const preset = presetForRole(selectedRole);
+    if (preset) {
+      setRoleName(preset.roleName);
+      setPermissions(preset.permissions);
+    } else if (selectedRole === 'custom') {
+      setRoleName('مخصص');
+    }
+  };
+  const submit = async e => {
+    e.preventDefault();
+    if (!name.trim()) return showToast('يرجى كتابة اسم الموظف', 'error');
+    await saveEmployee({
+      id: editingEmployee?.id || `emp-${Date.now()}`,
+      name: name.trim(),
+      phone: phone.trim() || undefined,
+      role,
+      roleName: roleName.trim() || 'موظف',
+      pin: pin.trim() || undefined,
+      permissions: { ...defaultPermissions, ...permissions },
+      active,
+      authVersion: editingEmployee?.authVersion,
+      createdAt: editingEmployee?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    setIsModalOpen(false);
+  };
+  const switchEmployee = emp => {
+    setActiveEmployee(emp);
+    showToast(`تم تسجيل الدخول بحساب: ${emp.name} (${emp.roleName})`, 'success');
+  };
+  const removeEmployee = async emp => {
+    if (!window.confirm(`حذف الموظف ${emp.name}؟`)) return;
+    await deleteEmployee(emp.id);
+  };
+  const downloadLoginFile = async emp => {
+    try {
+      if (!emp.active) throw new Error('فعّل حساب الموظف أولاً.');
+      let current = emp;
+      if (!current.authVersion) {
+        current = { ...current, authVersion: `AUTH-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, updatedAt: new Date().toISOString() };
+        await saveEmployee(current);
+      }
+      window.OscarCloudSync?.requestSync?.(10);
+      const syncResult = await window.OscarCloudSync?.syncNow?.({ force: true });
+      if (syncResult?.error || window.OscarCloudSync?.pendingCount?.()) throw new Error('لم تكتمل مزامنة الموظف بعد. أعد المحاولة بعد الاتصال.');
+      await window.OscarActivation?.prepareVerifiedRoleFile?.('employee', current, `${current.name}-دخول.mzauth`);
+      showToast(`تم تنزيل ملف دخول مستقل للموظف ${current.name}`, 'success');
+    } catch (err) {
+      showToast(String(err?.message || err), 'error');
+    }
+  };
+
+  const togglePermission = key => setPermissions(p => ({ ...p, [key]: !p[key] }));
+  const permissionRow = (key, label, tone = 'emerald', icon = null) => h('label', {
+    key,
+    className: 'flex items-center gap-2 p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer'
+  },
+    h('input', { type: 'checkbox', checked: !!permissions[key], onChange: () => togglePermission(key), className: 'rounded accent-emerald-600' }),
+    icon ? h(icon, { className: `w-4 h-4 text-${tone}-600 shrink-0` }) : null,
+    h('span', { className: 'text-slate-700 font-bold text-[11px]' }, label)
+  );
+
+  const generalPermissions = [
+    ['canDiscount', 'منح خصم في السلة'],
+    ['canEditPrice', 'تعديل سعر البيع'],
+    ['canDeleteInvoice', 'حذف وإلغاء الفواتير'],
+    ['canDeleteProducts', 'حذف الأصناف'],
+    ['canManageVouchers', 'سندات القبض والصرف'],
+    ['canManagePurchases', 'المشتريات والتوريد'],
+    ['canManageInventory', 'الجرد وتحويلات المخزون'],
+    ['canViewReports', 'التقارير والأرباح'],
+    ['canAccessSettings', 'إعدادات النظام'],
+  ];
+  const employeesPager = usePagination(employees || [], 50, 'employees');
+
+  return h('div', { id: 'employees-view-container', className: 'p-3 sm:p-5 space-y-4 max-w-7xl mx-auto select-none min-h-[calc(100vh-4rem)] text-right', dir: 'rtl' },
+    h('div', { className: 'flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm' },
+      h('div', null,
+        h('div', { className: 'flex items-center gap-2' },
+          h('div', { className: 'p-2 rounded-xl bg-emerald-50 text-emerald-600' }, h(Users, { className: 'w-5 h-5' })),
+          h('h1', { className: 'text-lg font-black text-slate-900' }, 'إدارة الموظفين والصلاحيات')
+        ),
+        h('p', { className: 'text-xs text-slate-500 mt-1' }, 'صلاحيات مستقلة لكل موظف، وتشمل صفحات المطعم والمطبخ كل صفحة على حدة.')
+      ),
+      h('button', { onClick: openAdd, className: 'flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-sm' }, h(UserPlus, { className: 'w-4 h-4' }), 'إضافة موظف جديد')
+    ),
+
+    activeEmployee && h('div', { className: 'p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3' },
+      h('div', { className: 'flex items-center gap-3' },
+        h('div', { className: 'w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center' }, h(UserCheck, { className: 'w-5 h-5' })),
+        h('div', null, h('div', { className: 'text-[10px] text-emerald-700 font-black' }, 'المستخدم النشط'), h('div', { className: 'font-black text-slate-900 text-sm' }, activeEmployee.name), h('div', { className: 'text-[10px] text-slate-500' }, activeEmployee.roleName))
+      )
+    ),
+
+    h('div', { className: 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3' },
+      employeesPager.pageItems.map(emp => {
+        const perms = { ...defaultPermissions, ...(emp.permissions || {}) };
+        const restaurantPages = Object.entries(restaurantPermissionLabels).filter(([key]) => perms[key]).map(([, label]) => label);
+        const isCurrent = activeEmployee?.id === emp.id;
+        return h('div', { key: emp.id, className: `rounded-2xl border bg-white p-4 shadow-sm ${isCurrent ? 'border-emerald-400 ring-1 ring-emerald-100' : 'border-slate-200'}` },
+          h('div', { className: 'flex items-start justify-between gap-3' },
+            h('div', { className: 'min-w-0' },
+              h('div', { className: 'font-black text-sm text-slate-900 truncate' }, emp.name),
+              h('div', { className: 'text-[10px] text-slate-500 mt-0.5' }, `${emp.roleName || 'موظف'}${emp.phone ? ' • ' + emp.phone : ''}`)
+            ),
+            h('span', { className: `shrink-0 px-2 py-1 rounded-lg text-[10px] font-black ${emp.active === false ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}` }, emp.active === false ? 'موقوف' : 'نشط')
+          ),
+          h('div', { className: 'mt-3 min-h-10 flex flex-wrap gap-1' },
+            restaurantPages.length
+              ? restaurantPages.map(label => h('span', { key: label, className: 'px-2 py-1 rounded-lg bg-amber-50 border border-amber-100 text-amber-800 text-[9px] font-black' }, label))
+              : h('span', { className: 'text-[10px] text-slate-400' }, 'لا توجد صلاحيات مطعم مفعلة')
+          ),
+          h('div', { className: 'mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-1.5' },
+            h('button', { onClick: () => switchEmployee(emp), className: `px-2.5 py-1.5 rounded-lg text-[10px] font-black ${isCurrent ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}` }, isCurrent ? 'الحساب الحالي' : 'تبديل للحساب'),
+            h('button', { onClick: () => openEdit(emp), className: 'p-1.5 rounded-lg border border-slate-200 text-slate-600', title: 'تعديل' }, h(Edit2, { className: 'w-4 h-4' })),
+            h('button', { onClick: () => downloadLoginFile(emp), className: 'p-1.5 rounded-lg border border-blue-200 text-blue-600', title: 'تنزيل ملف الدخول' }, h(Download, { className: 'w-4 h-4' })),
+            h('button', { onClick: () => removeEmployee(emp), className: 'p-1.5 rounded-lg border border-rose-200 text-rose-600', title: 'حذف' }, h(Trash2, { className: 'w-4 h-4' }))
+          )
+        );
+      })
+    ),
+    h(Pagination, { pager: employeesPager }),
+
+    isModalOpen && h('div', { className: 'oscar-employee-modal-overlay fixed z-[120] bg-black/55 flex justify-center' },
+      h('div', { className: 'oscar-employee-modal-panel w-full max-w-2xl bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col' },
+        h('div', { className: 'p-4 border-b border-slate-100 flex items-center justify-between shrink-0' },
+          h('div', { className: 'flex items-center gap-2' }, h(ShieldCheck, { className: 'w-5 h-5 text-emerald-600' }), h('div', null, h('div', { className: 'font-black text-slate-900 text-sm' }, editingEmployee ? 'تعديل الموظف والصلاحيات' : 'إضافة موظف جديد'), h('div', { className: 'text-[10px] text-slate-500' }, 'حدد صلاحية كل صفحة من صفحات المطعم بشكل مستقل'))),
+          h('button', { type: 'button', onClick: () => setIsModalOpen(false), className: 'w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500' }, h(X, { className: 'w-4 h-4' }))
+        ),
+        h('form', { onSubmit: submit, className: 'flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4 space-y-4' },
+          h('div', { className: 'grid grid-cols-1 sm:grid-cols-2 gap-3' },
+            h('div', null, h('label', { className: 'block text-[11px] font-black text-slate-700 mb-1' }, 'اسم الموظف *'), h('input', { required: true, value: name, onChange: e => setName(e.target.value), className: 'w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-emerald-500' })),
+            h('div', null, h('label', { className: 'block text-[11px] font-black text-slate-700 mb-1' }, 'رقم الهاتف'), h('input', { value: phone, onChange: e => setPhone(e.target.value), className: 'w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-emerald-500' })),
+            h('div', null, h('label', { className: 'block text-[11px] font-black text-slate-700 mb-1' }, 'الدور / القالب الجاهز'), h('select', { value: role, onChange: e => changeRole(e.target.value), className: 'w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold outline-none' },
+              h('option', { value: 'cashier' }, 'كاشير'),
+              h('option', { value: 'waiter' }, 'جرسون'),
+              h('option', { value: 'kitchen' }, 'موظف مطبخ'),
+              h('option', { value: 'admin' }, 'مدير عام — كل الصلاحيات'),
+              h('option', { value: 'accountant' }, 'محاسب'),
+              h('option', { value: 'inventory_mgr' }, 'مسؤول مخزون'),
+              h('option', { value: 'custom' }, 'مخصص')
+            )),
+            h('div', null, h('label', { className: 'block text-[11px] font-black text-slate-700 mb-1' }, 'PIN'), h('input', { type: 'password', maxLength: 6, value: pin, onChange: e => setPin(e.target.value), className: 'w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-center outline-none' })),
+            h('div', { className: 'sm:col-span-2' }, h('label', { className: 'block text-[11px] font-black text-slate-700 mb-1' }, 'المسمى الوظيفي'), h('input', { value: roleName, onChange: e => setRoleName(e.target.value), className: 'w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none' }))
+          ),
+
+          h('section', { className: 'p-3 rounded-2xl border border-slate-200 bg-slate-50' },
+            h('div', { className: 'font-black text-xs text-slate-900 mb-2' }, 'الصلاحيات العامة'),
+            h('div', { className: 'grid grid-cols-1 sm:grid-cols-2 gap-2' }, generalPermissions.map(([key, label]) => permissionRow(key, label)))
+          ),
+
+          h('section', { className: 'p-3 rounded-2xl border border-amber-200 bg-amber-50/50' },
+            h('div', { className: 'font-black text-xs text-amber-900' }, 'صلاحيات المطعم والكافيه — كل صفحة مستقلة'),
+            h('div', { className: 'text-[10px] text-amber-700 mt-0.5 mb-2' }, 'الصفحة التي لا تفعّلها لن تظهر للموظف ولن يستطيع فتحها.'),
+            h('div', { className: 'grid grid-cols-1 sm:grid-cols-2 gap-2' },
+              permissionRow('canAccessRestaurantTables', 'الطاولات والصالات', 'amber', LayoutGrid),
+              permissionRow('canAccessRestaurantWaiter', 'واجهة الجرسون', 'amber', UtensilsCrossed),
+              permissionRow('canAccessRestaurantKitchen', 'شاشة المطبخ KDS', 'amber', ChefHat),
+              permissionRow('canAccessRestaurantWaste', 'الوصفات والهالك', 'amber', Scale)
+            )
+          ),
+
+          h('label', { className: 'flex items-center gap-2 p-3 rounded-xl border border-slate-200 bg-white cursor-pointer' },
+            h('input', { type: 'checkbox', checked: active, onChange: e => setActive(e.target.checked), className: 'accent-emerald-600' }),
+            h('span', { className: 'text-xs font-black text-slate-700' }, 'حساب الموظف نشط ويمكنه تسجيل الدخول')
+          ),
+
+          h('div', { className: 'sticky bottom-0 -mx-4 -mb-4 px-4 py-3 bg-white border-t border-slate-100 flex items-center justify-end gap-2' },
+            h('button', { type: 'button', onClick: () => setIsModalOpen(false), className: 'px-4 py-2 rounded-xl border border-slate-200 text-xs font-black text-slate-600' }, 'إلغاء'),
+            h('button', { type: 'submit', className: 'px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-sm' }, 'حفظ الموظف والصلاحيات')
+          )
+        )
+      )
+    )
+  );
 };

@@ -3949,3 +3949,175 @@ select{font-family:'Cairo',sans-serif}
     max-height:100dvh!important;
   }
 }
+
+/* Restaurant & Cafe mode transplanted from Oooo-main */
+@media print {
+  body * { visibility: hidden; }
+  #kitchen-ticket-print-area, #kitchen-ticket-print-area * { visibility: visible; }
+  #kitchen-ticket-print-area { position: fixed !important; top: 0; right: 0; left: 0; margin: 0 auto !important; box-shadow: none !important; border: 0 !important; }
+}
+
+/* ===== v7.9 Restaurant live patch: true black/white night surfaces ===== */
+@media screen {
+  html.dark, html.dark body, html.dark #root { background:#000!important; color:#fff!important; color-scheme:dark; }
+  html.dark [class*="dark:bg-slate-"],
+  html.dark [class*="dark:bg-gray-"],
+  html.dark [class*="dark:bg-neutral-"] { background-color:#000!important; }
+  html.dark [class*="dark:text-slate-"],
+  html.dark [class*="dark:text-gray-"],
+  html.dark [class*="dark:text-neutral-"] { color:#fff!important; }
+  html.dark [class*="dark:border-slate-"],
+  html.dark [class*="dark:border-gray-"],
+  html.dark [class*="dark:border-neutral-"] { border-color:#3f3f46!important; }
+  html.dark input, html.dark textarea, html.dark select {
+    background:#050505!important;
+    color:#fff!important;
+    border-color:#404040!important;
+  }
+  html.dark input::placeholder, html.dark textarea::placeholder { color:#a3a3a3!important; }
+  html.dark .searchable-dropdown-panel { background:#000!important; color:#fff!important; border-color:#404040!important; }
+  html.dark .searchable-dropdown-panel * { color:inherit; }
+}
+@media screen {
+  /* Night mode is intentionally monochrome: black / white / neutral grays only. */
+  html.dark #root { filter: grayscale(100%); }
+}
+
+/* ===== Waiter cart overlay placement v14 ===== */
+#waiter-cart-fab {
+  position: fixed !important;
+  left: 16px !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: calc(4rem + env(safe-area-inset-bottom, 0px) + 12px) !important;
+  z-index: 70 !important;
+}
+#waiter-cart-backdrop {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 3.5rem !important;
+  bottom: calc(4rem + env(safe-area-inset-bottom, 0px)) !important;
+  z-index: 95 !important;
+}
+#waiter-cart-modal {
+  position: fixed !important;
+  top: calc(3.5rem + 8px) !important;
+  bottom: calc(4rem + env(safe-area-inset-bottom, 0px) + 8px) !important;
+  left: 50% !important;
+  right: auto !important;
+  width: calc(100vw - 16px) !important;
+  max-width: 920px !important;
+  height: auto !important;
+  max-height: none !important;
+  transform: translateX(-50%) !important;
+  z-index: 110 !important;
+}
+#waiter-cart-modal > div:nth-child(2) {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+@media (min-width: 1024px) {
+  #waiter-cart-fab {
+    bottom: 18px !important;
+    left: 18px !important;
+  }
+  #waiter-cart-backdrop {
+    bottom: 0 !important;
+  }
+  #waiter-cart-modal {
+    bottom: 12px !important;
+    width: min(920px, calc(100vw - 80px)) !important;
+  }
+}
+
+
+/* ===== v7.9.1 Restaurant action controls ===== */
+#waiter-cart-modal button,
+.restaurant-kds-action {
+  -webkit-tap-highlight-color: transparent;
+}
+#waiter-cart-modal button:disabled {
+  cursor: not-allowed;
+  box-shadow: none !important;
+}
+
+/* ===== Oscar AI mobile safe modal sizing v7.9.4 ===== */
+.oscar-ai-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  align-items: center;
+  padding: 16px;
+  overflow: hidden !important;
+  overscroll-behavior: contain;
+}
+.oscar-ai-panel {
+  max-height: calc(100dvh - 32px);
+  border-radius: 24px;
+  min-height: 0;
+}
+.oscar-ai-panel > div[class*="overflow-y-auto"] {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+@media (max-width: 639px) {
+  .oscar-ai-overlay {
+    inset: auto 0 auto 0 !important;
+    top: calc(3.5rem + 4px) !important;
+    bottom: calc(4rem + env(safe-area-inset-bottom, 0px) + 4px) !important;
+    padding: 6px !important;
+    align-items: stretch !important;
+  }
+  .oscar-ai-panel {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    border-radius: 18px !important;
+  }
+  .oscar-purchase-ai-panel {
+    max-width: none !important;
+  }
+  .oscar-ai-panel header,
+  .oscar-ai-panel footer {
+    position: relative;
+    z-index: 2;
+  }
+}
+
+/* ===== v7.9.4.6 Employee modal: bounded below header / above mobile nav ===== */
+.oscar-employee-modal-overlay{
+  position:fixed!important;
+  inset:0!important;
+  padding:12px!important;
+  align-items:center!important;
+  overflow:hidden!important;
+  overscroll-behavior:contain!important;
+}
+.oscar-employee-modal-panel{
+  min-height:0!important;
+  max-height:calc(var(--oscar-app-height,100dvh) - 24px)!important;
+}
+.oscar-employee-modal-panel form{
+  min-height:0!important;
+  overflow-y:auto!important;
+  overscroll-behavior:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+  touch-action:pan-y!important;
+}
+@media (max-width:1023px){
+  .oscar-employee-modal-overlay{
+    inset:auto 0 auto 0!important;
+    top:3.5rem!important;
+    bottom:calc(4rem + env(safe-area-inset-bottom,0px))!important;
+    padding:6px!important;
+    align-items:stretch!important;
+  }
+  .oscar-employee-modal-panel{
+    width:100%!important;
+    height:100%!important;
+    max-height:none!important;
+    border-radius:16px!important;
+  }
+}

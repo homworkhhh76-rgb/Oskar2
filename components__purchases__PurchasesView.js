@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from './context__AppContext.js';
-import { SearchableDropdown } from './components__common__Dropdown.js';
-import { getBrandLogoDataUrl } from './brand__logo.js';
-import { printElementOnly, warmExportLibraries } from './utils__export.js';
-import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js';
-import { Plus, Trash2, Building2, Eye, X, Image as ImageIcon, FileDown, FileSpreadsheet, Printer, AlertTriangle, ReceiptText } from 'lucide-react';
+import { useApp } from './context__AppContext.js?v=7.9.4.11-notifications-popup';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.11-notifications-popup';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.11-notifications-popup';
+import { getBrandLogoDataUrl } from './brand__logo.js?v=7.9.4.11-notifications-popup';
+import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.11-notifications-popup';
+import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.11-notifications-popup';
+import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.11-notifications-popup';
+import { Plus, Trash2, Building2, Eye, X, Image as ImageIcon, FileDown, FileSpreadsheet, Printer, AlertTriangle, ReceiptText, Sparkles, ScanLine } from 'lucide-react';
 
 const h = React.createElement;
 const money = (n) => Number(n || 0).toFixed(2);
@@ -54,6 +56,9 @@ export const PurchasesView = () => {
   const [quickPhone, setQuickPhone] = useState('');
   const [exporting, setExporting] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [showAIScan, setShowAIScan] = useState(false);
+  const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().slice(0,10));
+  const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState('');
   const singleRef = useRef(null);
 
   useEffect(() => {
@@ -135,11 +140,12 @@ export const PurchasesView = () => {
       supplierId: supplier.id, supplierName: supplier.name, warehouseId, items,
       paymentType, paidAmount: paidSafe, payments,
       discountType, discountValue: num(discountValue), discountAmount, notes,
+      date: purchaseDate || undefined, supplierInvoiceNumber: supplierInvoiceNumber.trim(),
     });
     if (res) {
       setMode('list');
       setRows([makeRow()]);
-      setPaid(''); setDiscountValue(''); setNotes('');
+      setPaid(''); setDiscountValue(''); setNotes(''); setSupplierInvoiceNumber(''); setPurchaseDate(new Date().toISOString().slice(0,10));
       const preferred = warehouses[0];
       if (preferred) setWarehouseId(preferred.id);
     }
@@ -175,12 +181,33 @@ export const PurchasesView = () => {
   const whOpts = warehouses.map((w) => ({ id: w.id, label: w.name || 'مخزن', subLabel: w.code || '' }));
   const accountOpts = accounts.map((a) => ({ id: a.id, label: a.name || 'حساب', subLabel: `الرصيد: ${money(a.balance)} ${settings.currencySymbol || ''}` }));
   const sortedPurchases = purchases.slice().sort((a, b) => safeDate(b?.date) - safeDate(a?.date));
+  const purchasesPager = usePagination(sortedPurchases, 50, String(sortedPurchases.length));
+
+  const applyAIScan = (data) => {
+    if (!data) return;
+    if (data.supplierId) setSupplierId(data.supplierId);
+    if (Array.isArray(data.rows) && data.rows.length) setRows(data.rows);
+    if (data.date) setPurchaseDate(String(data.date).slice(0,10));
+    if (data.invoiceNumber) setSupplierInvoiceNumber(data.invoiceNumber);
+    if (Number(data.discount) > 0) { setDiscountType('fixed'); setDiscountValue(String(Number(data.discount))); }
+    if (data.paidAmount != null && Number(data.paidAmount) >= 0) setPaid(String(Number(data.paidAmount)));
+    setNotes(prev => [data.notes, prev].filter(Boolean).join(' • '));
+    showToast?.(`تمت تعبئة ${data.rows?.length || 0} صنف بالذكاء الاصطناعي. راجع البيانات ثم احفظ.`, 'success');
+  };
 
   const form = h('div', { className: 'rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-sm space-y-4' },
+    h('div', { className:'rounded-2xl border border-emerald-200 bg-emerald-50 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3' },
+      h('div', { className:'flex items-center gap-2' }, h('div',{className:'w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center'},h(ScanLine,{className:'w-5 h-5'})), h('div',null,h('div',{className:'text-xs font-black text-emerald-900'},'تعبئة ذكية من صورة أو نص'),h('div',{className:'text-[10px] text-emerald-700'},'ارفع صورة أو اكتب الفاتورة بالنص؛ يقرأ المورد والأصناف والوحدات والأسعار'))),
+      h('button',{type:'button',onClick:()=>setShowAIScan(true),className:'px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-black flex items-center justify-center gap-2 shadow-sm'},h(Sparkles,{className:'w-4 h-4'}),'صورة / نص / تصوير')
+    ),
     h('div', { className: 'grid grid-cols-1 sm:grid-cols-3 gap-3' },
       h(SearchableDropdown, { id: 'purchase-supplier', label: 'المورد:', options: supplierOpts, selectedId: supplierId, onSelect: setSupplierId, onQuickAdd: () => setShowQuickSupp(true), quickAddLabel: '+ مورد جديد', icon: h(Building2, { className: 'w-4 h-4' }) }),
       h(SearchableDropdown, { id: 'purchase-warehouse', label: 'المخزن المستلم:', options: whOpts, selectedId: warehouseId, onSelect: setWarehouseId, onQuickAdd: () => setShowQuickWarehouse(true), quickAddLabel: '+ إضافة مخزن', placeholder: 'ابحث عن مخزن...' }),
       h(SearchableDropdown, { id: 'purchase-account', label: paidSafe > 0 ? 'حساب دفع المبلغ المدفوع:' : 'الحساب (يستخدم عند الدفع):', options: accountOpts, selectedId: accountId, onSelect: setAccountId, placeholder: 'ابحث عن حساب...' })
+    ),
+    h('div',{className:'grid grid-cols-1 sm:grid-cols-2 gap-3'},
+      h('div',null,h('label',{className:'text-[11px] font-bold block mb-1'},'تاريخ فاتورة المورد'),h('input',{type:'date',value:purchaseDate,onChange:e=>setPurchaseDate(e.target.value),className:'w-full px-3 py-2 border rounded-xl text-xs bg-white dark:bg-slate-900 dark:border-slate-700'})),
+      h('div',null,h('label',{className:'text-[11px] font-bold block mb-1'},'رقم فاتورة المورد'),h('input',{value:supplierInvoiceNumber,onChange:e=>setSupplierInvoiceNumber(e.target.value),placeholder:'يُقرأ تلقائياً من الصورة أو أدخله يدوياً',className:'w-full px-3 py-2 border rounded-xl text-xs bg-white dark:bg-slate-900 dark:border-slate-700'}))
     ),
     h('div', { className: 'overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl slim-scrollbar' },
       h('table', { className: 'w-full min-w-[900px] text-xs text-right' },
@@ -246,7 +273,7 @@ export const PurchasesView = () => {
         rows.push(['', '', '', '', 'الباقي دين', num(viewing.remainingAmount)]);
         ok = await downloadProfessionalTableExcel({
           title: 'فاتورة مشتريات',
-          subtitle: `رقم الفاتورة: ${viewing.invoiceNumber || '-'} • المورد: ${viewing.supplierName || 'مورد'} • التاريخ: ${safeDate(viewing.date).toLocaleString('ar-EG')}`,
+          subtitle: `رقم النظام: ${viewing.invoiceNumber || '-'}${viewing.supplierInvoiceNumber ? ` • فاتورة المورد: ${viewing.supplierInvoiceNumber}` : ''} • المورد: ${viewing.supplierName || 'مورد'} • التاريخ: ${safeDate(viewing.date).toLocaleString('ar-EG')}`,
           headers: ['#', 'الصنف', 'الوحدة', 'الكمية', 'السعر', 'الإجمالي'],
           rows,
           settings,
@@ -267,7 +294,7 @@ export const PurchasesView = () => {
       ? h('div', { className: 'min-h-64 flex flex-col items-center justify-center p-8 text-center' }, h(ReceiptText, { className: 'w-10 h-10 text-slate-300 mb-3' }), h('div', { className: 'font-black text-slate-700 dark:text-slate-200' }, 'لا توجد فواتير مشتريات بعد'), h('p', { className: 'text-xs text-slate-400 mt-1' }, 'اضغط «فاتورة شراء جديدة» لتسجيل أول عملية توريد.'))
       : h('div', { className: 'overflow-x-auto slim-scrollbar' }, h('table', { className: 'w-full min-w-[760px] text-xs text-right' },
           h('thead', null, h('tr', { className: 'bg-slate-50 dark:bg-slate-800 border-b text-slate-500 dark:border-slate-700' }, ...['الرقم', 'التاريخ', 'المورد', 'الإجمالي', 'المدفوع', 'الدين', ''].map((x, i) => h('th', { key: i, className: 'p-3' }, x)))),
-          h('tbody', null, ...sortedPurchases.map((p, index) => h('tr', { key: p.id || index, className: 'border-b last:border-0 dark:border-slate-800' },
+          h('tbody', null, ...purchasesPager.pageItems.map((p, index) => h('tr', { key: p.id || index, className: 'border-b last:border-0 dark:border-slate-800' },
             h('td', { className: 'p-3 font-mono font-bold' }, p.invoiceNumber || `PUR-${index + 1}`),
             h('td', { className: 'p-3' }, safeDate(p.date).toLocaleDateString('ar-EG')),
             h('td', { className: 'p-3 font-bold' }, p.supplierName || 'مورد'),
@@ -276,12 +303,15 @@ export const PurchasesView = () => {
             h('td', { className: 'p-3 font-mono text-rose-600' }, money(p.remainingAmount)),
             h('td', { className: 'p-3 flex gap-1' }, h('button', { type: 'button', onClick: () => { warmExportLibraries(); setViewing(p); }, className: 'p-2 rounded-lg border dark:border-slate-700' }, h(Eye, { className: 'w-4 h-4' })), canDelete ? h('button', { type: 'button', onClick: () => setDeleting(p.id), className: 'p-2 rounded-lg border dark:border-slate-700 text-rose-600' }, h(Trash2, { className: 'w-4 h-4' })) : null)
           )))
-        ))
+        ),
+        h(Pagination,{pager:purchasesPager})
+      )
   );
 
   return h('div', { id: 'purchases-screen', className: 'p-4 sm:p-6 space-y-4 max-w-7xl mx-auto text-right min-h-full' },
     h('div', { className: 'flex items-center justify-end gap-2' }, h('button', { type: 'button', onClick: () => setMode(mode === 'list' ? 'new' : 'list'), className: 'px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-sm' }, mode === 'new' ? 'عرض السجل' : 'فاتورة شراء جديدة')),
     mode === 'new' ? form : list,
+    h(PurchaseAIScanModal,{open:showAIScan,onClose:()=>setShowAIScan(false),onApply:applyAIScan}),
     viewing ? h('div', { className: 'fixed inset-x-0 oscar-bounded-modal p-2 sm:p-5 flex items-stretch sm:items-center justify-center overflow-hidden', style:{zIndex:2147482000,background:'rgba(15,23,42,.62)',backdropFilter:'blur(6px)',WebkitBackdropFilter:'blur(6px)'} },
       h('div', { className: 'w-full max-w-3xl h-full max-h-full sm:h-auto bg-slate-100 dark:bg-slate-950 rounded-2xl shadow-2xl overflow-hidden flex flex-col' },
         h('div',{className:'no-print shrink-0 flex items-center justify-between gap-2 p-3 bg-white dark:bg-slate-900 border-b dark:border-slate-800'},
@@ -302,6 +332,7 @@ export const PurchasesView = () => {
             h('section',{className:'grid grid-cols-2 gap-x-5 gap-y-2 p-4 sm:p-5 text-[11px] border-b border-slate-200 bg-slate-50/70'},
               h('div',null,h('span',{className:'text-slate-400'},'رقم الفاتورة: '),h('b',{className:'font-mono'},viewing.invoiceNumber || '-')),
               h('div',null,h('span',{className:'text-slate-400'},'التاريخ: '),h('b',null,safeDate(viewing.date).toLocaleString('ar-EG'))),
+              viewing.supplierInvoiceNumber ? h('div',null,h('span',{className:'text-slate-400'},'فاتورة المورد: '),h('b',{className:'font-mono'},viewing.supplierInvoiceNumber)) : null,
               h('div',null,h('span',{className:'text-slate-400'},'المورد: '),h('b',null,viewing.supplierName || 'مورد')),
               h('div',null,h('span',{className:'text-slate-400'},'المخزن: '),h('b',null,warehouses.find((w)=>w.id===viewing.warehouseId)?.name || '-'))
             ),

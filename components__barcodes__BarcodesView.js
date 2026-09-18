@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { useApp } from './context__AppContext.js';
-import { SearchableDropdown } from './components__common__Dropdown.js';
-import { printReceiptElement } from './utils__export.js';
+import { useApp } from './context__AppContext.js?v=7.9.4.11-notifications-popup';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.11-notifications-popup';
+import { printReceiptElement } from './utils__export.js?v=7.9.4.11-notifications-popup';
 import { Printer, Barcode as BarcodeIcon } from 'lucide-react';
-import { code128Geometry } from './utils__code128.js';
+import { code128Geometry } from './utils__code128.js?v=7.9.4.11-notifications-popup';
 const h = React.createElement;
 
 const BarcodeSvg = ({ value, compact = false }) => {

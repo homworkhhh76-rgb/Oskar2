@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useApp } from './context__AppContext.js';
-import { SearchableDropdown } from './components__common__Dropdown.js';
-import { exportToCSV, printElementOnly, warmExportLibraries } from './utils__export.js';
-import { downloadProfessionalTablePDF, downloadProfessionalTableImage, downloadProfessionalVoucherPDF, downloadProfessionalVoucherImage } from './utils__professionalExport.js';
-import { getBrandLogoDataUrl } from './brand__logo.js';
+import { useApp } from './context__AppContext.js?v=7.9.4.11-notifications-popup';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.11-notifications-popup';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.11-notifications-popup';
+import { exportToCSV, printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.11-notifications-popup';
+import { downloadProfessionalTablePDF, downloadProfessionalTableImage, downloadProfessionalVoucherPDF, downloadProfessionalVoucherImage } from './utils__professionalExport.js?v=7.9.4.11-notifications-popup';
+import { getBrandLogoDataUrl } from './brand__logo.js?v=7.9.4.11-notifications-popup';
 import { FileSpreadsheet, ArrowDownLeft, ArrowUpRight, Search, Trash2, Printer, Download, Image as ImageIcon, FileText, CreditCard, User, Building2, AlertCircle, Eye, X } from 'lucide-react';
 
 const h = React.createElement;
@@ -42,6 +43,7 @@ export const VouchersView = () => {
     if (!q) return true;
     return String(v.voucherNumber || '').includes(q) || String(v.partyName || '').toLowerCase().includes(q) || String(v.notes || '').toLowerCase().includes(q);
   });
+  const vouchersPager = usePagination(filteredVouchers, 50, `${activeTabFilter}|${searchTerm}`);
   const totalReceipts = vouchers.filter(v => v.type === 'receipt').reduce((s,v) => s + (Number(v.amount)||0), 0);
   const totalPayments = vouchers.filter(v => v.type === 'payment').reduce((s,v) => s + (Number(v.amount)||0), 0);
 
@@ -156,7 +158,7 @@ export const VouchersView = () => {
     h('div',{ref:tableContainerRef,id:'vouchers-table-card',className:'bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 overflow-x-auto'},
       h('table',{className:'w-full text-xs text-right min-w-[760px]'},
         h('thead',{className:'bg-slate-50 text-slate-500'},h('tr',null,...['#','النوع','التاريخ','الجهة','المبلغ','الحساب/المصدر','البيان',''].map((x,i)=>h('th',{key:i,className:'p-3'},x)))),
-        h('tbody',{className:'divide-y'},...(filteredVouchers.length?filteredVouchers.map(v=>h('tr',{key:v.id,className:'hover:bg-slate-50'},
+        h('tbody',{className:'divide-y'},...(filteredVouchers.length?vouchersPager.pageItems.map(v=>h('tr',{key:v.id,className:'hover:bg-slate-50'},
           h('td',{className:'p-3 font-mono font-bold'},v.voucherNumber),
           h('td',{className:'p-3'},h('span',{className:`px-2 py-1 rounded-lg font-bold ${v.type==='receipt'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}`},v.type==='receipt'?'قبض':'صرف')),
           h('td',{className:'p-3 text-slate-500'},new Date(v.date).toLocaleDateString('ar-EG')),
@@ -166,7 +168,8 @@ export const VouchersView = () => {
           h('td',{className:'p-3 text-slate-500 max-w-[220px] truncate'},v.notes||'-'),
           h('td',{className:'p-3'},h('div',{className:'flex gap-1'},h('button',{type:'button',onClick:()=>{setViewingVoucher(v);setVoucherPaperSize(settings.printerWidth||'80mm');},className:'p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-700'},h(Eye,{className:'w-4 h-4'})),h('button',{type:'button',onClick:()=>setDeleteConfirmId(v.id),className:'p-1.5 rounded-lg hover:bg-rose-50 text-rose-600'},h(Trash2,{className:'w-4 h-4'}))))
         )):[h('tr',{key:'empty'},h('td',{colSpan:8,className:'p-8 text-center text-slate-400'},'لا توجد سندات مطابقة'))]))
-      )
+      ),
+      h(Pagination,{pager:vouchersPager})
     ),
     isModalOpen ? createPortal(h('div',{className:'fixed inset-x-0 oscar-bounded-modal z-[100] bg-black/60 backdrop-blur-[2px] p-1.5 sm:p-3 flex items-stretch sm:items-center justify-center overflow-hidden'},
       h('div',{className:'w-screen max-w-none h-full sm:h-auto max-h-full overflow-y-auto custom-scrollbar flex items-start sm:items-center justify-center py-1 sm:py-2'},

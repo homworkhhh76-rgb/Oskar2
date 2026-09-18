@@ -1,5 +1,5 @@
-import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js';
-import { code128Geometry } from './utils__code128.js';
+import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.11-notifications-popup';
+import { code128Geometry } from './utils__code128.js?v=7.9.4.11-notifications-popup';
 
 const imageCache = new Map();
 const num = v => { const n=Number(v); return Number.isFinite(n)?n:0; };

@@ -1,13 +1,62 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState } from 'react';
-import { useApp } from './context__AppContext.js';
-import { RotateCcw, } from 'lucide-react';
+import { useApp } from './context__AppContext.js?v=7.9.4.11-notifications-popup';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.11-notifications-popup';
+import { RotateCcw } from 'lucide-react';
+
+const h = React.createElement;
+
 export const TrashView = () => {
-    const { products, customers, suppliers, expenses, restoreProduct, restoreCustomer, restoreSupplier, restoreExpense, } = useApp();
-    const [activeTab, setActiveTab] = useState('products');
-    const deletedProducts = products.filter((p) => p.deletedAt);
-    const deletedCustomers = customers.filter((c) => c.deletedAt);
-    const deletedSuppliers = suppliers.filter((s) => s.deletedAt);
-    const deletedExpenses = expenses.filter((e) => e.deletedAt);
-    return (_jsxs("div", { id: "trash-screen", className: "p-4 sm:p-6 space-y-4 max-w-5xl mx-auto text-right select-none", children: [_jsxs("div", { className: "flex flex-col sm:flex-row sm:items-center justify-between gap-4", children: [_jsxs("div", { children: [_jsx("h2", { className: "text-xl font-black text-slate-900 dark:text-white", children: "\u0633\u0644\u0629 \u0627\u0644\u0645\u062d\u0630\u0648\u0641\u0627\u062a" }), _jsx("p", { className: "text-xs text-slate-500 mt-0.5", children: "\u0627\u0644\u0639\u0646\u0627\u0635\u0631 \u0627\u0644\u0645\u062d\u0630\u0648\u0641\u0629 \u0644\u0645 \u064a\u062a\u0645 \u0645\u0633\u062d\u0647\u0627 \u0646\u0647\u0627\u0626\u064a\u0627\u064b \u0644\u062a\u0641\u0627\u062f\u064a \u0623\u064a \u062e\u0637\u0623 \u0628\u0634\u0631\u064a\u060c \u0648\u064a\u0645\u0643\u0646\u0643 \u0627\u0633\u062a\u0631\u062c\u0627\u0639\u0647\u0627 \u0641\u0648\u0631\u0627\u064b" })] }), _jsxs("div", { className: "flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs font-bold", children: [_jsxs("button", { onClick: () => setActiveTab('products'), className: `px-3 py-1.5 rounded-lg transition ${activeTab === 'products' ? 'bg-white dark:bg-slate-900 text-emerald-600 shadow-xs' : 'text-slate-500'}`, children: ["\u0627\u0644\u0623\u0635\u0646\u0627\u0641 (", deletedProducts.length, ")"] }), _jsxs("button", { onClick: () => setActiveTab('customers'), className: `px-3 py-1.5 rounded-lg transition ${activeTab === 'customers' ? 'bg-white dark:bg-slate-900 text-emerald-600 shadow-xs' : 'text-slate-500'}`, children: ["\u0627\u0644\u0639\u0645\u0644\u0627\u0621 (", deletedCustomers.length, ")"] }), _jsxs("button", { onClick: () => setActiveTab('suppliers'), className: `px-3 py-1.5 rounded-lg transition ${activeTab === 'suppliers' ? 'bg-white dark:bg-slate-900 text-emerald-600 shadow-xs' : 'text-slate-500'}`, children: ["\u0627\u0644\u0645\u0648\u0631\u062f\u0648\u0646 (", deletedSuppliers.length, ")"] }), _jsxs("button", { onClick: () => setActiveTab('expenses'), className: `px-3 py-1.5 rounded-lg transition ${activeTab === 'expenses' ? 'bg-white dark:bg-slate-900 text-emerald-600 shadow-xs' : 'text-slate-500'}`, children: ["\u0627\u0644\u0645\u0635\u0631\u0648\u0641\u0627\u062a (", deletedExpenses.length, ")"] })] })] }), _jsxs("div", { className: "rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden", children: [activeTab === 'products' && (_jsx("div", { className: "divide-y divide-slate-100 dark:divide-slate-800", children: deletedProducts.length === 0 ? (_jsx("div", { className: "p-12 text-center text-xs text-slate-400", children: "\u0644\u0627 \u062a\u0648\u062c\u062f \u0623\u0635\u0646\u0627\u0641 \u0641\u064a \u0633\u0644\u0629 \u0627\u0644\u0645\u062d\u0630\u0648\u0641\u0627\u062a" })) : (deletedProducts.map((p) => (_jsxs("div", { className: "p-4 flex items-center justify-between", children: [_jsxs("div", { children: [_jsx("h4", { className: "font-bold text-sm text-slate-900 dark:text-white", children: p.name }), _jsxs("span", { className: "text-xs text-slate-400", children: ["\u062d\u064f\u0630\u0641 \u0628\u062a\u0627\u0631\u064a\u062e: ", new Date(p.deletedAt).toLocaleString('ar-EG')] })] }), _jsxs("button", { onClick: () => restoreProduct(p.id), className: "flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg transition", children: [_jsx(RotateCcw, { className: "w-3.5 h-3.5" }), _jsx("span", { children: "\u0627\u0633\u062a\u0631\u062c\u0627\u0639 \u0627\u0644\u0635\u0646\u0641" })] })] }, p.id)))) })), activeTab === 'customers' && (_jsx("div", { className: "divide-y divide-slate-100 dark:divide-slate-800", children: deletedCustomers.length === 0 ? (_jsx("div", { className: "p-12 text-center text-xs text-slate-400", children: "\u0644\u0627 \u064a\u0648\u062c\u062f \u0639\u0645\u0644\u0627\u0621 \u0641\u064a \u0633\u0644\u0629 \u0627\u0644\u0645\u062d\u0630\u0648\u0641\u0627\u062a" })) : (deletedCustomers.map((c) => (_jsxs("div", { className: "p-4 flex items-center justify-between", children: [_jsxs("div", { children: [_jsx("h4", { className: "font-bold text-sm text-slate-900 dark:text-white", children: c.name }), _jsxs("span", { className: "text-xs text-slate-400", children: ["\u0627\u0644\u0647\u0627\u062a\u0641: ", c.phone || '-'] })] }), _jsxs("button", { onClick: () => restoreCustomer(c.id), className: "flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg transition", children: [_jsx(RotateCcw, { className: "w-3.5 h-3.5" }), _jsx("span", { children: "\u0627\u0633\u062a\u0631\u062c\u0627\u0639 \u0627\u0644\u0639\u0645\u064a\u0644" })] })] }, c.id)))) })), activeTab === 'suppliers' && (_jsx("div", { className: "divide-y divide-slate-100 dark:divide-slate-800", children: deletedSuppliers.length === 0 ? (_jsx("div", { className: "p-12 text-center text-xs text-slate-400", children: "\u0644\u0627 \u064a\u0648\u062c\u062f \u0645\u0648\u0631\u062f\u0648\u0646 \u0641\u064a \u0633\u0644\u0629 \u0627\u0644\u0645\u062d\u0630\u0648\u0641\u0627\u062a" })) : (deletedSuppliers.map((s) => (_jsxs("div", { className: "p-4 flex items-center justify-between", children: [_jsxs("div", { children: [_jsx("h4", { className: "font-bold text-sm text-slate-900 dark:text-white", children: s.name }), _jsxs("span", { className: "text-xs text-slate-400", children: ["\u0627\u0644\u0634\u0631\u0643\u0629: ", s.company || '-'] })] }), _jsxs("button", { onClick: () => restoreSupplier(s.id), className: "flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg transition", children: [_jsx(RotateCcw, { className: "w-3.5 h-3.5" }), _jsx("span", { children: "\u0627\u0633\u062a\u0631\u062c\u0627\u0639 \u0627\u0644\u0645\u0648\u0631\u062f" })] })] }, s.id)))) })), activeTab === 'expenses' && (_jsx("div", { className: "divide-y divide-slate-100 dark:divide-slate-800", children: deletedExpenses.length === 0 ? (_jsx("div", { className: "p-12 text-center text-xs text-slate-400", children: "\u0644\u0627 \u062a\u0648\u062c\u062f \u0645\u0635\u0631\u0648\u0641\u0627\u062a \u0641\u064a \u0633\u0644\u0629 \u0627\u0644\u0645\u062d\u0630\u0648\u0641\u0627\u062a" })) : (deletedExpenses.map((e) => (_jsxs("div", { className: "p-4 flex items-center justify-between", children: [_jsxs("div", { children: [_jsxs("h4", { className: "font-bold text-sm text-slate-900 dark:text-white", children: [e.category, " - ", e.amount] }), _jsx("span", { className: "text-xs text-slate-400", children: e.notes || '-' })] }), _jsxs("button", { onClick: () => restoreExpense(e.id), className: "flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg transition", children: [_jsx(RotateCcw, { className: "w-3.5 h-3.5" }), _jsx("span", { children: "\u0627\u0633\u062a\u0631\u062c\u0627\u0639 \u0627\u0644\u0645\u0635\u0631\u0648\u0641" })] })] }, e.id)))) }))] })] }));
+  const { products, customers, suppliers, expenses, restoreProduct, restoreCustomer, restoreSupplier, restoreExpense } = useApp();
+  const [activeTab, setActiveTab] = useState('products');
+  const deletedProducts = (products || []).filter(p => p.deletedAt);
+  const deletedCustomers = (customers || []).filter(c => c.deletedAt);
+  const deletedSuppliers = (suppliers || []).filter(s => s.deletedAt);
+  const deletedExpenses = (expenses || []).filter(e => e.deletedAt);
+  const groups = { products: deletedProducts, customers: deletedCustomers, suppliers: deletedSuppliers, expenses: deletedExpenses };
+  const activeItems = groups[activeTab] || [];
+  const pager = usePagination(activeItems, 50, activeTab);
+
+  const restore = item => {
+    if (activeTab === 'products') return restoreProduct(item.id);
+    if (activeTab === 'customers') return restoreCustomer(item.id);
+    if (activeTab === 'suppliers') return restoreSupplier(item.id);
+    return restoreExpense(item.id);
+  };
+  const emptyText = {
+    products: 'لا توجد أصناف في سلة المحذوفات', customers: 'لا يوجد عملاء في سلة المحذوفات',
+    suppliers: 'لا يوجد موردون في سلة المحذوفات', expenses: 'لا توجد مصروفات في سلة المحذوفات'
+  }[activeTab];
+  const restoreText = { products:'استرجاع الصنف', customers:'استرجاع العميل', suppliers:'استرجاع المورد', expenses:'استرجاع المصروف' }[activeTab];
+  const itemTitle = item => activeTab === 'expenses' ? `${item.category || 'مصروف'} - ${Number(item.amount || 0).toFixed(2)}` : item.name;
+  const itemSub = item => {
+    if (activeTab === 'products') return `حُذف بتاريخ: ${new Date(item.deletedAt).toLocaleString('ar-EG')}`;
+    if (activeTab === 'customers') return `الهاتف: ${item.phone || '-'}`;
+    if (activeTab === 'suppliers') return `الشركة: ${item.company || '-'}`;
+    return item.notes || '-';
+  };
+
+  const tabButton = (id, label, count) => h('button', {
+    type:'button', onClick:()=>setActiveTab(id),
+    className:`px-3 py-1.5 rounded-lg transition whitespace-nowrap ${activeTab===id?'bg-white dark:bg-slate-900 text-emerald-600 shadow-xs':'text-slate-500'}`
+  }, `${label} (${count})`);
+
+  return h('div',{id:'trash-screen',className:'p-4 sm:p-6 space-y-4 max-w-5xl mx-auto text-right select-none'},
+    h('div',{className:'flex flex-col sm:flex-row sm:items-center justify-between gap-4'},
+      h('div',null,h('h2',{className:'text-xl font-black text-slate-900 dark:text-white'},'سلة المحذوفات'),h('p',{className:'text-xs text-slate-500 mt-0.5'},'العناصر المحذوفة محفوظة للاسترجاع عند الحاجة.')),
+      h('div',{className:'flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs font-bold overflow-x-auto'},
+        tabButton('products','الأصناف',deletedProducts.length), tabButton('customers','العملاء',deletedCustomers.length),
+        tabButton('suppliers','الموردون',deletedSuppliers.length), tabButton('expenses','المصروفات',deletedExpenses.length)
+      )
+    ),
+    h('div',{className:'rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden'},
+      activeItems.length===0 ? h('div',{className:'p-12 text-center text-xs text-slate-400'},emptyText) :
+      h('div',{className:'divide-y divide-slate-100 dark:divide-slate-800'},
+        ...pager.pageItems.map(item=>h('div',{key:item.id,className:'p-4 flex items-center justify-between gap-3'},
+          h('div',{className:'min-w-0'},h('h4',{className:'font-bold text-sm text-slate-900 dark:text-white truncate'},itemTitle(item)),h('span',{className:'text-xs text-slate-400'},itemSub(item))),
+          h('button',{type:'button',onClick:()=>restore(item),className:'shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg transition'},h(RotateCcw,{className:'w-3.5 h-3.5'}),restoreText)
+        ))
+      )
+    ),
+    h(Pagination,{pager})
+  );
 };

@@ -2,7 +2,7 @@
 
 تشغيل النظام:
 1) افتح admin.html على جهاز الإدارة.
-2) أدخل رابط وتوكن القاعدة الأم واضغط «حفظ واختبار الاتصال».
+2) أدخل رابط وتوكن القاعدة الأم + مفتاح OpenRouter لـ Oscar AI واضغط «حفظ واختبار الاتصال».
 3) من «قواعد الشركات» أضف قاعدة واحدة أو أكثر.
 4) من «الشركات والمفاتيح» أنشئ الشركة واختر قاعدتها.
 5) حمّل ملف مدير الشركة بصيغة .mzauth.
@@ -30,3 +30,19 @@
 - ترقية البيانات القديمة: أول شركة فقط على الجهاز تستلم قاعدة AlMezan_POS_DB القديمة تلقائياً إذا كانت الشركة الجديدة فارغة.
 
 ملاحظة: لا تحذف ملفات oscar-activation-runtime.js أو oscar-cloud-sync.js أو admin.html أو master-admin.js من النسخة المنشورة.
+
+
+Restaurant update v2:
+- Removed table reservations page.
+- Waiter shows restaurant/both products and recipe-manufactured meals.
+- Added raw_material product visibility mode (hidden from cashier/waiter, usable in recipes).
+- Recipe ingredient units use product unit tree.
+- Sale of a recipe meal deducts its ingredients from stock and records recipe_sale movements.
+
+=== Oscar AI ===
+تمت إضافة مساعد Oscar AI داخل النظام + قراءة صور فواتير المشتريات وتعبئتها تلقائياً.
+إعداد Oscar AI يتم من admin.html، وينزل المفتاح والموديل داخل ملف دخول الشركة .mzauth مع بيانات قاعدة الشركة.
+ملفات الموظفين ومدراء الفروع الجديدة ترث إعدادات AI تلقائياً. راجع AI_SETUP.txt.
+لا يوجد مفتاح ثابت داخل main.js أو services__ai.js.
+
+Oscar AI v7.9.4.5: تنفيذ مباشر + تراجع عن آخر عملية + ردود مختصرة + اختيار نماذج OpenRouter من الأدمن مرتبة حسب السعر.

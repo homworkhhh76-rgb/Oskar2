@@ -1,8 +1,9 @@
-import React, { useRef, useState } from 'react';
-import { useApp } from './context__AppContext.js';
-import { PWAInstallButton } from './components__common__PWAInstallButton.js';
-import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js';
-import { Wifi, WifiOff, RefreshCw, Sun, Moon, Maximize2, Minimize2, Clock, Store, Camera, Menu, LogOut, Building2 } from 'lucide-react';
+import React, { useRef, useState, useMemo } from 'react';
+import { useApp } from './context__AppContext.js?v=7.9.4.11-notifications-popup';
+import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.11-notifications-popup';
+import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.11-notifications-popup';
+import { Wifi, WifiOff, RefreshCw, Maximize2, Minimize2, Clock, Store, Camera, Menu, LogOut, Building2, Bell } from 'lucide-react';
+import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.11-notifications-popup';
 
 const h = React.createElement;
 
@@ -10,16 +11,14 @@ export const Header = () => {
   const {
     settings, saveSettings, isOnline, isSyncing, syncQueue, setShowSyncModal,
     activeShift, setActiveTab, mobileSidebarOpen, setMobileSidebarOpen, showToast,
+    customers, suppliers, products, invoices, stock, getProductStock,
   } = useApp();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notificationCount = useMemo(() => buildSystemNotifications({ customers, suppliers, products, invoices, stock, settings, getProductStock }).length, [customers, suppliers, products, invoices, stock, settings.activeWarehouseId, settings.currencySymbol]);
   const runtime = window.OscarActivation?.readRuntime?.();
   const logoInputRef = useRef(null);
 
-  const toggleTheme = () => {
-    const nextTheme = settings.theme === 'dark' ? 'light' : 'dark';
-    saveSettings({ ...settings, theme: nextTheme });
-    document.documentElement.classList.toggle('dark', nextTheme === 'dark');
-  };
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen?.().then(() => setIsFullscreen(true)).catch(() => {});
@@ -68,8 +67,12 @@ export const Header = () => {
       ),
       runtime?.companyName ? h('div', { className: 'hidden md:flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-300 max-w-40' }, h(Building2, { className: 'w-3 h-3 text-emerald-600 shrink-0' }), h('span', { className: 'truncate' }, runtime.companyName)) : null,
       h('button', { type: 'button', onClick: () => { if (confirm('تسجيل الخروج من الشركة؟ لن يتم حذف البيانات المحلية.')) { window.OscarActivation?.clearRuntime?.(); location.reload(); } }, className: 'p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-rose-600 hover:bg-rose-50', title: 'تسجيل الخروج' }, h(LogOut, { className: 'w-4 h-4' })),
-      h('button', { id: 'btn-theme-toggle', type: 'button', onClick: toggleTheme, className: 'p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800', title: settings.theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن' }, settings.theme === 'dark' ? h(Sun, { className: 'w-4 h-4 text-amber-400' }) : h(Moon, { className: 'w-4 h-4 text-slate-600' })),
+      h('button', { type:'button', onClick:()=>setShowNotifications(true), className:'relative p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50', title:'الإشعارات والتنبيهات' },
+        h(Bell,{className:'w-4 h-4'}),
+        notificationCount > 0 ? h('span',{className:'absolute rounded-full bg-rose-600 text-white font-black flex items-center justify-center',style:{top:'-5px',left:'-5px',height:'14px',minWidth:'14px',padding:'0 3px',fontSize:'8px',lineHeight:'14px',boxShadow:'0 0 0 1.5px #fff'}}, notificationCount > 99 ? '99+' : String(notificationCount)) : null
+      ),
       h('button', { id: 'btn-fullscreen-toggle', type: 'button', onClick: toggleFullscreen, className: 'hidden md:flex p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800', title: 'ملء الشاشة' }, isFullscreen ? h(Minimize2, { className: 'w-4 h-4' }) : h(Maximize2, { className: 'w-4 h-4' }))
-    )
+    ),
+    h(NotificationsModal,{open:showNotifications,onClose:()=>setShowNotifications(false)})
   );
 };

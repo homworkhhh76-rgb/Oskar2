@@ -1,0 +1,11 @@
+Oscar Accounting POS v7.9.4.8
+
+- Oscar AI can create products, including unit trees and opening stock.
+- Chat attachments changed to one clear "إرفاق ملف" control.
+- Allowed attachment types only: images, PDF, Excel (.xlsx/.xls).
+- Excel files are parsed locally in the browser and converted to structured text before AI analysis.
+- Purchase AI scanner also accepts Excel files.
+- Voice recording / speech input removed from Oscar AI chat.
+- Chat input placeholder changed to: "اكتب استفسارك هنا".
+- Chat close button made high-contrast and clearly visible.
+- Existing products found during bulk product import are skipped instead of aborting the whole import.

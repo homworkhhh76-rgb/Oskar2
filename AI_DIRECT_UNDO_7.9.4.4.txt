@@ -1,0 +1,7 @@
+Oscar AI v7.9.4.5
+- تنفيذ مباشر بدون نعم/لا.
+- أمر «تراجع» يرجع آخر عملية AI من نسخة احتياطية ذرية.
+- ردود أقصر وتقليل history/context/token budget.
+- أسئلة الربح تُحسب محلياً من صافي المبيعات - تكلفة FIFO - المصروفات، ولا ترجع المبيعات بدل الربح.
+- لوحة الأدمن: قائمة نماذج OpenRouter ديناميكية مرتبة حسب السعر، مع Gemini 2.5 Flash :free و OpenRouter Free Router.
+- في حال عدم توفر google/gemini-2.5-flash:free يحاول openrouter/free تلقائياً.

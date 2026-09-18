@@ -1,6 +1,6 @@
-import { calculateUnitConversions } from './utils__unitTree.js';
+import { calculateUnitConversions } from './utils__unitTree.js?v=7.9.4.11-notifications-popup';
 const DB_BASE_NAME = 'Oscar_Accounting_POS_DB';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 export const getTenantId = () => String(window.OscarActivation?.readRuntime?.()?.companyId || 'local').trim() || 'local';
 const dbNameForTenant = () => `${DB_BASE_NAME}__${encodeURIComponent(getTenantId())}`;
 let cachedTenant = '';
@@ -93,6 +93,13 @@ function openDB() {
                     'settings',
                     'vouchers',
                     'employees',
+                    'restaurant_tables',
+                    'restaurant_sections',
+                    'restaurant_orders',
+                    'kitchen_sections',
+                    'table_reservations',
+                    'recipes',
+                    'waste_records',
                 ];
                 stores.forEach((storeName) => {
                     if (!db.objectStoreNames.contains(storeName)) {
@@ -255,6 +262,14 @@ export const DEFAULT_SETTINGS = {
     receiptShowStoreInfo: true,
     receiptShowBarcode: true,
     scannerBeepEnabled: true,
+    expenseCategories: ['نثريات وضيافة','كهرباء ومياه','إيجار المحل','أجور ورواتب عمال','صيانة ونظافة','بضائع تالفة ومنتهية','أكياس وتغليف وطباعة','نقل وشحن','أخرى'],
+    isRestaurantModeEnabled: false,
+    autoPrintKitchenTicket: false,
+    kitchenTicketWidth: '80mm',
+    kitchenTicketShowPrices: false,
+    targetPrepTimeMinutes: 15,
+    tableAfterPayment: 'available',
+    enableKitchenSoundAlerts: true,
     allowNegativeStock: false,
     warnSellingBelowCost: true,
     receiptFooterMessage: 'شكراً لاستخدام أوسكار المحاسبي - نسعد بخدمتكم دائماً',
@@ -745,6 +760,11 @@ export const DEFAULT_EMPLOYEES = [
             canManageInventory: true,
             canViewReports: true,
             canAccessSettings: true,
+            canAccessRestaurantTables: true,
+            canAccessRestaurantWaiter: true,
+            canAccessRestaurantKitchen: true,
+            canAccessRestaurantOrders: true,
+            canAccessRestaurantWaste: true,
         },
         createdAt: new Date().toISOString(),
     },
@@ -766,6 +786,11 @@ export const DEFAULT_EMPLOYEES = [
             canManageInventory: false,
             canViewReports: false,
             canAccessSettings: false,
+            canAccessRestaurantTables: false,
+            canAccessRestaurantWaiter: false,
+            canAccessRestaurantKitchen: false,
+            canAccessRestaurantOrders: false,
+            canAccessRestaurantWaste: false,
         },
         createdAt: new Date().toISOString(),
     },
@@ -787,6 +812,11 @@ export const DEFAULT_EMPLOYEES = [
             canManageInventory: true,
             canViewReports: true,
             canAccessSettings: false,
+            canAccessRestaurantTables: false,
+            canAccessRestaurantWaiter: false,
+            canAccessRestaurantKitchen: false,
+            canAccessRestaurantOrders: false,
+            canAccessRestaurantWaste: false,
         },
         createdAt: new Date().toISOString(),
     },
@@ -966,6 +996,13 @@ export async function resetDatabase(withDemo = false) {
         'settings',
         'vouchers',
         'employees',
+        'restaurant_tables',
+        'restaurant_sections',
+        'restaurant_orders',
+        'kitchen_sections',
+        'table_reservations',
+        'recipes',
+        'waste_records',
     ];
     for (const store of stores) {
         await clearStore(store);
@@ -1010,6 +1047,13 @@ export async function exportDatabaseBackup() {
         'settings',
         'vouchers',
         'employees',
+        'restaurant_tables',
+        'restaurant_sections',
+        'restaurant_orders',
+        'kitchen_sections',
+        'table_reservations',
+        'recipes',
+        'waste_records',
     ];
     for (const store of stores) {
         data[store] = await getAllFromStore(store);
