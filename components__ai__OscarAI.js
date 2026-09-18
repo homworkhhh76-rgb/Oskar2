@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, X, Send, Sparkles, TrendingUp, PackageSearch, WalletCards, Receipt, ChefHat, Settings2, CheckCircle2, LoaderCircle, ShoppingCart, RotateCcw, BarChart3, FileDown, FileText, FileSpreadsheet, Paperclip, PackagePlus } from 'lucide-react';
-import { useApp } from './context__AppContext.js?v=7.9.4.12-motion-120hz';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.12-motion-120hz';
-import { askOscar, getAIConfig, aiHealthCheck, fileToDataUrl } from './services__ai.js?v=7.9.4.12-motion-120hz';
-import { executeAIActions, isMutationAction } from './services__aiActions.js?v=7.9.4.12-motion-120hz';
+import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { askOscar, getAIConfig, aiHealthCheck, fileToDataUrl } from './services__ai.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { executeAIActions, isMutationAction } from './services__aiActions.js?v=7.9.4.20-modal-backdrop-rootfix';
 
 const h = React.createElement;
 const DAY = 86400000;

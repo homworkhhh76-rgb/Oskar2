@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.12-motion-120hz';
-import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.12-motion-120hz';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
 import {
   ChefHat, Flame, Clock, Printer, CheckCircle2, Volume2, VolumeX,
   Utensils, ShoppingBag, Trash2, StickyNote, TimerReset, CircleDot
 } from 'lucide-react';
-import { KitchenTicketModal } from './restaurant__components__KitchenTicketModal.js?v=7.9.4.12-motion-120hz';
-import { printKitchenTicketDirect } from './restaurant__services__kitchenPrint.js?v=7.9.4.12-motion-120hz';
+import { KitchenTicketModal } from './restaurant__components__KitchenTicketModal.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { printKitchenTicketDirect } from './restaurant__services__kitchenPrint.js?v=7.9.4.20-modal-backdrop-rootfix';
 
 const h = React.createElement;
 const noteText = notes => typeof notes === 'string' ? notes : String(notes?.kitchenNotes || notes?.general || '');

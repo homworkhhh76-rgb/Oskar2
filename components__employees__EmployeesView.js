@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.12-motion-120hz';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.12-motion-120hz';
+import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.20-modal-backdrop-rootfix';
 import {
   Users, UserPlus, ShieldCheck, Trash2, Edit2, UserCheck, Download,
   UtensilsCrossed, ChefHat, LayoutGrid, Scale, X
@@ -211,7 +211,7 @@ export const EmployeesView = () => {
           h('button', { type: 'button', onClick: () => setIsModalOpen(false), className: 'w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500' }, h(X, { className: 'w-4 h-4' }))
         ),
         h('form', { onSubmit: submit, className: 'flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4 space-y-4' },
-          h('div', { className: 'grid grid-cols-1 sm:grid-cols-2 gap-3' },
+          h('div', { className: 'oscar-mobile-form-grid grid grid-cols-2 gap-2.5 sm:gap-3' },
             h('div', null, h('label', { className: 'block text-[11px] font-black text-slate-700 mb-1' }, 'اسم الموظف *'), h('input', { required: true, value: name, onChange: e => setName(e.target.value), className: 'w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-emerald-500' })),
             h('div', null, h('label', { className: 'block text-[11px] font-black text-slate-700 mb-1' }, 'رقم الهاتف'), h('input', { value: phone, onChange: e => setPhone(e.target.value), className: 'w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:border-emerald-500' })),
             h('div', null, h('label', { className: 'block text-[11px] font-black text-slate-700 mb-1' }, 'الدور / القالب الجاهز'), h('select', { value: role, onChange: e => changeRole(e.target.value), className: 'w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold outline-none' },
@@ -224,7 +224,7 @@ export const EmployeesView = () => {
               h('option', { value: 'custom' }, 'مخصص')
             )),
             h('div', null, h('label', { className: 'block text-[11px] font-black text-slate-700 mb-1' }, 'PIN'), h('input', { type: 'password', maxLength: 6, value: pin, onChange: e => setPin(e.target.value), className: 'w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-center outline-none' })),
-            h('div', { className: 'sm:col-span-2' }, h('label', { className: 'block text-[11px] font-black text-slate-700 mb-1' }, 'المسمى الوظيفي'), h('input', { value: roleName, onChange: e => setRoleName(e.target.value), className: 'w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none' }))
+            h('div', { className: 'min-w-0' }, h('label', { className: 'block text-[11px] font-black text-slate-700 mb-1' }, 'المسمى الوظيفي'), h('input', { value: roleName, onChange: e => setRoleName(e.target.value), className: 'w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none' }))
           ),
 
           h('section', { className: 'p-3 rounded-2xl border border-slate-200 bg-slate-50' },

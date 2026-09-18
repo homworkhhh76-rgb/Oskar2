@@ -1,6 +1,6 @@
 import React from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.12-motion-120hz';
-import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.12-motion-120hz';
+import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.20-modal-backdrop-rootfix';
 import {
   LayoutDashboard, ShoppingCart, ReceiptText, Truck, Package, Boxes, Warehouse,
   Users, Building2, Wallet, Receipt, FileSpreadsheet, UserCheck, Barcode, BarChart3,

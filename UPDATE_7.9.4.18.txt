@@ -1,0 +1,9 @@
+Oscar Accounting POS v7.9.4.18
+
+- Global mobile modal safe-area: all centered dialogs start below the app header and end above bottom navigation.
+- Internal touch scrolling for long modal content across the site.
+- Product editor uses fixed header + scrolling body inside safe bounds.
+- Full cashier cart uses the same safe bounds while preserving its internal table/payment layout.
+- Expense type manager keeps header/add row visible and scrolls the type list.
+- Oscar AI, employee forms, bounded dialogs and waiter cart follow the same mobile safe area.
+- Camera scanner and mobile more-menu are intentionally excluded from generic dialog geometry.

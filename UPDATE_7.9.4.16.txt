@@ -1,0 +1,8 @@
+Oscar Accounting POS v7.9.4.16
+
+- Base: v7.9.4.14 with all functional updates preserved.
+- Restored popup and POS cart window geometry/appearance from v7.9.4.10 only.
+- Kept v7.9.4.12 page/modal/button/card animations.
+- Kept v7.9.4.13 two-fields-per-row mobile forms.
+- Kept expense-type manager internal list scrolling without changing the baseline modal shape.
+- No functional modules were reverted to v7.9.4.10.

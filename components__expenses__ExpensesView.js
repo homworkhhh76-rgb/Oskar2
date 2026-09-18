@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.12-motion-120hz';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.12-motion-120hz';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.12-motion-120hz';
-import { downloadProfessionalTablePDF, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.12-motion-120hz';
+import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { downloadProfessionalTablePDF, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.20-modal-backdrop-rootfix';
 import { Plus, Search, Trash2, Edit2, FileSpreadsheet, FileText, Settings2, UsersRound, Receipt, WalletCards, X } from 'lucide-react';
 
 const h = React.createElement;
@@ -354,10 +354,10 @@ export const ExpensesView = () => {
     ),
 
     showTypeManager && h('div',{className:'fixed inset-0 z-[75] bg-black/60 p-3 flex items-center justify-center',onClick:()=>setShowTypeManager(false)},
-      h('div',{onClick:e=>e.stopPropagation(),className:'w-full max-w-md rounded-2xl bg-white shadow-2xl p-5 text-right max-h-[calc(100dvh-130px)] overflow-y-auto'},
-        h('div',{className:'flex justify-between items-center mb-4'},h('div',null,h('h3',{className:'text-sm font-black'},'إدارة أنواع المصروف'),h('p',{className:'text-[10px] text-slate-500 mt-1'},'الأنواع الجديدة تتزامن ضمن إعدادات الشركة، والحركات القديمة تبقى محفوظة.')),h('button',{type:'button',onClick:()=>setShowTypeManager(false),className:'p-1.5 rounded-lg hover:bg-slate-100'},h(X,{className:'w-4 h-4'}))),
-        h('form',{onSubmit:addExpenseType,className:'flex gap-2 mb-4'},h('input',{value:newType,onChange:e=>setNewType(e.target.value),placeholder:'مثال: وقود، مواصلات، أجور يومية...',className:'flex-1 px-3 py-2 text-xs border rounded-xl'}),h('button',{type:'submit',className:'px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold'},'إضافة')),
-        h('div',{className:'space-y-2'},configuredCategories.map(name=>h('div',{key:name,className:'flex justify-between items-center p-2.5 rounded-xl border border-slate-200 bg-slate-50'},h('span',{className:'text-xs font-bold'},name),h('button',{type:'button',onClick:()=>removeExpenseType(name),className:'p-1.5 rounded-lg text-rose-600 hover:bg-rose-50',title:'حذف النوع من القائمة'},h(Trash2,{className:'w-3.5 h-3.5'})))))
+      h('div',{onClick:e=>e.stopPropagation(),className:'expense-types-modal-panel w-full max-w-md rounded-2xl bg-white shadow-2xl text-right overflow-hidden flex flex-col max-h-[calc(100dvh-130px)]'},
+        h('div',{className:'shrink-0 flex justify-between items-center p-4 border-b border-slate-100 bg-white'},h('div',null,h('h3',{className:'text-sm font-black'},'إدارة أنواع المصروف'),h('p',{className:'text-[10px] text-slate-500 mt-1'},'الأنواع الجديدة تتزامن ضمن إعدادات الشركة، والحركات القديمة تبقى محفوظة.')),h('button',{type:'button',onClick:()=>setShowTypeManager(false),className:'p-1.5 rounded-lg hover:bg-slate-100'},h(X,{className:'w-4 h-4'}))),
+        h('form',{onSubmit:addExpenseType,className:'shrink-0 flex gap-2 p-4 border-b border-slate-100'},h('input',{value:newType,onChange:e=>setNewType(e.target.value),placeholder:'مثال: وقود، مواصلات، أجور يومية...',className:'flex-1 min-w-0 px-3 py-2 text-xs border rounded-xl'}),h('button',{type:'submit',className:'shrink-0 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold'},'إضافة')),
+        h('div',{className:'expense-types-modal-scroll flex-1 min-h-0 overflow-y-auto p-4 space-y-2 custom-scrollbar'},configuredCategories.map(name=>h('div',{key:name,className:'flex justify-between items-center p-2.5 rounded-xl border border-slate-200 bg-slate-50'},h('span',{className:'text-xs font-bold'},name),h('button',{type:'button',onClick:()=>removeExpenseType(name),className:'p-1.5 rounded-lg text-rose-600 hover:bg-rose-50',title:'حذف النوع من القائمة'},h(Trash2,{className:'w-3.5 h-3.5'})))))
       )
     )
   );

@@ -1,0 +1,6 @@
+v7.9.4.20
+- Mobile modal top edge now touches the bottom of the 56px app header.
+- Mobile modal bottom edge now touches the top of the 64px bottom navigation.
+- Removed the 6px vertical safe-area gap while keeping 6px horizontal breathing room.
+- Full cashier cart uses the full available vertical space between header and bottom nav.
+- Internal scrolling remains enabled for long modal content across the app.

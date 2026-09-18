@@ -1,13 +1,13 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.12-motion-120hz';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.12-motion-120hz';
-import { formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.12-motion-120hz';
-import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.12-motion-120hz';
-import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.12-motion-120hz';
-import { downloadProfessionalTablePDF, downloadProfessionalTableExcel, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.12-motion-120hz';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.12-motion-120hz';
-import { TransferForm } from './components__inventory__TransferForm.js?v=7.9.4.12-motion-120hz';
+import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { downloadProfessionalTablePDF, downloadProfessionalTableExcel, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { TransferForm } from './components__inventory__TransferForm.js?v=7.9.4.20-modal-backdrop-rootfix';
 import { ArrowLeftRight, Building2, Download, Search, Image as ImageIcon, FileSpreadsheet, Trash2, } from 'lucide-react';
 export const InventoryView = () => {
     const { products, warehouses, settings, getProductStock, adjustStockCount, transferStock, recordDamagedStock, showToast, } = useApp();

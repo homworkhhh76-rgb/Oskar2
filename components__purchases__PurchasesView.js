@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.12-motion-120hz';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.12-motion-120hz';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.12-motion-120hz';
-import { getBrandLogoDataUrl } from './brand__logo.js?v=7.9.4.12-motion-120hz';
-import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.12-motion-120hz';
-import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.12-motion-120hz';
-import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.12-motion-120hz';
+import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { getBrandLogoDataUrl } from './brand__logo.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.20-modal-backdrop-rootfix';
 import { Plus, Trash2, Building2, Eye, X, Image as ImageIcon, FileDown, FileSpreadsheet, Printer, AlertTriangle, ReceiptText, Sparkles, ScanLine } from 'lucide-react';
 
 const h = React.createElement;

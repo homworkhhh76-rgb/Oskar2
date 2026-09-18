@@ -1,0 +1,6 @@
+v7.9.4.17
+- Base: v7.9.4.16 with all later features and 120Hz motion preserved.
+- Only modal/cart size and placement geometry were matched to the user-provided v7.9.4.10 reference.
+- Product editor keeps the later two-fields-per-row mobile layout.
+- Expense type manager keeps its internal scrolling behavior.
+- No business logic, AI actions, pagination, notifications logic, restaurant logic, or data behavior was reverted.

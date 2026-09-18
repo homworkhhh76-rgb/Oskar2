@@ -1,9 +1,9 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useEffect } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.12-motion-120hz';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.12-motion-120hz';
-import { usePWAInstall } from './hooks__usePWAInstall.js?v=7.9.4.12-motion-120hz';
-import { db } from './services__db.js?v=7.9.4.12-motion-120hz';
+import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { usePWAInstall } from './hooks__usePWAInstall.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { db } from './services__db.js?v=7.9.4.20-modal-backdrop-rootfix';
 import { Store, Printer, ShieldCheck, Building2, Database, Download, Upload, RefreshCw, Trash2, Save, Edit2, X, } from 'lucide-react';
 export const SettingsView = () => {
     const { settings, updateSettings, warehouses, saveWarehouse, deleteWarehouse, showToast, refreshData, } = useApp();

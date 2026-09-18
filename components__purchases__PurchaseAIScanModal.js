@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { X, ScanLine, Upload, AlertTriangle, CheckCircle2, LoaderCircle, Sparkles, FileText, FileSpreadsheet } from 'lucide-react';
-import { useApp } from './context__AppContext.js?v=7.9.4.12-motion-120hz';
-import { scanPurchaseInvoice } from './services__ai.js?v=7.9.4.12-motion-120hz';
-import { findBestSupplier, findBestProduct, findBestUnit } from './utils__aiMatching.js?v=7.9.4.12-motion-120hz';
+import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { scanPurchaseInvoice } from './services__ai.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { findBestSupplier, findBestProduct, findBestUnit } from './utils__aiMatching.js?v=7.9.4.20-modal-backdrop-rootfix';
 
 const h = React.createElement;
 const n = (v) => Number(v || 0) || 0;

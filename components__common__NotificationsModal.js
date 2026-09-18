@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { useApp } from './context__AppContext.js?v=7.9.4.12-motion-120hz';
+import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
 import { X, Bell, CreditCard, PackageX, History, CalendarClock, Truck, AlertTriangle } from 'lucide-react';
 
 const h = React.createElement;
@@ -106,7 +106,7 @@ export const NotificationsModal = ({ open, onClose }) => {
   const tone = t => ({rose:'border-rose-200 bg-rose-50 text-rose-700',amber:'border-amber-200 bg-amber-50 text-amber-700',blue:'border-blue-200 bg-blue-50 text-blue-700',slate:'border-slate-200 bg-slate-50 text-slate-700'}[t] || 'border-slate-200 bg-white text-slate-700');
 
   const modal = h('div',{
-      className:'fixed inset-x-0 oscar-bounded-modal flex items-center justify-center overflow-hidden',
+      className:'fixed inset-x-0 oscar-bounded-modal p-2 sm:p-5 flex items-stretch sm:items-center justify-center overflow-hidden',
       style:{zIndex:2147483000,background:'rgba(15,23,42,.52)',padding:'12px',backdropFilter:'blur(2px)',WebkitBackdropFilter:'blur(2px)'},
       onClick:onClose
     },
@@ -125,7 +125,7 @@ export const NotificationsModal = ({ open, onClose }) => {
         ),
         h('button',{type:'button',onClick:onClose,className:'w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center shrink-0',title:'إغلاق'},h(X,{className:'w-4 h-4'}))
       ),
-      h('div',{className:'flex-1 min-h-0 overflow-y-auto p-2.5 space-y-2 custom-scrollbar',style:{overscrollBehavior:'contain',WebkitOverflowScrolling:'touch'}},
+      h('div',{className:'flex-1 min-h-0 overflow-y-auto p-3 space-y-2 custom-scrollbar',style:{overscrollBehavior:'contain',WebkitOverflowScrolling:'touch'}},
         alerts.length===0
           ? h('div',{className:'min-h-44 flex flex-col items-center justify-center text-center text-slate-400'},h(Bell,{className:'w-10 h-10 opacity-20'}),h('div',{className:'mt-2 text-sm font-black'},'لا توجد تنبيهات حالياً'))
           : alerts.map(a=>h('button',{

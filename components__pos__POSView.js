@@ -1,14 +1,14 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.12-motion-120hz';
-import { ProductGrid } from './components__pos__ProductGrid.js?v=7.9.4.12-motion-120hz';
-import { CartPanel } from './components__pos__CartPanel.js?v=7.9.4.12-motion-120hz';
-import { FullCartView } from './components__pos__FullCartView.js?v=7.9.4.12-motion-120hz';
-import { PaymentModal } from './components__pos__PaymentModal.js?v=7.9.4.12-motion-120hz';
-import { CameraScannerModal } from './components__pos__CameraScannerModal.js?v=7.9.4.12-motion-120hz';
-import { HoldInvoicesModal } from './components__pos__HoldInvoicesModal.js?v=7.9.4.12-motion-120hz';
-import { RestaurantPendingOrdersModal } from './restaurant__components__RestaurantPendingOrdersModal.js?v=7.9.4.12-motion-120hz';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.12-motion-120hz';
+import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { ProductGrid } from './components__pos__ProductGrid.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { CartPanel } from './components__pos__CartPanel.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { FullCartView } from './components__pos__FullCartView.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { PaymentModal } from './components__pos__PaymentModal.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { CameraScannerModal } from './components__pos__CameraScannerModal.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { HoldInvoicesModal } from './components__pos__HoldInvoicesModal.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { RestaurantPendingOrdersModal } from './restaurant__components__RestaurantPendingOrdersModal.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.20-modal-backdrop-rootfix';
 import { Barcode, Camera, Maximize2, UtensilsCrossed } from 'lucide-react';
 export const POSView = () => {
     const { cart, handleScannedBarcode, setShowCameraModal, holdCurrentInvoice, posCartLayout, setPosCartLayout, settings } = useApp();

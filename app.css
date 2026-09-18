@@ -4152,6 +4152,7 @@ html,body,#root{
 /* Common modal/backdrop entrance. Targets existing overlays without changing their markup. */
 .oscar-ai-overlay,
 .oscar-employee-modal-overlay,
+.oscar-form-modal-overlay,
 .oscar-bounded-modal,
 .barcode-camera-overlay,
 [class*="fixed"][class*="inset-0"][class*="bg-black"]{
@@ -4159,6 +4160,7 @@ html,body,#root{
 }
 .oscar-ai-panel,
 .oscar-employee-modal-panel,
+.oscar-form-modal-panel,
 .oscar-bounded-modal > section,
 .oscar-bounded-modal > div,
 [class*="fixed"][class*="inset-0"][class*="bg-black"] > form,
@@ -4234,6 +4236,7 @@ button svg,[role="button"] svg{
   .oscar-page-stage,
   .oscar-ai-overlay,.oscar-ai-panel,
   .oscar-employee-modal-overlay,.oscar-employee-modal-panel,
+  .oscar-form-modal-overlay,.oscar-form-modal-panel,
   .oscar-bounded-modal,.oscar-bounded-modal > *,
   .barcode-camera-overlay,
   [class*="fixed"][class*="inset-0"][class*="bg-black"],
@@ -4254,4 +4257,294 @@ button.transition-all,
   transition-property:transform,opacity,background-color,border-color,color!important;
   transition-duration:120ms!important;
   transition-timing-function:var(--oscar-motion-ease)!important;
+}
+
+/* ===== v7.9.4.13 Two fields per row (window geometry kept at v7.9.4.10 baseline) ===== */
+.oscar-mobile-form-grid > *{min-width:0!important;}
+@media (max-width:1023px){
+  .oscar-mobile-form-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:9px!important;
+  }
+  .oscar-mobile-form-grid label{
+    font-size:10px!important;
+    line-height:1.4!important;
+    min-height:28px;
+    display:flex!important;
+    align-items:flex-end;
+  }
+  .oscar-mobile-form-grid input,
+  .oscar-mobile-form-grid select,
+  .oscar-mobile-form-grid button{
+    min-width:0!important;
+    max-width:100%!important;
+  }
+}
+@media (max-width:380px){
+  .oscar-mobile-form-grid{gap:7px!important;}
+  .oscar-mobile-form-grid label{font-size:9px!important;}
+  .oscar-mobile-form-grid input,
+  .oscar-mobile-form-grid select{padding-left:8px!important;padding-right:8px!important;}
+}
+
+
+/* ===== v7.9.4.17 Exact modal geometry lock — copied ONLY from v7.9.4.10 reference ===== */
+/* Keep later features/motion intact; lock only size/position/scroll geometry. */
+.product-editor-modal-overlay{
+  position:fixed!important;
+  inset:0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  padding:1rem!important;
+  overflow-y:auto!important;
+}
+.product-editor-modal-panel{
+  width:100%!important;
+  max-width:48rem!important;
+  margin-top:1.5rem!important;
+  margin-bottom:1.5rem!important;
+  overflow:hidden!important;
+}
+.product-editor-modal-panel .product-editor-body{
+  max-height:75vh!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  -webkit-overflow-scrolling:touch!important;
+  overscroll-behavior:contain!important;
+}
+
+/* Cashier wide cart: exact v7.9.4.10 viewport geometry. */
+@media (max-width:1023px){
+  #full-cart-modal-backdrop{
+    top:0!important;
+    left:0!important;
+    right:0!important;
+    bottom:auto!important;
+    height:var(--oscar-app-height,100dvh)!important;
+    max-height:var(--oscar-app-height,100dvh)!important;
+    padding:.375rem!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    overflow:hidden!important;
+  }
+  #full-cart-modal-box{
+    width:calc(100vw - .75rem)!important;
+    max-width:1600px!important;
+    height:calc(var(--oscar-app-height,100dvh) - .75rem)!important;
+    max-height:calc(var(--oscar-app-height,100dvh) - .75rem)!important;
+    border-radius:.75rem!important;
+    overflow:hidden!important;
+  }
+}
+@media (min-width:640px) and (max-width:1023px){
+  #full-cart-modal-backdrop{padding:1rem!important;}
+  #full-cart-modal-box{
+    width:calc(100vw - 2rem)!important;
+    border-radius:1rem!important;
+  }
+}
+
+/* Expense type manager: retain the requested inner scroll, keep reference outer dimensions. */
+.expense-types-modal-panel{
+  width:100%!important;
+  max-width:28rem!important;
+  max-height:calc(100dvh - 130px)!important;
+}
+.expense-types-modal-scroll{
+  min-height:0!important;
+  overflow-y:auto!important;
+  -webkit-overflow-scrolling:touch!important;
+  overscroll-behavior:contain!important;
+}
+
+/* ===== v7.9.4.20 Global mobile modal edge-to-edge safe-area system =====
+   Every real dialog touches the bottom edge of the app header and the top edge
+   of the mobile bottom nav. No wasted vertical gap; content scrolls internally. */
+@media (max-width:1023px){
+  :root{
+    --oscar-modal-header-edge:3.5rem;
+    --oscar-modal-bottom-edge:4rem;
+    --oscar-modal-edge-gap:0px;
+  }
+
+  /* Known modal overlays + generic centered dialogs used across the app. */
+  .oscar-bounded-modal,
+  .oscar-ai-overlay,
+  .oscar-employee-modal-overlay,
+  .oscar-form-modal-overlay,
+  .product-editor-modal-overlay,
+  #full-cart-modal-backdrop,
+  #waiter-cart-backdrop,
+  [class*="fixed"][class*="inset-0"][class*="items-center"][class*="justify-center"]:not(.barcode-camera-overlay){
+    position:fixed!important;
+    inset:auto 0 auto 0!important;
+    top:calc(var(--oscar-modal-header-edge) + var(--oscar-modal-edge-gap))!important;
+    bottom:calc(var(--oscar-modal-bottom-edge) + var(--oscar-modal-edge-gap))!important;
+    width:auto!important;
+    height:auto!important;
+    max-height:none!important;
+    min-height:0!important;
+    padding:0 6px!important;
+    align-items:stretch!important;
+    justify-content:center!important;
+    overflow:hidden!important;
+    overscroll-behavior:contain!important;
+  }
+
+  /* Ordinary dialog cards/forms: fit the safe viewport and scroll internally. */
+  [class*="fixed"][class*="inset-0"][class*="items-center"][class*="justify-center"]:not(.barcode-camera-overlay) > form,
+  [class*="fixed"][class*="inset-0"][class*="items-center"][class*="justify-center"]:not(.barcode-camera-overlay) > section,
+  [class*="fixed"][class*="inset-0"][class*="items-center"][class*="justify-center"]:not(.barcode-camera-overlay) > div,
+  .oscar-bounded-modal > form,
+  .oscar-bounded-modal > section,
+  .oscar-bounded-modal > div{
+    min-height:0!important;
+    max-height:100%!important;
+    margin-top:0!important;
+    margin-bottom:0!important;
+    overflow-y:auto!important;
+    -webkit-overflow-scrolling:touch!important;
+    overscroll-behavior:contain!important;
+    touch-action:pan-y!important;
+  }
+
+  /* Product editor: fixed header, scrolling body, all actions remain reachable. */
+  .product-editor-modal-panel{
+    width:100%!important;
+    max-width:48rem!important;
+    height:100%!important;
+    max-height:100%!important;
+    min-height:0!important;
+    margin:0!important;
+    display:flex!important;
+    flex-direction:column!important;
+    overflow:hidden!important;
+    border-radius:16px!important;
+  }
+  .product-editor-modal-panel > div:first-child{
+    flex:0 0 auto!important;
+  }
+  .product-editor-modal-panel .product-editor-body{
+    flex:1 1 auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    -webkit-overflow-scrolling:touch!important;
+    overscroll-behavior:contain!important;
+    touch-action:pan-y!important;
+  }
+
+  /* Cashier full cart: same safe bounds; its own inner panes keep their scroll. */
+  #full-cart-modal-backdrop{
+    padding:0 6px!important;
+  }
+  #full-cart-modal-box{
+    width:calc(100vw - 12px)!important;
+    max-width:1600px!important;
+    height:100%!important;
+    max-height:100%!important;
+    min-height:0!important;
+    border-radius:14px!important;
+    overflow:hidden!important;
+  }
+  #full-cart-modal-box > #full-page-cart-view,
+  #full-cart-modal-box #full-page-cart-view{
+    height:100%!important;
+    max-height:100%!important;
+    min-height:0!important;
+    overflow:hidden!important;
+  }
+
+  /* Expense type manager: header/add row stay visible, only the list scrolls. */
+  .expense-types-modal-panel{
+    width:100%!important;
+    max-width:28rem!important;
+    height:100%!important;
+    max-height:100%!important;
+    min-height:0!important;
+    margin:0!important;
+    overflow:hidden!important;
+    display:flex!important;
+    flex-direction:column!important;
+  }
+  .expense-types-modal-scroll{
+    flex:1 1 auto!important;
+    min-height:0!important;
+    overflow-y:auto!important;
+    -webkit-overflow-scrolling:touch!important;
+    overscroll-behavior:contain!important;
+    touch-action:pan-y!important;
+  }
+
+  /* Existing specialist panels must also fill the same safe window. */
+  .oscar-ai-panel,
+  .oscar-employee-modal-panel,
+  .oscar-form-modal-panel{
+    max-height:100%!important;
+    min-height:0!important;
+  }
+  .oscar-ai-panel,
+  .oscar-employee-modal-panel{
+    height:100%!important;
+  }
+
+  /* Waiter cart follows exactly the same top/bottom edges. */
+  #waiter-cart-modal{
+    top:calc(var(--oscar-modal-header-edge) + var(--oscar-modal-edge-gap))!important;
+    bottom:calc(var(--oscar-modal-bottom-edge) + var(--oscar-modal-edge-gap))!important;
+    height:auto!important;
+    max-height:none!important;
+    min-height:0!important;
+  }
+}
+
+/* ===== v7.9.4.20 In-stage modal backdrop root fix =====
+   Main content already occupies the exact area below #main-header and above
+   #mobile-bottom-nav. Dialogs rendered inside .oscar-page-stage must therefore
+   fill that local area from 0 to 0; adding header/nav offsets a second time
+   creates the visible gaps above and below the dark backdrop. Portaled dialogs
+   remain governed by the global body-safe offsets above. */
+@media (max-width:1023px){
+  .oscar-page-stage .oscar-bounded-modal,
+  .oscar-page-stage .oscar-ai-overlay,
+  .oscar-page-stage .oscar-employee-modal-overlay,
+  .oscar-page-stage .oscar-form-modal-overlay,
+  .oscar-page-stage .product-editor-modal-overlay,
+  .oscar-page-stage #full-cart-modal-backdrop,
+  .oscar-page-stage #waiter-cart-backdrop,
+  .oscar-page-stage [class*="fixed"][class*="inset-0"][class*="items-center"][class*="justify-center"]:not(.barcode-camera-overlay){
+    top:0!important;
+    bottom:0!important;
+    left:0!important;
+    right:0!important;
+    inset:0!important;
+    width:auto!important;
+    height:auto!important;
+    max-height:none!important;
+    min-height:0!important;
+  }
+
+  /* Dark layer itself reaches both app edges; only the white card keeps a
+     tiny horizontal breathing room. */
+  .oscar-page-stage #full-cart-modal-backdrop,
+  .oscar-page-stage .product-editor-modal-overlay,
+  .oscar-page-stage .oscar-employee-modal-overlay,
+  .oscar-page-stage .oscar-form-modal-overlay,
+  .oscar-page-stage .oscar-bounded-modal,
+  .oscar-page-stage .oscar-ai-overlay{
+    padding-top:0!important;
+    padding-bottom:0!important;
+  }
+
+  .oscar-page-stage #full-cart-modal-box,
+  .oscar-page-stage .product-editor-modal-panel,
+  .oscar-page-stage .oscar-employee-modal-panel,
+  .oscar-page-stage .oscar-form-modal-panel,
+  .oscar-page-stage .expense-types-modal-panel{
+    max-height:100%!important;
+    min-height:0!important;
+  }
 }
