@@ -1,9 +1,10 @@
 import React, { useRef, useState, useMemo } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { useApp } from './context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
+import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.33-waiter-mobile-centered';
+import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.33-waiter-mobile-centered';
 import { Wifi, WifiOff, RefreshCw, Maximize2, Minimize2, Clock, Store, Camera, Menu, LogOut, Building2, Bell } from 'lucide-react';
-import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.33-waiter-mobile-centered';
+import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.33-waiter-mobile-centered';
 
 const h = React.createElement;
 
@@ -11,12 +12,16 @@ export const Header = () => {
   const {
     settings, saveSettings, isOnline, isSyncing, syncQueue, setShowSyncModal,
     activeShift, setActiveTab, mobileSidebarOpen, setMobileSidebarOpen, showToast,
-    customers, suppliers, products, invoices, stock, getProductStock,
+    customers, suppliers, products, invoices, stock, getProductStock, currentUser, activeEmployee,
   } = useApp();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationCount = useMemo(() => buildSystemNotifications({ customers, suppliers, products, invoices, stock, settings, getProductStock }).length, [customers, suppliers, products, invoices, stock, settings.activeWarehouseId, settings.currencySymbol]);
   const runtime = window.OscarActivation?.readRuntime?.();
+  const accessArgs = { runtime, currentUser, activeEmployee, restaurantEnabled: !!settings.isRestaurantModeEnabled };
+  const homeTab = firstAllowedTab(accessArgs) || 'no_access';
+  const canAccounts = canAccessTab('accounts', accessArgs);
+  const canSettings = canAccessPermission('canAccessSettings', accessArgs);
   const logoInputRef = useRef(null);
 
   const toggleFullscreen = () => {
@@ -43,11 +48,11 @@ export const Header = () => {
     h('div', { className: 'flex items-center gap-2 shrink-0 min-w-0 lg:hidden' },
       h('button', { type: 'button', onClick: () => setMobileSidebarOpen(!mobileSidebarOpen), className: 'lg:hidden p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800', title: 'القائمة الجانبية' }, h(Menu, { className: 'w-5 h-5' })),
       h('input', { ref: logoInputRef, type: 'file', accept: 'image/*', className: 'hidden', onChange: handleLogoUpload }),
-      h('button', { type: 'button', onClick: () => logoInputRef.current?.click(), className: 'relative w-9 h-9 shrink-0 rounded-xl overflow-hidden bg-white border border-emerald-500/30 shadow-xs group', title: 'تغيير شعار المحل' },
+      h('button', { type: 'button', onClick: () => canSettings ? logoInputRef.current?.click() : setActiveTab(homeTab), className: 'relative w-9 h-9 shrink-0 rounded-xl overflow-hidden bg-white border border-emerald-500/30 shadow-xs group', title: canSettings ? 'تغيير شعار المحل' : 'الصفحة الرئيسية المسموحة' },
         h('img', { src: getBrandLogoDataUrl(settings), alt: settings.storeName, className: 'w-full h-full object-contain bg-white p-0.5', onError: (e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_LOGO_DATA_URL; } }),
         h('span', { className: 'absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity' }, h(Camera, { className: 'w-4 h-4' }))
       ),
-      h('button', { type: 'button', onClick: () => setActiveTab('pos'), className: 'flex flex-col text-right min-w-0 group focus:outline-none' },
+      h('button', { type: 'button', onClick: () => setActiveTab(homeTab), className: 'flex flex-col text-right min-w-0 group focus:outline-none' },
         h('h1', { className: 'text-sm font-black text-slate-900 dark:text-white tracking-tight truncate max-w-[160px] sm:max-w-[220px] group-hover:text-emerald-600 transition' }, settings.storeName),
         h('span', { className: 'text-[10px] text-emerald-600 dark:text-emerald-400 font-bold block leading-none truncate' }, settings.subtitle || 'إدارة ذكية')
       ),
@@ -55,9 +60,9 @@ export const Header = () => {
     ),
     h('div', { className: 'flex items-center gap-1.5 sm:gap-2 shrink-0' },
       h(PWAInstallButton),
-      activeShift
+      canAccounts ? (activeShift
         ? h('button', { type: 'button', onClick: () => setActiveTab('accounts'), className: 'hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-xs font-semibold' }, h(Clock, { className: 'w-3.5 h-3.5 text-emerald-600' }), h('span', null, `وردية #${activeShift.shiftNumber}`))
-        : h('button', { type: 'button', onClick: () => setActiveTab('accounts'), className: 'hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-200 text-amber-800 dark:text-amber-300 text-xs font-semibold' }, h(Clock, { className: 'w-3.5 h-3.5 text-amber-600' }), h('span', null, 'فتح وردية')),
+        : h('button', { type: 'button', onClick: () => setActiveTab('accounts'), className: 'hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-200 text-amber-800 dark:text-amber-300 text-xs font-semibold' }, h(Clock, { className: 'w-3.5 h-3.5 text-amber-600' }), h('span', null, 'فتح وردية'))) : null,
       h('button', { id: 'btn-header-sync', type: 'button', onClick: () => setShowSyncModal(true), className: `relative p-1.5 rounded-lg border transition-colors ${isOnline ? 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800' : 'border-amber-400 bg-amber-50 dark:bg-amber-950/40 text-amber-600'}`, title: isOnline ? 'حالة المزامنة' : 'غير متصل بالإنترنت' },
         h(RefreshCw, { className: `w-4 h-4 ${isSyncing ? 'animate-spin text-emerald-600' : ''}` }),
         syncQueue.length > 0 ? h('span', { className: 'absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-amber-500 text-[10px] font-black text-white' }, syncQueue.length) : null

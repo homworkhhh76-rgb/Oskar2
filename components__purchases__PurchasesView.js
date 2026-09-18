@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { getBrandLogoDataUrl } from './brand__logo.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { useApp } from './context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.33-waiter-mobile-centered';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.33-waiter-mobile-centered';
+import { getBrandLogoDataUrl } from './brand__logo.js?v=7.9.4.33-waiter-mobile-centered';
+import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.33-waiter-mobile-centered';
+import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.33-waiter-mobile-centered';
+import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.33-waiter-mobile-centered';
 import { Plus, Trash2, Building2, Eye, X, Image as ImageIcon, FileDown, FileSpreadsheet, Printer, AlertTriangle, ReceiptText, Sparkles, ScanLine } from 'lucide-react';
 
 const h = React.createElement;
@@ -34,7 +34,7 @@ export const PurchasesView = () => {
   const warehouses = Array.isArray(app.warehouses) ? app.warehouses.filter(Boolean) : [];
   const accounts = Array.isArray(app.accounts) ? app.accounts.filter(Boolean) : [];
   const settings = app.settings || {};
-  const { createPurchaseInvoice, deletePurchase, saveSupplier, saveWarehouse, activeEmployee, showToast } = app;
+  const { createPurchaseInvoice, deletePurchase, saveSupplier, saveWarehouse, currentUser, showToast } = app;
   const primaryWarehouse = warehouses[0] || warehouses.find((w) => w?.id === settings.activeWarehouseId) || warehouses.find((w) => w?.isDefault);
 
   const activeProducts = products.filter((p) => !p.deletedAt && p.status !== 'archived' && Array.isArray(p.units) && p.units.length > 0);
@@ -87,7 +87,7 @@ export const PurchasesView = () => {
   const total = Math.max(0, subtotal - discountAmount);
   const paidSafe = Math.min(total, Math.max(0, num(paid)));
   const debt = Math.max(0, total - paidSafe);
-  const canDelete = activeEmployee?.permissions?.canDeleteInvoice ?? true;
+  const canDelete = currentUser?.permissions?.canDeleteInvoice === true;
 
   const updateRow = (index, patch) => setRows((prev) => prev.map((row, i) => {
     if (i !== index) return row;

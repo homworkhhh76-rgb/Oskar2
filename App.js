@@ -1,37 +1,38 @@
 import React, { useEffect, useState } from 'react';
-import { AppProvider, useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { Header } from './components__common__Header.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { Sidebar } from './components__common__Sidebar.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { BottomNav } from './components__common__BottomNav.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { Toast } from './components__common__Toast.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { SyncModal } from './components__sync__SyncModal.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { POSView } from './components__pos__POSView.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { DashboardView } from './components__dashboard__DashboardView.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { SalesView } from './components__sales__SalesView.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { PurchasesView } from './components__purchases__PurchasesView.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { ProductsView } from './components__products__ProductsView.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { CategoriesView } from './components__categories__CategoriesView.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { InventoryView } from './components__inventory__InventoryView.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { CustomersView } from './components__customers__CustomersView.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { SuppliersView } from './components__suppliers__SuppliersView.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { AccountsView } from './components__accounts__AccountsView.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { ExpensesView } from './components__expenses__ExpensesView.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { VouchersView } from './components__vouchers__VouchersView.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { EmployeesView } from './components__employees__EmployeesView.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { BarcodesView } from './components__barcodes__BarcodesView.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { ReportsView } from './components__reports__ReportsView.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { TrashView } from './components__trash__TrashView.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { SettingsView } from './components__settings__SettingsView.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { ThermalReceiptModal } from './components__pos__ThermalReceiptModal.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { LoginGate } from './components__auth__LoginGate.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { RestaurantProvider } from './restaurant__context__RestaurantContext.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { RestaurantTablesView } from './restaurant__components__RestaurantTablesView.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { RestaurantWaiterView } from './restaurant__components__RestaurantWaiterView.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { RestaurantKDSView } from './restaurant__components__RestaurantKDSView.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { RestaurantWasteView } from './restaurant__components__RestaurantWasteView.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { RestaurantSettingsPanel } from './restaurant__components__RestaurantSettingsPanel.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { OscarAI } from './components__ai__OscarAI.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { AppProvider, useApp } from './context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
+import { Header } from './components__common__Header.js?v=7.9.4.33-waiter-mobile-centered';
+import { Sidebar } from './components__common__Sidebar.js?v=7.9.4.33-waiter-mobile-centered';
+import { BottomNav } from './components__common__BottomNav.js?v=7.9.4.33-waiter-mobile-centered';
+import { Toast } from './components__common__Toast.js?v=7.9.4.33-waiter-mobile-centered';
+import { SyncModal } from './components__sync__SyncModal.js?v=7.9.4.33-waiter-mobile-centered';
+import { POSView } from './components__pos__POSView.js?v=7.9.4.33-waiter-mobile-centered';
+import { DashboardView } from './components__dashboard__DashboardView.js?v=7.9.4.33-waiter-mobile-centered';
+import { SalesView } from './components__sales__SalesView.js?v=7.9.4.33-waiter-mobile-centered';
+import { PurchasesView } from './components__purchases__PurchasesView.js?v=7.9.4.33-waiter-mobile-centered';
+import { ProductsView } from './components__products__ProductsView.js?v=7.9.4.33-waiter-mobile-centered';
+import { CategoriesView } from './components__categories__CategoriesView.js?v=7.9.4.33-waiter-mobile-centered';
+import { InventoryView } from './components__inventory__InventoryView.js?v=7.9.4.33-waiter-mobile-centered';
+import { CustomersView } from './components__customers__CustomersView.js?v=7.9.4.33-waiter-mobile-centered';
+import { SuppliersView } from './components__suppliers__SuppliersView.js?v=7.9.4.33-waiter-mobile-centered';
+import { AccountsView } from './components__accounts__AccountsView.js?v=7.9.4.33-waiter-mobile-centered';
+import { ExpensesView } from './components__expenses__ExpensesView.js?v=7.9.4.33-waiter-mobile-centered';
+import { VouchersView } from './components__vouchers__VouchersView.js?v=7.9.4.33-waiter-mobile-centered';
+import { EmployeesView } from './components__employees__EmployeesView.js?v=7.9.4.33-waiter-mobile-centered';
+import { BarcodesView } from './components__barcodes__BarcodesView.js?v=7.9.4.33-waiter-mobile-centered';
+import { ReportsView } from './components__reports__ReportsView.js?v=7.9.4.33-waiter-mobile-centered';
+import { TrashView } from './components__trash__TrashView.js?v=7.9.4.33-waiter-mobile-centered';
+import { SettingsView } from './components__settings__SettingsView.js?v=7.9.4.33-waiter-mobile-centered';
+import { ThermalReceiptModal } from './components__pos__ThermalReceiptModal.js?v=7.9.4.33-waiter-mobile-centered';
+import { DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.33-waiter-mobile-centered';
+import { LoginGate } from './components__auth__LoginGate.js?v=7.9.4.33-waiter-mobile-centered';
+import { RestaurantProvider } from './restaurant__context__RestaurantContext.js?v=7.9.4.33-waiter-mobile-centered';
+import { RestaurantTablesView } from './restaurant__components__RestaurantTablesView.js?v=7.9.4.33-waiter-mobile-centered';
+import { RestaurantWaiterView } from './restaurant__components__RestaurantWaiterView.js?v=7.9.4.33-waiter-mobile-centered';
+import { RestaurantKDSView } from './restaurant__components__RestaurantKDSView.js?v=7.9.4.33-waiter-mobile-centered';
+import { RestaurantWasteView } from './restaurant__components__RestaurantWasteView.js?v=7.9.4.33-waiter-mobile-centered';
+import { RestaurantSettingsPanel } from './restaurant__components__RestaurantSettingsPanel.js?v=7.9.4.33-waiter-mobile-centered';
+import { OscarAI } from './components__ai__OscarAI.js?v=7.9.4.33-waiter-mobile-centered';
+import { canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.33-waiter-mobile-centered';
 
 const h = React.createElement;
 const ScrollScreen = ({ children }) => h('div', { className:'scroll-chain-page h-full min-h-0 overflow-y-auto custom-scrollbar mobile-safe-bottom lg:pb-0' }, children);
@@ -44,7 +45,7 @@ const RESTAURANT_TAB_PERMISSIONS = {
 };
 
 const MainLayout = () => {
-  const { activeTab, setActiveTab, isLoaded, settings, saveSettings, currentUser, activeEmployee } = useApp();
+  const { activeTab, setActiveTab, isLoaded, settings, saveSettings, currentUser, activeEmployee, cart } = useApp();
   const [forceEnter, setForceEnter] = useState(false);
   const [showSkipButton, setShowSkipButton] = useState(false);
 
@@ -52,6 +53,48 @@ const MainLayout = () => {
     const timer = setTimeout(() => setShowSkipButton(true), 1500);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    const isVisible = (el) => {
+      if (!el || el.disabled) return false;
+      const style = window.getComputedStyle(el);
+      if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity || 1) === 0) return false;
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.right > 0;
+    };
+    const clickFirstVisible = (selectors) => {
+      for (const selector of selectors) {
+        const nodes = Array.from(document.querySelectorAll(selector));
+        const button = nodes.find(isVisible);
+        if (button) { button.click(); return true; }
+      }
+      return false;
+    };
+    const onEnterExecute = (e) => {
+      if (e.key !== 'Enter' || e.defaultPrevented || e.repeat || e.isComposing || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
+      const target = e.target;
+      if (target?.id === 'pos-barcode-input') return; // Enter here remains barcode submit.
+      if (target?.tagName === 'TEXTAREA') return; // Textareas own Enter/Shift+Enter behavior.
+
+      const form = target?.closest?.('form');
+      if (form) {
+        const submit = Array.from(form.querySelectorAll('button[type="submit"],input[type="submit"]')).find(isVisible);
+        if (submit) { e.preventDefault(); submit.click(); return; }
+      }
+
+      const executed = clickFirstVisible([
+        '#btn-confirm-payment:not([disabled])',
+        '#waiter-send-kitchen:not([disabled])',
+        '#oscar-ai-send:not([disabled])',
+        '#btn-full-cart-payment:not([disabled])',
+        '#btn-checkout:not([disabled])',
+        '[data-enter-primary="true"]:not([disabled])'
+      ]);
+      if (executed) e.preventDefault();
+    };
+    window.addEventListener('keydown', onEnterExecute);
+    return () => window.removeEventListener('keydown', onEnterExecute);
+  }, [activeTab, cart?.length]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -94,19 +137,20 @@ const MainLayout = () => {
     }
   }, [isLoaded, settings, saveSettings]);
 
-  const runtimeAccount = window.OscarActivation?.readRuntime?.()?.account;
-  const roleText = String(currentUser?.role || '').toLowerCase();
-  const isAdmin = !!currentUser?.isCompanyManager || roleText === 'admin' || roleText.includes('مدير') || (!runtimeAccount && activeEmployee?.role === 'admin');
-  const perms = currentUser?.permissions || {};
-  const hasPermission = key => isAdmin || (Array.isArray(perms) ? perms.includes(key) : perms?.[key] === true);
-  const canOpenRestaurantTab = tab => {
-    const permission = RESTAURANT_TAB_PERMISSIONS[tab];
-    return !permission || (settings.isRestaurantModeEnabled && hasPermission(permission));
+  const accessArgs = {
+    runtime: window.OscarActivation?.readRuntime?.() || null,
+    currentUser,
+    activeEmployee,
+    restaurantEnabled: !!settings.isRestaurantModeEnabled,
   };
+  const canOpenRestaurantTab = tab => canAccessTab(tab, accessArgs);
 
   useEffect(() => {
-    if (RESTAURANT_TAB_PERMISSIONS[activeTab] && !canOpenRestaurantTab(activeTab)) setActiveTab('pos');
-  }, [activeTab, settings.isRestaurantModeEnabled, currentUser, activeEmployee]);
+    if (!isLoaded) return;
+    if (activeTab !== 'no_access' && !canAccessTab(activeTab, accessArgs)) {
+      setActiveTab(firstAllowedTab(accessArgs) || 'no_access');
+    }
+  }, [activeTab, settings.isRestaurantModeEnabled, currentUser, activeEmployee, isLoaded]);
 
   if (!isLoaded && !forceEnter) {
     return h('div', { className:'min-h-[100dvh] w-screen flex flex-col items-center justify-center bg-slate-50 text-slate-900 px-4' },
@@ -118,6 +162,14 @@ const MainLayout = () => {
   }
 
   const screen = (() => {
+    if (activeTab === 'no_access' || !canAccessTab(activeTab, accessArgs)) {
+      return h('div', { className:'h-full flex items-center justify-center p-6 bg-slate-100' },
+        h('div', { className:'max-w-md w-full rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm' },
+          h('div', { className:'text-lg font-black text-slate-900' }, 'لا توجد صفحة مسموحة لهذا الحساب'),
+          h('div', { className:'text-xs text-slate-500 mt-2 leading-6' }, 'يجب على المدير تحديد صفحة واحدة على الأقل من صلاحيات الموظف ثم حفظها. بعد المزامنة سيُفتح الحساب على أول صفحة مسموحة تلقائياً.')
+        )
+      );
+    }
     if (activeTab === 'pos') return h(POSView);
     if (activeTab === 'dashboard') return h(ScrollScreen, null, h(DashboardView));
     if (activeTab === 'sales') return h(ScrollScreen, null, h(SalesView));

@@ -1,6 +1,7 @@
 import React from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { useApp } from './context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
+import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.33-waiter-mobile-centered';
+import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.33-waiter-mobile-centered';
 import {
   LayoutDashboard, ShoppingCart, ReceiptText, Truck, Package, Boxes, Warehouse,
   Users, Building2, Wallet, Receipt, FileSpreadsheet, UserCheck, Barcode, BarChart3,
@@ -15,11 +16,12 @@ export const Sidebar = () => {
     setMobileSidebarOpen, settings, currentUser, activeEmployee
   } = useApp();
 
-  const runtimeAccount = window.OscarActivation?.readRuntime?.()?.account;
-  const roleText = String(currentUser?.role || '').toLowerCase();
-  const isAdmin = !!currentUser?.isCompanyManager || roleText === 'admin' || roleText.includes('مدير') || (!runtimeAccount && activeEmployee?.role === 'admin');
-  const perms = currentUser?.permissions || {};
-  const hasPermission = key => isAdmin || (Array.isArray(perms) ? perms.includes(key) : perms?.[key] === true);
+  const accessArgs = {
+    runtime: window.OscarActivation?.readRuntime?.() || null,
+    currentUser,
+    activeEmployee,
+    restaurantEnabled: !!settings.isRestaurantModeEnabled,
+  };
 
   const navItems = [
     { id:'pos', label:'الكاشير POS', icon:ShoppingCart, badge:cart.length || undefined },
@@ -43,16 +45,19 @@ export const Sidebar = () => {
   ];
 
   const restaurantItems = settings.isRestaurantModeEnabled ? [
-    { id:'restaurant_tables', label:'الطاولات والصالات', icon:LayoutGrid, restaurant:true, permission:'canAccessRestaurantTables' },
-    { id:'restaurant_waiter', label:'واجهة الجرسون', icon:UtensilsCrossed, restaurant:true, permission:'canAccessRestaurantWaiter' },
-    { id:'restaurant_kitchen', label:'شاشة المطبخ KDS', icon:ChefHat, restaurant:true, permission:'canAccessRestaurantKitchen' },
-    { id:'restaurant_waste', label:'الوصفات والهالك', icon:Scale, restaurant:true, permission:'canAccessRestaurantWaste' },
-  ].filter(item => hasPermission(item.permission)) : [];
+    { id:'restaurant_tables', label:'الطاولات والصالات', icon:LayoutGrid, restaurant:true },
+    { id:'restaurant_waiter', label:'واجهة الجرسون', icon:UtensilsCrossed, restaurant:true },
+    { id:'restaurant_kitchen', label:'شاشة المطبخ KDS', icon:ChefHat, restaurant:true },
+    { id:'restaurant_waste', label:'الوصفات والهالك', icon:Scale, restaurant:true },
+  ] : [];
 
-  const allNavItems = settings.isRestaurantModeEnabled ? [navItems[0], navItems[1], ...restaurantItems, ...navItems.slice(2)] : navItems;
+  const orderedItems = settings.isRestaurantModeEnabled ? [navItems[0], navItems[1], ...restaurantItems, ...navItems.slice(2)] : navItems;
+  const allNavItems = orderedItems.filter(item => item.id === 'oscar_ai'
+    ? canAccessPermission('canAccessAI', accessArgs)
+    : canAccessTab(item.id, accessArgs));
   const go = id => {
     if (id === 'oscar_ai') {
-      window.dispatchEvent(new Event('oscar-ai-open'));
+      if (canAccessPermission('canAccessAI', accessArgs)) window.dispatchEvent(new Event('oscar-ai-open'));
       setMobileSidebarOpen(false);
       return;
     }
@@ -61,7 +66,7 @@ export const Sidebar = () => {
   };
 
   const brand = (compact=false) => h('div', { className:`${compact?'p-3 pl-12':'p-3.5'} border-b border-slate-100 bg-white shrink-0` },
-    h('button', { type:'button', onClick:()=>go('pos'), className:'w-full flex items-center gap-2.5 text-right min-w-0' },
+    h('button', { type:'button', onClick:()=>go(firstAllowedTab(accessArgs) || 'no_access'), className:'w-full flex items-center gap-2.5 text-right min-w-0' },
       h('img', {
         src:getBrandLogoDataUrl(settings),
         onError:e=>{e.currentTarget.onerror=null;e.currentTarget.src=DEFAULT_LOGO_DATA_URL;},

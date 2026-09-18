@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@200;300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./app.css?v=7.9.4.20-modal-backdrop-rootfix" />
+  <link rel="stylesheet" href="./app.css?v=7.9.4.33-waiter-mobile-centered" />
   <script type="importmap">
   {
     "imports": {
@@ -29,8 +29,8 @@
     }
   }
   </script>
-  <script src="./oscar-activation-runtime.js?v=7.9.4.20-modal-backdrop-rootfix"></script>
-  <script src="./oscar-cloud-sync.js?v=7.9.4.20-modal-backdrop-rootfix"></script>
+  <script src="./oscar-activation-runtime.js?v=7.9.4.33-waiter-mobile-centered"></script>
+  <script src="./oscar-cloud-sync.js?v=7.9.4.33-waiter-mobile-centered"></script>
 </head>
 <body>
   <script>document.documentElement.classList.remove('dark');</script>
@@ -44,7 +44,7 @@
     </div>
   </div>
   <script type="module">
-    const OSCAR_BUILD = '7.9.4.20-modal-backdrop-rootfix';
+    const OSCAR_BUILD = '7.9.4.33-waiter-mobile-centered';
     const isLocal = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
 
     const clearCodeCaches = async () => {
@@ -84,7 +84,7 @@
       } catch (_) {}
 
       try {
-        await import('./main.js?v=7.9.4.20-modal-backdrop-rootfix');
+        await import('./main.js?v=7.9.4.33-waiter-mobile-centered');
         sessionStorage.removeItem('oscar-rootfix-retry');
       } catch (error) {
         try { console.error('OSCAR_BOOT_RECOVERY', error); } catch (_) {}
@@ -105,7 +105,7 @@
   </script>
   <script>
     if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !['localhost','127.0.0.1','::1'].includes(location.hostname)) {
-      addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=7.9.4.20-modal-backdrop-rootfix', { updateViaCache: 'none' }).then((registration) => registration.update()).catch(() => {}));
+      addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=7.9.4.33-waiter-mobile-centered', { updateViaCache: 'none' }).then((registration) => registration.update()).catch(() => {}));
     }
   </script>
 </body>

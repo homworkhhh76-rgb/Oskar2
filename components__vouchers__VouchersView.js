@@ -1,18 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { exportToCSV, printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { downloadProfessionalTablePDF, downloadProfessionalTableImage, downloadProfessionalVoucherPDF, downloadProfessionalVoucherImage } from './utils__professionalExport.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { getBrandLogoDataUrl } from './brand__logo.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { useApp } from './context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.33-waiter-mobile-centered';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.33-waiter-mobile-centered';
+import { exportToCSV, printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.33-waiter-mobile-centered';
+import { downloadProfessionalTablePDF, downloadProfessionalTableImage, downloadProfessionalVoucherPDF, downloadProfessionalVoucherImage } from './utils__professionalExport.js?v=7.9.4.33-waiter-mobile-centered';
+import { getBrandLogoDataUrl } from './brand__logo.js?v=7.9.4.33-waiter-mobile-centered';
 import { FileSpreadsheet, ArrowDownLeft, ArrowUpRight, Search, Trash2, Printer, Download, Image as ImageIcon, FileText, CreditCard, User, Building2, AlertCircle, Eye, X } from 'lucide-react';
 
 const h = React.createElement;
 const money = (v) => (Number(v) || 0).toFixed(2);
 
 export const VouchersView = () => {
-  const { vouchers, createVoucher, deleteVoucher, customers, suppliers, accounts, settings, activeEmployee, showToast } = useApp();
+  const { vouchers, createVoucher, deleteVoucher, customers, suppliers, accounts, settings, currentUser, showToast } = useApp();
   const [activeTabFilter, setActiveTabFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -36,7 +36,7 @@ export const VouchersView = () => {
   useEffect(() => { warmExportLibraries(); }, []);
   useEffect(() => { if (!viewingVoucher) setVoucherPaperSize(settings.printerWidth || '80mm'); }, [settings.printerWidth, viewingVoucher]);
 
-  const canManageVouchers = activeEmployee?.permissions?.canManageVouchers ?? true;
+  const canManageVouchers = currentUser?.permissions?.canManageVouchers === true;
   const filteredVouchers = vouchers.filter((v) => {
     if (activeTabFilter !== 'all' && v.type !== activeTabFilter) return false;
     const q = searchTerm.trim().toLowerCase();

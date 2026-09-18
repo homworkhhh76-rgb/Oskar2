@@ -1,8 +1,8 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { getAllFromStore, getFromStore, deleteFromStore, putInStore, syncChannel, } from './restaurant__services__db.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { initRestaurantDefaults, generateOrderNumber, generateTakeawayQueueNumber, generateKitchenTicketId, playChimeSound, } from './restaurant__services__restaurantService.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { getAllFromStore, getFromStore, deleteFromStore, putInStore, syncChannel, } from './restaurant__services__db.js?v=7.9.4.33-waiter-mobile-centered';
+import { initRestaurantDefaults, generateOrderNumber, generateTakeawayQueueNumber, generateKitchenTicketId, playChimeSound, } from './restaurant__services__restaurantService.js?v=7.9.4.33-waiter-mobile-centered';
+import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
 const RestaurantContext = createContext(null);
 const RESTAURANT_STORES = new Set([
     'restaurant_sections',
@@ -16,7 +16,7 @@ const RESTAURANT_STORES = new Set([
 const isRestaurantTab = (tab) => String(tab || '').startsWith('restaurant_');
 const makeRestaurantId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 export const RestaurantProvider = ({ children }) => {
-    const { products, setCart, setActiveTab, showToast, settings, isLoaded, isCloudReady, activeTab, } = useApp();
+    const { products, customers, setSelectedCustomer, setCart, setActiveTab, showToast, settings, isLoaded, isCloudReady, activeTab, } = useApp();
     const [sections, setSections] = useState([]);
     const [tables, setTables] = useState([]);
     const [orders, setOrders] = useState([]);
@@ -684,14 +684,18 @@ export const RestaurantProvider = ({ children }) => {
                 const prod = (products || []).find((p) => p.id === item.productId);
                 const finalUnitPrice = Number(item.unitPrice || 0);
                 const notesParts = [];
-                const defaultUnit = (prod?.units || []).find((u) => u.isDefaultSale) || (prod?.units || [])[0];
-                const conversionFactor = Number(defaultUnit?.conversionToBase) || 1;
+                const units = prod?.units || [];
+                const defaultUnit = units.find((u) => u.isDefaultSale) || units[0];
+                const selectedUnit = units.find((u) => String(u.id) === String(item.unitId))
+                    || units.find((u) => String(u.name || '') === String(item.unitName || ''))
+                    || defaultUnit;
+                const conversionFactor = Number(item.conversionFactor || selectedUnit?.conversionToBase) || 1;
                 return {
                     productId: item.productId,
                     productName: item.productName,
-                    unitId: defaultUnit?.id || 'u-piece',
-                    unitName: defaultUnit?.name || 'وجبة',
-                    availableUnits: prod?.units || [{ id:'u-piece', name:'وجبة', conversionToBase:1, costPrice:Number(item.unitPrice||0)*0.5, salePrice:finalUnitPrice, isDefaultSale:true }],
+                    unitId: item.unitId || selectedUnit?.id || 'u-piece',
+                    unitName: item.unitName || selectedUnit?.name || 'وجبة',
+                    availableUnits: units.length ? units : [{ id:'u-piece', name:'وجبة', conversionToBase:1, costPrice:Number(item.unitPrice||0)*0.5, salePrice:finalUnitPrice, isDefaultSale:true }],
                     quantity: Number(item.quantity || 1),
                     conversionFactor,
                     unitPrice: finalUnitPrice,
@@ -713,9 +717,26 @@ export const RestaurantProvider = ({ children }) => {
     const recallOrderToPOS = (order) => {
         const cartItems = orderToCartItems(order);
         setCart(cartItems);
+        const restaurantCustomerName = String(order?.customerName || '').trim();
+        if (restaurantCustomerName) {
+            const normalized = restaurantCustomerName.toLocaleLowerCase('ar');
+            const matchedCustomer = (customers || []).find((c) => !c?.deletedAt && String(c.name || '').trim().toLocaleLowerCase('ar') === normalized);
+            setSelectedCustomer(matchedCustomer || {
+                id: `restaurant-customer-${order.id}`,
+                name: restaurantCustomerName,
+                phone: order.customerPhone || '',
+                balance: 0,
+                priceList: 'retail',
+                isVirtual: true,
+                restaurantOrderId: order.id,
+            });
+        } else {
+            setSelectedCustomer({ id:'cust-walkin', name:'عميل نقدي', balance:0, priceList:'retail', isVirtual:true });
+        }
         setActiveRestaurantOrder(order);
         setActiveTab('pos');
-        showToast(`تم استدعاء طلب ${order.tableNumber ? `طاولة ${order.tableNumber}` : order.orderNumber} للكاشير`, 'success');
+        const tableText = order.tableName || (order.tableNumber ? `طاولة ${order.tableNumber}` : 'طلب سفري');
+        showToast(`تم استدعاء ${tableText} للكاشير`, 'success');
     };
 
     // If the waiter adds items to the same table while the cashier already has the order open,

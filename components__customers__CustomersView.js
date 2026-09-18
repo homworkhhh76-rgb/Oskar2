@@ -1,12 +1,12 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { exportToCSV, printReceiptElement } from './utils__export.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { downloadProfessionalCustomerStatementPDF, downloadProfessionalCustomerStatementImage, downloadProfessionalCustomerStatementExcel, downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { useApp } from './context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.33-waiter-mobile-centered';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.33-waiter-mobile-centered';
+import { exportToCSV, printReceiptElement } from './utils__export.js?v=7.9.4.33-waiter-mobile-centered';
+import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.33-waiter-mobile-centered';
+import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.33-waiter-mobile-centered';
+import { downloadProfessionalCustomerStatementPDF, downloadProfessionalCustomerStatementImage, downloadProfessionalCustomerStatementExcel, downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.33-waiter-mobile-centered';
 import { Plus, Search, FileText, DollarSign, Download, Printer, Trash2, X, Edit, Image as ImageIcon, FileSpreadsheet, } from 'lucide-react';
 export const CustomersView = () => {
     const { customers, invoices, vouchers, accounts, settings, saveCustomer, softDeleteCustomer, recordCustomerPayment, showToast, } = useApp();

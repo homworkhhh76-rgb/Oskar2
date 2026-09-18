@@ -4548,3 +4548,834 @@ button.transition-all,
     min-height:0!important;
   }
 }
+
+/* ===== v7.9.4.21 Short modal vertical centering =====
+   Keep the dark backdrop filling the whole app stage between header and bottom nav.
+   Short cards are centered inside that area; known long/workspace dialogs still use full height. */
+@media (max-width:1023px){
+  /* Generic dialogs: center the card vertically in the already-bounded dark backdrop. */
+  .oscar-page-stage [class*="fixed"][class*="inset-0"][class*="items-center"][class*="justify-center"]:not(.barcode-camera-overlay):not(.product-editor-modal-overlay):not(#full-cart-modal-backdrop):not(#waiter-cart-backdrop):not(.oscar-ai-overlay):not(.oscar-employee-modal-overlay):not(.oscar-form-modal-overlay),
+  body > [class*="fixed"][class*="inset-0"][class*="items-center"][class*="justify-center"]:not(.barcode-camera-overlay):not(.product-editor-modal-overlay):not(#full-cart-modal-backdrop):not(#waiter-cart-backdrop):not(.oscar-ai-overlay):not(.oscar-employee-modal-overlay):not(.oscar-form-modal-overlay){
+    align-items:center!important;
+  }
+
+  /* Generic short modal card: natural height, centered; if content is long it grows only up to
+     the available safe height and then scrolls internally. */
+  .oscar-page-stage [class*="fixed"][class*="inset-0"][class*="items-center"][class*="justify-center"]:not(.barcode-camera-overlay):not(.product-editor-modal-overlay):not(#full-cart-modal-backdrop):not(#waiter-cart-backdrop):not(.oscar-ai-overlay):not(.oscar-employee-modal-overlay):not(.oscar-form-modal-overlay) > form,
+  .oscar-page-stage [class*="fixed"][class*="inset-0"][class*="items-center"][class*="justify-center"]:not(.barcode-camera-overlay):not(.product-editor-modal-overlay):not(#full-cart-modal-backdrop):not(#waiter-cart-backdrop):not(.oscar-ai-overlay):not(.oscar-employee-modal-overlay):not(.oscar-form-modal-overlay) > section,
+  .oscar-page-stage [class*="fixed"][class*="inset-0"][class*="items-center"][class*="justify-center"]:not(.barcode-camera-overlay):not(.product-editor-modal-overlay):not(#full-cart-modal-backdrop):not(#waiter-cart-backdrop):not(.oscar-ai-overlay):not(.oscar-employee-modal-overlay):not(.oscar-form-modal-overlay) > div,
+  body > [class*="fixed"][class*="inset-0"][class*="items-center"][class*="justify-center"]:not(.barcode-camera-overlay):not(.product-editor-modal-overlay):not(#full-cart-modal-backdrop):not(#waiter-cart-backdrop):not(.oscar-ai-overlay):not(.oscar-employee-modal-overlay):not(.oscar-form-modal-overlay) > form,
+  body > [class*="fixed"][class*="inset-0"][class*="items-center"][class*="justify-center"]:not(.barcode-camera-overlay):not(.product-editor-modal-overlay):not(#full-cart-modal-backdrop):not(#waiter-cart-backdrop):not(.oscar-ai-overlay):not(.oscar-employee-modal-overlay):not(.oscar-form-modal-overlay) > section,
+  body > [class*="fixed"][class*="inset-0"][class*="items-center"][class*="justify-center"]:not(.barcode-camera-overlay):not(.product-editor-modal-overlay):not(#full-cart-modal-backdrop):not(#waiter-cart-backdrop):not(.oscar-ai-overlay):not(.oscar-employee-modal-overlay):not(.oscar-form-modal-overlay) > div{
+    height:auto!important;
+    min-height:0!important;
+    max-height:calc(100% - 12px)!important;
+    margin-top:auto!important;
+    margin-bottom:auto!important;
+    overflow-y:auto!important;
+    -webkit-overflow-scrolling:touch!important;
+    overscroll-behavior:contain!important;
+  }
+
+  /* Long/special dialogs intentionally keep the full safe height. */
+  .product-editor-modal-overlay,
+  #full-cart-modal-backdrop,
+  #waiter-cart-backdrop,
+  .oscar-ai-overlay,
+  .oscar-employee-modal-overlay,
+  .oscar-form-modal-overlay{
+    align-items:stretch!important;
+  }
+  .product-editor-modal-panel,
+  #full-cart-modal-box,
+  .oscar-ai-panel,
+  .oscar-employee-modal-panel,
+  .oscar-form-modal-panel{
+    margin-top:0!important;
+    margin-bottom:0!important;
+  }
+
+  /* Expense types behaves like a workspace when long, but stays centered when its content is short. */
+  .expense-types-modal-panel{
+    height:auto!important;
+    max-height:calc(100% - 12px)!important;
+    margin-top:auto!important;
+    margin-bottom:auto!important;
+  }
+}
+
+/* ===== v7.9.4.24 Waiter popup only =====
+   Keep the waiter PAGE untouched. These rules apply only while the cart popup
+   is actually open. The hidden modal remains hidden. */
+@media (max-width:1023px){
+  .oscar-page-stage #waiter-cart-backdrop{
+    position:fixed!important;
+    inset:0!important;
+    top:0!important;
+    right:0!important;
+    bottom:0!important;
+    left:0!important;
+    width:auto!important;
+    height:auto!important;
+    margin:0!important;
+    padding:0!important;
+    z-index:95!important;
+    background:rgba(0,0,0,.55)!important;
+  }
+
+  .oscar-page-stage #waiter-cart-modal:not(.hidden){
+    position:fixed!important;
+    top:6px!important;
+    bottom:6px!important;
+    left:6px!important;
+    right:6px!important;
+    width:auto!important;
+    max-width:none!important;
+    height:auto!important;
+    max-height:none!important;
+    min-height:0!important;
+    margin:0!important;
+    transform:none!important;
+    border-radius:18px!important;
+    overflow:hidden!important;
+    z-index:110!important;
+  }
+
+  .oscar-page-stage #waiter-cart-modal:not(.hidden) > div:nth-child(2){
+    flex:1 1 auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    -webkit-overflow-scrolling:touch!important;
+    overscroll-behavior:contain!important;
+    touch-action:pan-y!important;
+  }
+
+  /* Fallback only if this popup is portaled directly under body. */
+  body > #waiter-cart-backdrop{
+    top:var(--oscar-modal-header-edge,3.5rem)!important;
+    bottom:var(--oscar-modal-bottom-edge,4rem)!important;
+    left:0!important;
+    right:0!important;
+  }
+  body > #waiter-cart-modal:not(.hidden){
+    top:calc(var(--oscar-modal-header-edge,3.5rem) + 6px)!important;
+    bottom:calc(var(--oscar-modal-bottom-edge,4rem) + 6px)!important;
+    left:6px!important;
+    right:6px!important;
+    width:auto!important;
+    max-width:none!important;
+    height:auto!important;
+    max-height:none!important;
+    transform:none!important;
+    border-radius:18px!important;
+  }
+}
+
+
+/* ===== v7.9.4.28 Desktop centered dialog geometry =====
+   Keep dialogs clear of the permanent 12rem desktop sidebar. Waiter cart and
+   Oscar AI behave like ordinary centered dialogs instead of wide workspaces. */
+@media (min-width:1024px){
+  #waiter-cart-backdrop{
+    position:fixed!important;
+    top:3.5rem!important;
+    bottom:0!important;
+    left:0!important;
+    right:12rem!important;
+    width:auto!important;
+    height:auto!important;
+    margin:0!important;
+    padding:0!important;
+    z-index:2147481400!important;
+    background:rgba(15,23,42,.52)!important;
+    backdrop-filter:blur(2px)!important;
+    -webkit-backdrop-filter:blur(2px)!important;
+  }
+  #waiter-cart-modal:not(.hidden){
+    position:fixed!important;
+    top:calc(3.5rem + (100dvh - 3.5rem)/2)!important;
+    bottom:auto!important;
+    left:0!important;
+    right:12rem!important;
+    width:min(740px,calc(100vw - 12rem - 48px))!important;
+    max-width:740px!important;
+    height:min(720px,calc(100dvh - 6.5rem))!important;
+    max-height:calc(100dvh - 6.5rem)!important;
+    min-height:420px!important;
+    margin-left:auto!important;
+    margin-right:auto!important;
+    transform:translateY(-50%)!important;
+    border-radius:20px!important;
+    overflow:hidden!important;
+    z-index:2147481500!important;
+    box-shadow:0 24px 70px rgba(15,23,42,.28)!important;
+  }
+  #waiter-cart-modal:not(.hidden) > div:nth-child(2){
+    flex:1 1 auto!important;
+    min-height:0!important;
+    overflow-y:auto!important;
+    overscroll-behavior:contain!important;
+  }
+
+  .oscar-ai-overlay{
+    position:fixed!important;
+    top:3.5rem!important;
+    bottom:0!important;
+    left:0!important;
+    right:12rem!important;
+    width:auto!important;
+    height:auto!important;
+    padding:24px!important;
+    align-items:center!important;
+    justify-content:center!important;
+    overflow:hidden!important;
+    background:rgba(15,23,42,.46)!important;
+    backdrop-filter:blur(3px)!important;
+    -webkit-backdrop-filter:blur(3px)!important;
+  }
+  .oscar-ai-panel{
+    width:min(760px,calc(100vw - 12rem - 48px))!important;
+    max-width:760px!important;
+    height:min(720px,calc(100dvh - 6.5rem))!important;
+    max-height:calc(100dvh - 6.5rem)!important;
+    min-height:460px!important;
+    margin:auto!important;
+    border-radius:22px!important;
+    overflow:hidden!important;
+    box-shadow:0 24px 80px rgba(15,23,42,.3)!important;
+  }
+  .oscar-ai-panel header{padding:12px 14px!important;}
+  .oscar-ai-panel footer{padding:12px 14px!important;}
+}
+
+/* Wide tablets / landscape without permanent sidebar: centered but compact. */
+@media (min-width:768px) and (max-width:1023px){
+  .oscar-ai-overlay{align-items:center!important;padding:12px!important;}
+  .oscar-ai-panel{height:min(680px,calc(100% - 24px))!important;max-width:720px!important;border-radius:20px!important;margin:auto!important;}
+  body > #waiter-cart-modal:not(.hidden),
+  .oscar-page-stage #waiter-cart-modal:not(.hidden){
+    top:50%!important;
+    bottom:auto!important;
+    left:12px!important;
+    right:12px!important;
+    width:min(700px,calc(100vw - 24px))!important;
+    max-width:700px!important;
+    height:min(680px,calc(100% - 24px))!important;
+    max-height:calc(100% - 24px)!important;
+    margin-left:auto!important;
+    margin-right:auto!important;
+    transform:translateY(-50%)!important;
+    border-radius:20px!important;
+  }
+}
+
+
+/* ===== v7.9.4.28 Waiter dialog compact desktop geometry =====
+   Only the waiter order popup is resized. The waiter page itself is untouched. */
+@media (min-width:1024px){
+  #waiter-cart-backdrop{
+    position:fixed!important;
+    top:3.5rem!important;
+    bottom:0!important;
+    left:0!important;
+    right:12rem!important;
+    width:auto!important;
+    height:auto!important;
+    margin:0!important;
+    padding:0!important;
+    z-index:2147481400!important;
+    background:rgba(15,23,42,.52)!important;
+    backdrop-filter:blur(2px)!important;
+    -webkit-backdrop-filter:blur(2px)!important;
+  }
+
+  #waiter-cart-modal:not(.hidden){
+    position:fixed!important;
+    top:calc(3.5rem + (100dvh - 3.5rem)/2)!important;
+    bottom:auto!important;
+    left:0!important;
+    right:12rem!important;
+    width:min(620px,calc(100vw - 12rem - 56px))!important;
+    max-width:620px!important;
+    height:auto!important;
+    max-height:min(720px,calc(100dvh - 5.5rem))!important;
+    min-height:0!important;
+    margin-left:auto!important;
+    margin-right:auto!important;
+    transform:translateY(-50%)!important;
+    border-radius:20px!important;
+    overflow:hidden!important;
+    z-index:2147481500!important;
+    box-shadow:0 24px 70px rgba(15,23,42,.28)!important;
+  }
+
+  #waiter-cart-modal:not(.hidden) > div:nth-child(2){
+    flex:1 1 auto!important;
+    min-height:120px!important;
+    max-height:390px!important;
+    overflow-y:auto!important;
+    overscroll-behavior:contain!important;
+  }
+
+  #waiter-cart-modal:not(.hidden) > div:first-child,
+  #waiter-cart-modal:not(.hidden) > div:last-child{
+    flex:0 0 auto!important;
+  }
+}
+
+/* ===== v7.9.4.29 Waiter desktop popup exact center fix =====
+   User requested: dark backdrop covers full work area up to the sidebar,
+   and the waiter popup itself must be centered, not stuck to the left. */
+@media (min-width:1024px){
+  #waiter-cart-backdrop{
+    position:fixed!important;
+    top:0!important;
+    bottom:0!important;
+    left:0!important;
+    right:12rem!important;
+    width:auto!important;
+    height:auto!important;
+    margin:0!important;
+    padding:0!important;
+    z-index:2147481400!important;
+    background:rgba(15,23,42,.58)!important;
+    backdrop-filter:blur(2px)!important;
+    -webkit-backdrop-filter:blur(2px)!important;
+  }
+
+  #waiter-cart-modal:not(.hidden){
+    position:fixed!important;
+    top:50dvh!important;
+    left:calc((100vw - 12rem) / 2)!important;
+    right:auto!important;
+    bottom:auto!important;
+    width:min(760px,calc(100vw - 12rem - 48px))!important;
+    max-width:760px!important;
+    min-width:520px!important;
+    max-height:calc(100dvh - 48px)!important;
+    height:auto!important;
+    margin:0!important;
+    transform:translate(-50%,-50%)!important;
+    border-radius:22px!important;
+    overflow:hidden!important;
+    z-index:2147481500!important;
+    box-shadow:0 28px 90px rgba(15,23,42,.34)!important;
+    background:#fff!important;
+  }
+
+  #waiter-cart-modal:not(.hidden) > div:nth-child(2){
+    flex:1 1 auto!important;
+    min-height:120px!important;
+    max-height:420px!important;
+    overflow-y:auto!important;
+    overscroll-behavior:contain!important;
+  }
+}
+
+/* ===== v7.9.4.30 Waiter backdrop + sticky footer + product grid polish ===== */
+@media (min-width:1024px){
+  /* Make the dark backdrop cover the whole working area up to the desktop sidebar */
+  #waiter-cart-backdrop{
+    position:fixed!important;
+    top:0!important;
+    bottom:0!important;
+    left:0!important;
+    right:12rem!important;
+    width:calc(100vw - 12rem)!important;
+    max-width:none!important;
+    height:100dvh!important;
+    margin:0!important;
+    padding:0!important;
+    z-index:2147481400!important;
+    background:rgba(15,23,42,.62)!important;
+  }
+
+  /* Keep waiter popup centered and fully visible */
+  #waiter-cart-modal:not(.hidden){
+    position:fixed!important;
+    top:50dvh!important;
+    left:calc((100vw - 12rem) / 2)!important;
+    right:auto!important;
+    bottom:auto!important;
+    width:min(860px,calc(100vw - 12rem - 56px))!important;
+    max-width:860px!important;
+    min-width:560px!important;
+    height:auto!important;
+    max-height:calc(100dvh - 42px)!important;
+    transform:translate(-50%,-50%)!important;
+    z-index:2147481500!important;
+    overflow:hidden!important;
+    display:flex!important;
+    flex-direction:column!important;
+  }
+
+  /* Let the middle content scroll, not the whole popup */
+  #waiter-cart-modal:not(.hidden) > div:nth-child(2){
+    flex:1 1 auto!important;
+    min-height:160px!important;
+    max-height:none!important;
+    overflow-y:auto!important;
+    overscroll-behavior:contain!important;
+    padding-bottom:14px!important;
+  }
+
+  /* Keep the bottom actions always visible */
+  #waiter-cart-modal:not(.hidden) > div:last-child{
+    position:sticky!important;
+    bottom:0!important;
+    z-index:4!important;
+    background:#f8fafc!important;
+    box-shadow:0 -10px 24px rgba(15,23,42,.10)!important;
+    padding-bottom:14px!important;
+  }
+}
+
+/* Mobile / tablet: keep send button zone visible while modal content scrolls */
+@media (max-width:1023.98px){
+  #waiter-cart-modal:not(.hidden) > div:last-child{
+    position:sticky!important;
+    bottom:0!important;
+    z-index:4!important;
+    background:#f8fafc!important;
+    box-shadow:0 -8px 20px rgba(15,23,42,.10)!important;
+    padding-bottom:calc(10px + env(safe-area-inset-bottom, 0px))!important;
+  }
+}
+
+/* ===== v7.9.4.31 waiter modal final layout fix ===== */
+:root{
+  --oscar-desktop-sidebar-width:12rem;
+  --waiter-modal-max-width:860px;
+}
+
+#waiter-cart-backdrop{
+  position:fixed!important;
+  inset:0!important;
+  z-index:2147483300!important;
+  background:rgba(15,23,42,.64)!important;
+  -webkit-backdrop-filter:blur(1.5px)!important;
+  backdrop-filter:blur(1.5px)!important;
+}
+
+#waiter-cart-modal:not(.hidden){
+  position:fixed!important;
+  z-index:2147483310!important;
+  display:flex!important;
+  flex-direction:column!important;
+  overflow:hidden!important;
+  background:#fff!important;
+  border:1px solid rgba(148,163,184,.30)!important;
+  box-shadow:0 28px 70px rgba(15,23,42,.24)!important;
+}
+
+#waiter-cart-modal:not(.hidden) > div:first-child{
+  flex:0 0 auto!important;
+}
+
+#waiter-cart-modal:not(.hidden) > div:nth-child(2){
+  flex:1 1 auto!important;
+  min-height:0!important;
+  overflow-y:auto!important;
+  overscroll-behavior:contain!important;
+}
+
+#waiter-cart-modal:not(.hidden) > div:last-child,
+#waiter-cart-modal:not(.hidden) .waiter-cart-footer{
+  flex:0 0 auto!important;
+  position:relative!important;
+  z-index:2!important;
+  background:#f8fafc!important;
+  box-shadow:0 -10px 24px rgba(15,23,42,.10)!important;
+}
+
+.waiter-footer-layout{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.waiter-footer-buttons{
+  align-items:stretch;
+}
+
+.waiter-note-textarea{
+  min-height:76px!important;
+}
+
+@media (max-width:1023.98px){
+  #waiter-cart-modal:not(.hidden){
+    top:88px!important;
+    left:12px!important;
+    right:12px!important;
+    bottom:calc(74px + env(safe-area-inset-bottom,0px))!important;
+    width:auto!important;
+    max-width:none!important;
+    max-height:none!important;
+    transform:none!important;
+    border-radius:24px!important;
+  }
+
+  .waiter-footer-layout{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+    gap:8px!important;
+    align-items:start!important;
+  }
+
+  .waiter-customer-field,
+  .waiter-note-field{
+    min-width:0!important;
+  }
+
+  .waiter-footer-actions{
+    grid-column:1 / -1!important;
+  }
+
+  .waiter-discovery-row{
+    margin-inline:-12px!important;
+    padding:0 12px 10px!important;
+    background:#fff!important;
+  }
+
+  .waiter-categories-strip{
+    min-width:100%!important;
+    padding-inline-start:12px!important;
+    margin-inline-start:-12px!important;
+  }
+}
+
+@media (min-width:1024px){
+  #waiter-cart-backdrop{
+    left:0!important;
+    top:0!important;
+    bottom:0!important;
+    right:var(--oscar-desktop-sidebar-width)!important;
+    width:calc(100vw - var(--oscar-desktop-sidebar-width))!important;
+    height:100dvh!important;
+  }
+
+  #waiter-cart-modal:not(.hidden){
+    top:50%!important;
+    left:calc((100vw - var(--oscar-desktop-sidebar-width)) / 2)!important;
+    right:auto!important;
+    bottom:auto!important;
+    transform:translate(-50%,-50%)!important;
+    width:min(var(--waiter-modal-max-width),calc(100vw - var(--oscar-desktop-sidebar-width) - 48px))!important;
+    min-width:620px!important;
+    max-width:var(--waiter-modal-max-width)!important;
+    max-height:calc(100dvh - 36px)!important;
+    border-radius:26px!important;
+  }
+
+  .waiter-footer-layout{
+    display:grid!important;
+    grid-template-columns:minmax(170px,200px) minmax(240px,1fr) minmax(230px,250px)!important;
+    gap:10px!important;
+    align-items:end!important;
+  }
+
+  .waiter-customer-field{grid-column:1!important;}
+  .waiter-note-field{grid-column:2!important;}
+  .waiter-footer-actions{grid-column:3!important;align-self:end!important;}
+
+  .waiter-customer-field input,
+  .waiter-note-field textarea{
+    font-size:11px!important;
+  }
+
+  .waiter-note-textarea{
+    min-height:58px!important;
+    max-height:76px!important;
+  }
+}
+
+/* ===== v7.9.4.32 Waiter responsive redesign + full-screen frosted modals ===== */
+.waiter-v2-root{
+  --waiter-accent:#059669;
+  --waiter-accent-dark:#047857;
+  --waiter-amber:#d97706;
+  height:100%;
+  min-height:0;
+  width:100%;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  overflow:hidden;
+  padding:10px;
+  background:linear-gradient(180deg,#f8fafc 0%,#f1f5f9 100%);
+  color:#0f172a;
+  font-family:Cairo,system-ui,sans-serif;
+}
+.waiter-v2-topbar{
+  flex:0 0 auto;
+  min-width:0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:9px;
+  border:1px solid #e2e8f0;
+  border-radius:18px;
+  background:rgba(255,255,255,.96);
+  box-shadow:0 8px 24px rgba(15,23,42,.05);
+}
+.waiter-v2-order-controls{min-width:0;display:flex;align-items:center;gap:8px;flex:1;}
+.waiter-v2-segment{display:flex;align-items:center;gap:3px;padding:3px;border-radius:13px;background:#f1f5f9;flex:0 0 auto;}
+.waiter-v2-segment button{height:36px;border:0;border-radius:10px;padding:0 11px;display:flex;align-items:center;justify-content:center;gap:5px;background:transparent;color:#64748b;font-family:inherit;font-size:11px;font-weight:900;white-space:nowrap;cursor:pointer;}
+.waiter-v2-segment button.active{background:var(--waiter-amber);color:#fff;box-shadow:0 4px 12px rgba(217,119,6,.2);}
+.waiter-v2-select{position:relative;display:flex;align-items:center;min-width:150px;max-width:350px;flex:1;}
+.waiter-v2-select select{appearance:none;width:100%;height:42px;padding:0 12px 0 32px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;color:#0f172a;font-family:inherit;font-size:11px;font-weight:800;outline:none;cursor:pointer;}
+.waiter-v2-select svg{position:absolute;left:10px;color:#64748b;pointer-events:none;}
+.waiter-v2-guests{height:42px;padding:0 10px;display:flex;align-items:center;gap:5px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;color:#64748b;flex:0 0 auto;}
+.waiter-v2-guests input{width:34px;border:0!important;background:transparent!important;padding:0!important;text-align:center;font-family:inherit;font-weight:900;outline:none;color:#0f172a!important;}
+.waiter-v2-guests span{font-size:10px;font-weight:800;}
+.waiter-v2-takeaway-note{height:42px;min-width:145px;padding:0 12px;display:flex;align-items:center;gap:7px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;color:#475569;font-size:11px;font-weight:800;}
+.waiter-v2-open-order{padding:6px 9px;border-radius:999px;background:#ecfdf5;border:1px solid #a7f3d0;color:#047857;font-size:9px;font-weight:900;white-space:nowrap;}
+.waiter-v2-cart-summary{height:44px;min-width:132px;border:1px solid #d1fae5;border-radius:14px;background:#ecfdf5;color:#065f46;padding:0 10px;display:flex;align-items:center;gap:9px;font-family:inherit;cursor:pointer;}
+.waiter-v2-cart-icon{position:relative;width:31px;height:31px;border-radius:10px;background:#059669;color:#fff;display:grid;place-items:center;flex:0 0 auto;}
+.waiter-v2-cart-icon b{position:absolute;top:-7px;right:-7px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:#e11d48;color:#fff;border:2px solid #fff;display:grid;place-items:center;font-size:8px;}
+.waiter-v2-cart-copy{min-width:0;display:flex;flex-direction:column;align-items:flex-start;line-height:1.2;}
+.waiter-v2-cart-copy small{font-size:9px;color:#64748b;font-weight:800;}
+.waiter-v2-cart-copy strong{font-size:11px;white-space:nowrap;color:#065f46;}
+.waiter-v2-discovery{flex:0 0 auto;display:flex;align-items:center;gap:8px;min-width:0;}
+.waiter-v2-search{position:relative;width:min(300px,34vw);flex:0 0 auto;}
+.waiter-v2-search svg{position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none;}
+.waiter-v2-search input{width:100%;height:40px;border:1px solid #e2e8f0;border-radius:13px;background:#fff;padding:0 38px 0 12px;font-family:inherit;font-size:11px;font-weight:700;outline:none;box-shadow:0 4px 14px rgba(15,23,42,.03);}
+.waiter-v2-search input:focus{border-color:#6ee7b7;box-shadow:0 0 0 3px rgba(16,185,129,.1);}
+.waiter-v2-categories{min-width:0;flex:1;display:flex;align-items:center;gap:6px;overflow-x:auto;overscroll-behavior-x:contain;padding:1px 0 3px;scrollbar-width:none;}
+.waiter-v2-categories::-webkit-scrollbar{display:none;}
+.waiter-v2-categories button{height:38px;padding:0 13px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;color:#475569;font-family:inherit;font-size:10px;font-weight:900;white-space:nowrap;cursor:pointer;}
+.waiter-v2-categories button.active{background:#059669;border-color:#059669;color:#fff;box-shadow:0 5px 14px rgba(5,150,105,.18);}
+.waiter-v2-products{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:1px 1px 76px;}
+.waiter-v2-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;}
+.waiter-v2-product{position:relative;min-height:108px;padding:11px;border:1px solid #e2e8f0;border-radius:16px;background:#fff;color:#0f172a;text-align:right;font-family:inherit;display:flex;flex-direction:column;justify-content:space-between;gap:7px;box-shadow:0 5px 18px rgba(15,23,42,.035);cursor:pointer;transition:transform .12s ease,border-color .12s ease,box-shadow .12s ease;overflow:hidden;}
+.waiter-v2-product:active{transform:scale(.985);}
+.waiter-v2-product:hover{border-color:#a7f3d0;box-shadow:0 8px 22px rgba(5,150,105,.08);}
+.waiter-v2-product.has-qty{border-color:#6ee7b7;background:linear-gradient(180deg,#fff 0%,#f0fdf4 100%);}
+.waiter-v2-product-qty{position:absolute;top:8px;left:8px;min-width:23px;height:23px;padding:0 6px;border-radius:999px;background:#059669;color:#fff;display:grid;place-items:center;font-size:9px;font-weight:900;box-shadow:0 3px 10px rgba(5,150,105,.24);}
+.waiter-v2-product-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.waiter-v2-product-category{max-width:72%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px;font-weight:800;color:#94a3b8;}
+.waiter-v2-product-plus{width:26px;height:26px;border-radius:9px;background:#ecfdf5;color:#059669;display:grid;place-items:center;flex:0 0 auto;}
+.waiter-v2-product-name{font-size:12px;line-height:1.55;font-weight:900;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.waiter-v2-product-foot{display:flex;align-items:flex-end;justify-content:space-between;gap:6px;padding-top:8px;border-top:1px solid #f1f5f9;}
+.waiter-v2-product-unit{font-size:9px;color:#94a3b8;font-weight:800;}
+.waiter-v2-product-foot b{font-size:12px;color:#059669;white-space:nowrap;}
+.waiter-v2-empty{height:100%;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#94a3b8;text-align:center;}
+.waiter-v2-empty strong{font-size:13px;color:#64748b;}
+.waiter-v2-empty span{font-size:10px;}
+.waiter-v2-fab{position:fixed!important;left:16px!important;right:auto!important;bottom:calc(4rem + env(safe-area-inset-bottom,0px) + 14px)!important;width:54px!important;height:54px!important;border:0!important;border-radius:17px!important;background:#059669!important;color:#fff!important;display:grid!important;place-items:center!important;box-shadow:0 14px 30px rgba(5,150,105,.3)!important;z-index:60!important;cursor:pointer;}
+.waiter-v2-fab span{position:absolute;top:-6px;right:-6px;min-width:21px;height:21px;padding:0 5px;border-radius:999px;background:#e11d48;color:#fff;border:2px solid #fff;display:grid;place-items:center;font-size:8px;font-weight:900;}
+
+/* All waiter dialogs are portaled to body so the backdrop truly fills the viewport. */
+.waiter-frost-overlay,
+#waiter-cart-backdrop{
+  position:fixed!important;
+  inset:0!important;
+  width:100vw!important;
+  height:100dvh!important;
+  max-width:none!important;
+  max-height:none!important;
+  margin:0!important;
+  padding:clamp(10px,2vw,22px)!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  overflow:hidden!important;
+  background:rgba(255,255,255,.14)!important;
+  -webkit-backdrop-filter:blur(14px) saturate(1.12)!important;
+  backdrop-filter:blur(14px) saturate(1.12)!important;
+  z-index:2147483300!important;
+}
+#waiter-cart-modal.waiter-order-dialog{
+  position:relative!important;
+  inset:auto!important;
+  top:auto!important;
+  right:auto!important;
+  bottom:auto!important;
+  left:auto!important;
+  transform:none!important;
+  width:min(920px,calc(100vw - 24px))!important;
+  min-width:0!important;
+  max-width:920px!important;
+  height:min(760px,calc(100dvh - 24px))!important;
+  max-height:calc(100dvh - 24px)!important;
+  margin:auto!important;
+  display:flex!important;
+  flex-direction:column!important;
+  overflow:hidden!important;
+  border:1px solid rgba(203,213,225,.9)!important;
+  border-radius:24px!important;
+  background:#fff!important;
+  box-shadow:0 30px 80px rgba(15,23,42,.22)!important;
+  z-index:2147483310!important;
+}
+.waiter-dialog-header{flex:0 0 auto;min-height:62px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #e2e8f0;background:#fff;}
+.waiter-dialog-title-wrap{min-width:0;display:flex;align-items:center;gap:9px;}
+.waiter-dialog-icon{width:38px;height:38px;border-radius:12px;background:#ecfdf5;color:#059669;display:grid;place-items:center;flex:0 0 auto;}
+.waiter-dialog-title{font-size:13px;font-weight:900;color:#0f172a;}
+.waiter-dialog-subtitle{margin-top:2px;font-size:9px;font-weight:700;color:#94a3b8;}
+.waiter-icon-button{width:36px;height:36px;border:1px solid #e2e8f0;border-radius:11px;background:#fff;color:#64748b;display:grid;place-items:center;cursor:pointer;}
+.waiter-dialog-body{flex:1 1 auto;min-height:0;overflow-y:auto!important;overscroll-behavior:contain;padding:10px;background:#f8fafc;}
+.waiter-cart-empty{height:100%;min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#94a3b8;text-align:center;}
+.waiter-cart-empty strong{font-size:13px;color:#64748b;}
+.waiter-cart-empty span{font-size:10px;}
+.waiter-cart-line{padding:10px;border:1px solid #e2e8f0;border-radius:14px;background:#fff;margin-bottom:8px;}
+.waiter-cart-line.is-sent{background:#f8fafc;}
+.waiter-cart-line.is-cancelled{opacity:.48;text-decoration:line-through;}
+.waiter-cart-line-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+.waiter-cart-line-info{min-width:0;flex:1;}
+.waiter-cart-line-name{display:block;font-size:11px;font-weight:900;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.waiter-cart-line-meta{margin-top:6px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.waiter-meta-pill,.waiter-status-pill{height:25px;padding:0 8px;border-radius:8px;display:inline-flex;align-items:center;font-size:8px;font-weight:900;white-space:nowrap;}
+.waiter-meta-pill{background:#f1f5f9;color:#64748b;}
+.waiter-status-pill.new{background:#ecfdf5;color:#047857;}.waiter-status-pill.sent{background:#eff6ff;color:#1d4ed8;}.waiter-status-pill.ready{background:#fef3c7;color:#92400e;}
+.waiter-unit-select-wrap{position:relative;display:inline-flex;align-items:center;}
+.waiter-unit-select{appearance:none;height:27px;max-width:170px;padding:0 8px 0 25px;border:1px solid #a7f3d0;border-radius:8px;background:#ecfdf5;color:#047857;font-family:inherit;font-size:8px;font-weight:900;outline:none;}
+.waiter-unit-select-wrap svg{position:absolute;left:7px;color:#059669;pointer-events:none;}
+.waiter-line-total{font-size:11px;font-weight:900;color:#0f172a;white-space:nowrap;}
+.waiter-cart-line-actions{margin-top:8px;padding-top:8px;border-top:1px solid #f1f5f9;display:flex;align-items:center;gap:8px;}
+.waiter-qty-control{display:flex;align-items:center;gap:4px;padding:3px;border-radius:10px;background:#f1f5f9;}
+.waiter-qty-control button{width:28px;height:28px;border:0;border-radius:8px;background:#fff;color:#334155;display:grid;place-items:center;cursor:pointer;}
+.waiter-qty-control button:last-child{background:#059669;color:#fff;}
+.waiter-qty-control span{min-width:24px;text-align:center;font-size:10px;font-weight:900;}
+.waiter-line-unit-price{margin-inline-start:auto;font-size:8px;font-weight:800;color:#94a3b8;}
+.waiter-remove-button{width:32px;height:32px;border:0;border-radius:9px;background:#fff1f2;color:#e11d48;display:grid;place-items:center;cursor:pointer;}
+.waiter-dialog-footer{flex:0 0 auto;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));border-top:1px solid #e2e8f0;background:#fff;box-shadow:0 -10px 30px rgba(15,23,42,.06);}
+.waiter-footer-fields{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:8px;}
+.waiter-field{min-width:0;display:flex;flex-direction:column;gap:4px;text-align:right;}
+.waiter-field>span{display:flex;align-items:center;gap:4px;font-size:9px;font-weight:900;color:#475569;}
+.waiter-field input,.waiter-field textarea,.waiter-field select{width:100%;border:1px solid #e2e8f0;border-radius:10px;background:#fff!important;color:#0f172a!important;font-family:inherit;font-size:10px;font-weight:700;outline:none;}
+.waiter-field input,.waiter-field select{height:38px;padding:0 10px;}.waiter-field textarea{height:48px;min-height:48px;max-height:64px;padding:8px 10px;resize:none;}
+.waiter-field input:focus,.waiter-field textarea:focus,.waiter-field select:focus{border-color:#6ee7b7;box-shadow:0 0 0 3px rgba(16,185,129,.08);}
+.waiter-footer-summary{margin-top:8px;display:flex;align-items:center;gap:9px;}
+.waiter-total-box{min-width:150px;height:42px;padding:0 11px;border:1px solid #d1fae5;border-radius:11px;background:#ecfdf5;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.waiter-total-box span{font-size:9px;font-weight:800;color:#64748b;}.waiter-total-box strong{font-size:12px;font-weight:900;color:#047857;white-space:nowrap;}
+.waiter-footer-buttons{margin-inline-start:auto;display:flex;align-items:center;gap:7px;}
+.waiter-primary-action,.waiter-secondary-action,.waiter-danger-action{height:42px;padding:0 15px;border-radius:11px;font-family:inherit;font-size:10px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;white-space:nowrap;}
+.waiter-primary-action{border:0;background:#059669;color:#fff;box-shadow:0 7px 16px rgba(5,150,105,.18);}.waiter-primary-action:hover{background:#047857;}.waiter-primary-action:disabled{background:#cbd5e1;color:#64748b;box-shadow:none;cursor:not-allowed;}
+.waiter-secondary-action{border:1px solid #e2e8f0;background:#fff;color:#475569;}.waiter-danger-action{border:0;background:#e11d48;color:#fff;}
+.waiter-confirm-overlay{z-index:2147483500!important;}
+.waiter-confirm-dialog{width:min(410px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow-y:auto;padding:16px;border:1px solid #e2e8f0;border-radius:20px;background:#fff;box-shadow:0 26px 70px rgba(15,23,42,.2);display:flex;flex-direction:column;gap:12px;}
+.waiter-confirm-heading{display:flex;align-items:center;gap:10px;}.waiter-confirm-icon{width:40px;height:40px;border-radius:12px;background:#fff1f2;color:#e11d48;display:grid;place-items:center;flex:0 0 auto;}.waiter-confirm-heading strong{display:block;font-size:12px;color:#be123c;}.waiter-confirm-heading span{display:block;margin-top:2px;font-size:10px;color:#64748b;}
+.waiter-pin-wrap{position:relative;}.waiter-pin-wrap svg{position:absolute;right:11px;top:50%;transform:translateY(-50%);color:#94a3b8;}.waiter-pin-wrap input{padding-right:34px;text-align:center;}
+.waiter-confirm-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:2px;}
+
+/* Replace black modal scrims with a light frosted full-screen backdrop. Camera scanner is intentionally excluded. */
+body > .fixed.inset-0[class*="bg-black/"]:not(.barcode-camera-overlay),
+.oscar-page-stage .fixed.inset-0[class*="bg-black/"]:not(.barcode-camera-overlay),
+.oscar-bounded-modal[class*="bg-black/"],
+.product-editor-modal-overlay,
+.oscar-ai-overlay,
+.oscar-employee-modal-overlay,
+.oscar-form-modal-overlay,
+#full-cart-modal-backdrop,
+#modal-sync-backdrop{
+  background:rgba(255,255,255,.14)!important;
+  -webkit-backdrop-filter:blur(14px) saturate(1.12)!important;
+  backdrop-filter:blur(14px) saturate(1.12)!important;
+}
+body > .fixed.inset-0[class*="bg-black/"]:not(.barcode-camera-overlay),
+body > #full-cart-modal-backdrop,
+body > #modal-sync-backdrop{
+  inset:0!important;
+  width:100vw!important;
+  height:100dvh!important;
+  max-height:none!important;
+}
+
+@media (min-width:640px){
+  .waiter-v2-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+  .waiter-v2-product{min-height:116px;padding:12px;}
+  .waiter-v2-product-name{font-size:13px;}
+}
+@media (min-width:1024px){
+  .waiter-v2-root{padding:12px 14px;gap:11px;}
+  .waiter-v2-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;}
+  .waiter-v2-products{padding-bottom:14px;}
+  .waiter-v2-fab{bottom:18px!important;left:18px!important;}
+  .waiter-v2-search{width:290px;}
+  #waiter-cart-modal.waiter-order-dialog{width:min(900px,calc(100vw - 48px))!important;height:min(720px,calc(100dvh - 42px))!important;}
+  .waiter-dialog-footer{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end;padding:10px 12px;}
+  .waiter-footer-fields{grid-template-columns:180px minmax(250px,1fr);gap:8px;}
+  .waiter-footer-summary{margin-top:0;align-self:end;}
+  .waiter-total-box{min-width:140px;}
+  .waiter-field textarea{height:42px;min-height:42px;max-height:42px;}
+}
+@media (min-width:1440px){.waiter-v2-grid{grid-template-columns:repeat(5,minmax(0,1fr));}}
+@media (max-width:639.98px){
+  .waiter-v2-root{padding:8px;gap:8px;}
+  .waiter-v2-topbar{align-items:stretch;padding:7px;gap:7px;}
+  .waiter-v2-order-controls{gap:6px;overflow:hidden;}
+  .waiter-v2-segment button{height:34px;padding:0 8px;font-size:10px;}.waiter-v2-segment button svg{width:14px;height:14px;}
+  .waiter-v2-select{min-width:0;max-width:none;}.waiter-v2-select select{height:40px;font-size:10px;padding-right:8px;}
+  .waiter-v2-guests{height:40px;padding:0 7px;}.waiter-v2-guests span{display:none;}.waiter-v2-guests input{width:28px;}
+  .waiter-v2-open-order{display:none;}
+  .waiter-v2-cart-summary{min-width:48px;width:48px;height:40px;padding:0;justify-content:center;}.waiter-v2-cart-copy{display:none;}.waiter-v2-cart-icon{width:32px;height:32px;}
+  .waiter-v2-discovery{flex-direction:column;align-items:stretch;gap:6px;}.waiter-v2-search{width:100%;}.waiter-v2-search input{height:39px;}
+  .waiter-v2-categories{width:100%;}.waiter-v2-categories button{height:34px;padding:0 11px;font-size:9px;}
+  .waiter-v2-grid{gap:7px;}.waiter-v2-product{min-height:102px;padding:9px;border-radius:14px;}.waiter-v2-product-name{font-size:11px;}.waiter-v2-product-foot b{font-size:11px;}
+  .waiter-frost-overlay,#waiter-cart-backdrop{padding:8px!important;}
+  #waiter-cart-modal.waiter-order-dialog{width:calc(100vw - 16px)!important;height:min(88dvh,760px)!important;max-height:calc(100dvh - 16px)!important;border-radius:20px!important;}
+  .waiter-dialog-header{min-height:56px;padding:8px 10px;}.waiter-dialog-icon{width:34px;height:34px;}.waiter-dialog-title{font-size:12px;}
+  .waiter-dialog-body{padding:8px;}.waiter-cart-line{padding:9px;border-radius:12px;}.waiter-cart-line-name{font-size:10px;}.waiter-line-total{font-size:10px;}
+  .waiter-dialog-footer{padding:8px 9px calc(8px + env(safe-area-inset-bottom,0px));}
+  .waiter-footer-fields{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:6px;}.waiter-field>span{font-size:8px;}.waiter-field input,.waiter-field textarea,.waiter-field select{font-size:9px;}.waiter-field input,.waiter-field select{height:36px;}.waiter-field textarea{height:42px;min-height:42px;max-height:52px;}
+  .waiter-footer-summary{margin-top:7px;display:grid;grid-template-columns:minmax(0,.75fr) minmax(0,1.25fr);gap:6px;}.waiter-total-box{min-width:0;height:40px;padding:0 8px;}.waiter-total-box span{font-size:8px;}.waiter-total-box strong{font-size:10px;}.waiter-footer-buttons{margin:0;display:grid;grid-template-columns:1fr 1.3fr;gap:6px;}.waiter-footer-buttons .waiter-primary-action:only-child{grid-column:1/-1;}.waiter-primary-action,.waiter-secondary-action,.waiter-danger-action{height:40px;padding:0 8px;font-size:9px;}
+}
+
+html.dark .waiter-v2-root{background:#050505;color:#fff;}
+html.dark .waiter-v2-topbar,html.dark .waiter-v2-product,html.dark .waiter-v2-search input,html.dark .waiter-v2-categories button,html.dark .waiter-v2-select select,html.dark .waiter-v2-guests,html.dark .waiter-v2-takeaway-note,html.dark #waiter-cart-modal.waiter-order-dialog,html.dark .waiter-dialog-header,html.dark .waiter-dialog-footer,html.dark .waiter-cart-line,html.dark .waiter-confirm-dialog{background:#0a0a0a!important;color:#fff!important;border-color:#333!important;}
+html.dark .waiter-dialog-body{background:#050505!important;}html.dark .waiter-cart-line.is-sent{background:#111!important;}html.dark .waiter-cart-line-name,html.dark .waiter-line-total,html.dark .waiter-dialog-title{color:#fff!important;}
+
+/* ===== v7.9.4.33 Waiter mobile exact viewport centering =====
+   Use the fixed overlay's real box (not 100dvh) so Android browser chrome
+   cannot push the dialog downward. The dialog stays centered with equal
+   breathing room above/below and only its body scrolls. */
+@media (max-width:639.98px){
+  body > #waiter-cart-backdrop.waiter-frost-overlay{
+    position:fixed!important;
+    inset:0!important;
+    top:0!important;
+    right:0!important;
+    bottom:0!important;
+    left:0!important;
+    width:auto!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    margin:0!important;
+    padding:8px!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    overflow:hidden!important;
+    box-sizing:border-box!important;
+  }
+
+  body > #waiter-cart-backdrop.waiter-frost-overlay > #waiter-cart-modal.waiter-order-dialog{
+    position:relative!important;
+    inset:auto!important;
+    top:auto!important;
+    right:auto!important;
+    bottom:auto!important;
+    left:auto!important;
+    transform:none!important;
+    margin:0!important;
+    width:100%!important;
+    max-width:680px!important;
+    height:min(760px,88%)!important;
+    max-height:calc(100% - 16px)!important;
+    min-height:0!important;
+    align-self:center!important;
+    border-radius:20px!important;
+  }
+
+  body > #waiter-cart-backdrop.waiter-frost-overlay > #waiter-cart-modal.waiter-order-dialog .waiter-dialog-body{
+    min-height:0!important;
+    overflow-y:auto!important;
+    -webkit-overflow-scrolling:touch!important;
+    overscroll-behavior:contain!important;
+  }
+}

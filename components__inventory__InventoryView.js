@@ -1,13 +1,13 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { downloadProfessionalTablePDF, downloadProfessionalTableExcel, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { TransferForm } from './components__inventory__TransferForm.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { useApp } from './context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.33-waiter-mobile-centered';
+import { formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.33-waiter-mobile-centered';
+import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.33-waiter-mobile-centered';
+import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.33-waiter-mobile-centered';
+import { downloadProfessionalTablePDF, downloadProfessionalTableExcel, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.33-waiter-mobile-centered';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.33-waiter-mobile-centered';
+import { TransferForm } from './components__inventory__TransferForm.js?v=7.9.4.33-waiter-mobile-centered';
 import { ArrowLeftRight, Building2, Download, Search, Image as ImageIcon, FileSpreadsheet, Trash2, } from 'lucide-react';
 export const InventoryView = () => {
     const { products, warehouses, settings, getProductStock, adjustStockCount, transferStock, recordDamagedStock, showToast, } = useApp();

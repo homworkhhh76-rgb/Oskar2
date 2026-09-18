@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { useApp } from './context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.33-waiter-mobile-centered';
 import { Trash2, Plus, Minus, CreditCard, User, UserPlus, ChevronDown, LayoutGrid, Search, PauseCircle, Clock, ShoppingBag, X } from 'lucide-react';
 
 const h = React.createElement;
@@ -73,8 +73,10 @@ export const FullCartView = ({ onOpenPayment, onToggleLayout }) => {
       )).slice(0, 8)
     : [];
 
+  const hasSelectedCustomerInList = !!selectedCustomer?.id && (selectedCustomer.id === 'cust-walkin' || customers.some((c) => String(c.id) === String(selectedCustomer.id)));
   const customerOptions = [
     { id:'cust-walkin', label:'عميل نقدي', subLabel:'الافتراضي للبيع النقدي المباشر' },
+    ...(!hasSelectedCustomerInList && selectedCustomer?.name ? [{ id:selectedCustomer.id, label:selectedCustomer.name, subLabel:'عميل طلب المطعم' }] : []),
     ...[...customers].filter((c)=>c && c.id!=='cust-walkin' && !c.deletedAt).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'ar')).map((c)=>({ id:c.id, label:c.name, subLabel:c.phone || undefined, badge:c.balance > 0 ? `دين: ${c.balance}` : undefined }))
   ];
 
@@ -104,7 +106,7 @@ export const FullCartView = ({ onOpenPayment, onToggleLayout }) => {
         )
       ),
       h('div', { className: 'flex items-center gap-2 min-w-0' },
-        h('div', { className: 'w-56 max-w-[55vw]' }, h(SearchableDropdown, { id:'full-cart-customer-select', options:customerOptions, selectedId:selectedCustomer?.id, onSelect:(id)=>{if(id==='cust-walkin')setSelectedCustomer({id:'cust-walkin',name:'عميل نقدي',balance:0,priceList:'retail',isVirtual:true});else{const found=customers.find((c)=>c.id===id);if(found)setSelectedCustomer(found);}}, icon:h(User,{className:'w-4 h-4'}), placeholder:'اختر العميل...' })),
+        h('div', { className: 'w-56 max-w-[55vw]' }, h(SearchableDropdown, { id:'full-cart-customer-select', options:customerOptions, selectedId:selectedCustomer?.id, onSelect:(id)=>{if(id==='cust-walkin')setSelectedCustomer({id:'cust-walkin',name:'عميل نقدي',balance:0,priceList:'retail',isVirtual:true});else{const found=customers.find((c)=>c.id===id)||(String(selectedCustomer?.id)===String(id)?selectedCustomer:null);if(found)setSelectedCustomer(found);}}, icon:h(User,{className:'w-4 h-4'}), placeholder:'اختر العميل...' })),
         h('button',{type:'button',onClick:()=>setShowQuickCustomer(true),className:'shrink-0 w-9 h-9 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 flex items-center justify-center hover:bg-emerald-100',title:'إضافة عميل جديد'},h(UserPlus,{className:'w-4 h-4'})),
         h('button', { type: 'button', onClick: onToggleLayout, className: 'flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold' }, h(LayoutGrid, { className: 'w-4 h-4 text-emerald-600' }), h('span', { className: 'hidden sm:inline' }, 'عرض مقسم'))
       )
@@ -153,7 +155,7 @@ export const FullCartView = ({ onOpenPayment, onToggleLayout }) => {
           h('button',{type:'button',disabled:cart.length===0,onClick:clearCart,className:'inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200 text-rose-700 text-[11px] font-bold disabled:opacity-40 whitespace-nowrap shrink-0'},h(Trash2,{className:'w-4 h-4 shrink-0'}),h('span',{className:'leading-none'},'تفريغ السلة')),
           h('button',{type:'button',disabled:cart.length===0,onClick:()=>holdCurrentInvoice(),className:'inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-amber-200 text-amber-700 text-[11px] font-bold disabled:opacity-40 whitespace-nowrap shrink-0'},h(PauseCircle,{className:'w-4 h-4 shrink-0'}),h('span',{className:'leading-none'},'تعليق [F4]')),
           h('button',{type:'button',onClick:()=>setShowHoldInvoicesModal(true),className:'relative inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-[11px] font-bold whitespace-nowrap shrink-0'},h(Clock,{className:'w-4 h-4 shrink-0'}),h('span',{className:'leading-none'},'المعلقة'),heldInvoices.length>0?h('span',{className:'px-1.5 rounded-full bg-amber-500 text-white text-[9px]'},heldInvoices.length):null),
-          h('button',{type:'button',disabled:cart.length===0,onClick:onOpenPayment,className:'flex-1 sm:flex-none flex items-center justify-center gap-2 px-8 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-sm shadow-lg'},h(CreditCard,{className:'w-5 h-5'}),'الدفع الفوري وإصدار الفاتورة [F9]')
+          h('button',{id:'btn-full-cart-payment','data-enter-primary':'true',type:'button',disabled:cart.length===0,onClick:onOpenPayment,className:'flex-1 sm:flex-none flex items-center justify-center gap-2 px-8 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-sm shadow-lg'},h(CreditCard,{className:'w-5 h-5'}),'الدفع الفوري وإصدار الفاتورة [F9]')
         )
       )
     )

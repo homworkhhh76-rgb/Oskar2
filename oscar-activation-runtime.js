@@ -140,7 +140,7 @@
     const db=payload.database||readDatabaseAccess(payload.companyId)||{},companyId=String(payload.companyId||payload.tenantId||'');if(!companyId||!db.databaseURL||!db.authToken)throw new Error('ملف التفعيل لا يحتوي على قاعدة شركة صالحة.');
     const base=`oscar/companies/${encodeURIComponent(companyId)}`,accessPath=`${base}/access/company`;let access=unwrapRecord(await readExact(db,accessPath,{ensureSchema:true}));
     if(!access)throw new Error('مفتاح الشركة غير مسجل في قاعدة الشركة.');if(String(access.companyKey||'').toUpperCase()!==String(payload.companyKey||payload.activationKey||'').toUpperCase())throw new Error('ملف التفعيل لا يطابق مفتاح الشركة.');if(access.status!=='active')throw new Error('تم إيقاف مفتاح الشركة من الإدارة العامة.');if(access.endAt&&Date.now()>=new Date(access.endAt).getTime())throw new Error('انتهت مدة تفعيل الشركة.');
-    const account=payload.account||{};
+    const account=payload.account||{};let verifiedAccount=null;
     if(payload.type==='company-manager'){
       let row=access.manager;if(!row||row.active===false)throw new Error('حساب مدير الشركة غير متاح.');if(String(row.id||'')!==String(account.id||''))throw new Error('ملف المدير لا يطابق الحساب المسجل.');
       const fileVersion=String(account.authVersion||''),currentVersion=String(row.authVersion||''),previousVersion=String(row.previousAuthVersion||''),pendingVersion=String(row.pendingAuthVersion||''),policyVersion=Number(row.authPolicyVersion||0);
@@ -149,13 +149,13 @@
       }else if(previousVersion&&fileVersion===previousVersion&&pendingVersion){
         // الملف السابق يظل صالحاً مؤقتاً إلى أن يتم استعمال الملف الجديد لأول مرة بنجاح.
       }else if(policyVersion<2){
-        // إصلاح الإصدارات القديمة التي ألغت الملف قبل التأكد من تنزيل البديل.
         const recovered={...row,...account,id:row.id||account.id,active:true,authVersion:fileVersion,previousAuthVersion:'',pendingAuthVersion:'',pendingIssuedAt:'',authPolicyVersion:2,recoveredAt:new Date().toISOString(),updatedAt:new Date().toISOString()},updatedAt=Date.now(),nextAccess={...access,manager:recovered,updatedAt};await writeExact(db,accessPath,nextAccess,updatedAt,false);access=nextAccess;row=recovered;
       }else throw new Error('تم إصدار ملف مدير أحدث. استخدم الملف الجديد.');
+      verifiedAccount=row;
     }else{
-      const row=unwrapRecord(await readExact(db,accountPath(payload)));if(!row)throw new Error('الحساب غير موجود في قاعدة الشركة أو لم تتم مزامنته بعد.');if(row.active===false)throw new Error('تم إيقاف هذا الحساب.');if(String(row.authVersion||'')!==String(account.authVersion||''))throw new Error('تم إصدار ملف دخول أحدث لهذا الحساب.');if(payload.type==='representative'&&String(row.role||'')!=='مندوب')throw new Error('الحساب لم يعد مندوباً.');if(payload.type==='branch-manager'&&String(row.role||'')!=='مدير فرع')throw new Error('حساب مدير الفرع غير متاح.');
+      const row=unwrapRecord(await readExact(db,accountPath(payload)));if(!row)throw new Error('الحساب غير موجود في قاعدة الشركة أو لم تتم مزامنته بعد.');if(row.active===false)throw new Error('تم إيقاف هذا الحساب.');if(String(row.authVersion||'')!==String(account.authVersion||''))throw new Error('تم إصدار ملف دخول أحدث لهذا الحساب.');if(payload.type==='representative'&&String(row.role||'')!=='مندوب')throw new Error('الحساب لم يعد مندوباً.');if(payload.type==='branch-manager'&&String(row.role||'')!=='مدير فرع')throw new Error('حساب مدير الفرع غير متاح.');verifiedAccount=row;
     }
-    markVerified(payload,access);return {access,online:true};
+    markVerified(payload,access);return {access,online:true,account:clone(verifiedAccount||account)};
   }
 
   function isLogicalVerificationError(error){

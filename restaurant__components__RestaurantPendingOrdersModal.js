@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Search, X, UtensilsCrossed, Clock3, UserRound, Trash2, ShoppingCart, RefreshCw } from 'lucide-react';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.33-waiter-mobile-centered';
+import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
 
 const h = React.createElement;
 const STATUS_LABELS = {
@@ -10,19 +10,34 @@ const STATUS_LABELS = {
 };
 
 export const RestaurantPendingOrdersModal = ({ isOpen, onClose }) => {
-  const { orders, recallOrderToPOS, cancelRestaurantOrder } = useRestaurant();
+  const { orders, tables, recallOrderToPOS, cancelRestaurantOrder } = useRestaurant();
   const { settings, showToast } = useApp();
   const [query, setQuery] = useState('');
   const [busyId, setBusyId] = useState('');
+
+  const getOrderTable = (order) => (tables || []).find((t) => t.id === order?.tableId);
+  const getTableLabel = (order) => {
+    const table = getOrderTable(order);
+    const tableName = String(order?.tableName || table?.name || '').trim();
+    const tableNumber = String(order?.tableNumber || table?.tableNumber || '').trim();
+    if (order?.orderType === 'takeaway') return order?.customerName ? `سفري — ${order.customerName}` : 'طلب سفري';
+    if (tableName) return tableName;
+    if (tableNumber) return `طاولة ${tableNumber}`;
+    return 'طاولة غير محددة';
+  };
 
   const pending = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (orders || [])
       .filter(o => o && o.cashierPending === true && ['ready','served','waiting_payment'].includes(o.status))
-      .filter(o => !q || [o.orderNumber,o.tableNumber,o.tableName,o.customerName,o.customerPhone,o.waiterName,o.queueNumber]
-        .some(v => String(v || '').toLowerCase().includes(q)))
+      .filter(o => {
+        if (!q) return true;
+        const table = getOrderTable(o);
+        return [o.customerName,o.customerPhone,o.waiterName,o.tableName,o.tableNumber,table?.name,table?.tableNumber,getTableLabel(o),o.orderNumber,o.queueNumber]
+          .some(v => String(v || '').toLowerCase().includes(q));
+      })
       .sort((a,b) => new Date(b.updatedAt || b.readyAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.readyAt || a.createdAt || 0).getTime());
-  }, [orders, query]);
+  }, [orders, tables, query]);
 
   if (!isOpen) return null;
 
@@ -49,7 +64,7 @@ export const RestaurantPendingOrdersModal = ({ isOpen, onClose }) => {
         h('button',{type:'button',onClick:onClose,className:'w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:bg-slate-100'},h(X,{className:'w-4 h-4'}))
       ),
       h('div',{className:'p-3 border-b border-slate-100 dark:border-slate-800 shrink-0'},
-        h('div',{className:'relative'}, h(Search,{className:'absolute right-3 top-2.5 w-4 h-4 text-slate-400'}), h('input',{value:query,onChange:e=>setQuery(e.target.value),placeholder:'بحث برقم الطلب، الطاولة، العميل أو الجرسون...',className:'w-full pr-9 pl-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:border-amber-500'}))
+        h('div',{className:'relative'}, h(Search,{className:'absolute right-3 top-2.5 w-4 h-4 text-slate-400'}), h('input',{value:query,onChange:e=>setQuery(e.target.value),placeholder:'بحث باسم العميل أو الطاولة أو الجرسون...',className:'w-full pr-9 pl-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:border-amber-500'}))
       ),
       h('div',{className:'flex-1 min-h-0 overflow-y-auto p-3 space-y-2 custom-scrollbar'},
         pending.length===0 ? h('div',{className:'py-16 text-center text-slate-400'},h(UtensilsCrossed,{className:'w-10 h-10 mx-auto mb-3 opacity-30'}),h('p',{className:'text-sm font-bold'},'لا توجد طلبات مطعم غير محاسبة')) :
@@ -57,14 +72,13 @@ export const RestaurantPendingOrdersModal = ({ isOpen, onClose }) => {
           h('div',{className:'flex items-start justify-between gap-3'},
             h('div',{className:'min-w-0 flex-1'},
               h('div',{className:'flex items-center gap-2 flex-wrap'},
-                h('span',{className:'font-black text-sm text-slate-900 dark:text-white'},order.tableNumber ? `طاولة ${order.tableNumber}` : (order.queueNumber || order.orderNumber)),
-                h('span',{className:`px-2 py-0.5 rounded-full text-[9px] font-black ${['ready','served','waiting_payment'].includes(order.status)?'bg-emerald-100 text-emerald-700':'bg-amber-100 text-amber-700'}`},STATUS_LABELS[order.status] || order.status),
-                h('span',{className:'text-[10px] font-mono text-slate-400'},order.orderNumber)
+                h('span',{className:'font-black text-sm text-slate-900 dark:text-white'},getTableLabel(order)),
+                h('span',{className:`px-2 py-0.5 rounded-full text-[9px] font-black ${['ready','served','waiting_payment'].includes(order.status)?'bg-emerald-100 text-emerald-700':'bg-amber-100 text-amber-700'}`},STATUS_LABELS[order.status] || order.status)
               ),
               h('div',{className:'flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[10px] text-slate-500'},
                 h('span',{className:'inline-flex items-center gap-1'},h(UserRound,{className:'w-3 h-3'}),order.waiterName || 'الجرسون'),
                 h('span',{className:'inline-flex items-center gap-1'},h(Clock3,{className:'w-3 h-3'}),new Date(order.createdAt || Date.now()).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'})),
-                order.customerName ? h('span',null,'العميل: '+order.customerName) : null,
+                order.customerName ? h('span',{className:'font-bold text-slate-700 dark:text-slate-200'},'العميل: '+order.customerName) : null,
                 h('span',{className:'font-black text-emerald-600'},`${Number(order.total||0).toLocaleString('ar-EG')} ${settings.currencySymbol||'₪'}`)
               ),
               h('div',{className:'mt-2 text-[10px] text-slate-500 truncate'},(order.items||[]).filter(i=>i.status!=='cancelled').map(i=>`${i.quantity}× ${i.productName}`).join('، '))

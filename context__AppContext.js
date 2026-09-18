@@ -1,8 +1,9 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, migrateLegacyDatabaseIfNeeded, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, migrateLegacyDatabaseIfNeeded, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.33-waiter-mobile-centered';
+import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.33-waiter-mobile-centered';
+import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.33-waiter-mobile-centered';
+import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.33-waiter-mobile-centered';
 const AppContext = createContext(null);
 const recordTime = (item = {}) => {
     const fields = ['createdAt', 'date', 'timestamp', 'startTime', 'updatedAt'];
@@ -49,7 +50,7 @@ export const AppProvider = ({ children }) => {
     const [employees, setEmployees] = useState(DEFAULT_EMPLOYEES);
     const [activeEmployee, setActiveEmployee] = useState(DEFAULT_EMPLOYEES[0]);
     // UI state
-    const [activeTab, setActiveTab] = useState('pos');
+    const [activeTab, setActiveTabState] = useState('pos');
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [posCartLayout, setPosCartLayout] = useState('split');
     const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
@@ -66,16 +67,51 @@ export const AppProvider = ({ children }) => {
     const currentUser = useMemo(() => {
         const rt = window.OscarActivation?.readRuntime?.();
         const account = rt?.account;
+        const sameEmployee = !!account?.id && !!activeEmployee?.id && String(account.id) === String(activeEmployee.id);
+        const liveEmployee = sameEmployee ? activeEmployee : null;
+        const roleCode = String(liveEmployee?.role || account?.role || activeEmployee?.role || (rt?.type === 'company-manager' ? 'admin' : 'custom')).trim().toLowerCase();
+        let permissions = normalizeEmployeePermissions(liveEmployee?.permissions ?? account?.permissions ?? activeEmployee?.permissions ?? {}, roleCode);
+        if (rt?.type === 'company-manager') {
+            permissions = { ...permissions, canDiscount:true, canEditPrice:true, canDeleteInvoice:true, canDeleteProducts:true, canManagePurchases:true, canManageVouchers:true, canManageInventory:true, canViewReports:true };
+        }
         return {
             id: account?.id || activeEmployee?.id || 'emp-admin',
-            name: account?.name || account?.displayName || activeEmployee?.name || 'مدير النظام',
-            role: account?.roleName || account?.role || activeEmployee?.roleName || 'مدير عام',
-            permissions: account?.permissions || activeEmployee?.permissions || {},
+            name: liveEmployee?.name || account?.name || account?.displayName || activeEmployee?.name || 'مدير النظام',
+            role: liveEmployee?.roleName || account?.roleName || activeEmployee?.roleName || account?.role || 'موظف',
+            roleCode,
+            permissions,
             isCompanyManager: rt?.type === 'company-manager',
             companyId: rt?.companyId || '',
             companyName: rt?.companyName || settings.storeName,
         };
     }, [activeEmployee, settings.storeName]);
+
+    const accessArgs = useMemo(() => ({
+        currentUser,
+        activeEmployee,
+        runtime: window.OscarActivation?.readRuntime?.() || null,
+        restaurantEnabled: !!settings.isRestaurantModeEnabled,
+    }), [currentUser, activeEmployee, settings.isRestaurantModeEnabled]);
+
+    const setActiveTab = useCallback((nextTab) => {
+        setActiveTabState(prev => {
+            const wanted = typeof nextTab === 'function' ? nextTab(prev) : nextTab;
+            if (canAccessTab(wanted, accessArgs)) return wanted;
+            return firstAllowedTab(accessArgs) || 'no_access';
+        });
+    }, [accessArgs]);
+
+    useEffect(() => {
+        if (!isLoaded) return;
+        if (activeTab === 'no_access') {
+            const first = firstAllowedTab(accessArgs);
+            if (first) setActiveTabState(first);
+            return;
+        }
+        if (!canAccessTab(activeTab, accessArgs)) {
+            setActiveTabState(firstAllowedTab(accessArgs) || 'no_access');
+        }
+    }, [isLoaded, activeTab, accessArgs]);
     // Cart state
     const [cart, setCart] = useState([]);
     const [invoiceDiscountType, setInvoiceDiscountType] = useState('fixed');
@@ -144,9 +180,16 @@ export const AppProvider = ({ children }) => {
                 setActiveEmployee((prev) => emps.find((e) => e.id === loginAccountId) || emps.find((e) => e.id === prev.id) || emps[0]);
             }
             if (sett) {
-                const normalizedSettings = normalizeCurrencySettings(sett);
+                let normalizedSettings = normalizeCurrencySettings(sett);
+                let settingsChanged = normalizedSettings.currency !== sett.currency || normalizedSettings.currencySymbol !== sett.currencySymbol;
+                // One-time migration: restaurant mode is enabled by default from v7.9.4.22 onward.
+                // After this marker is written, the user's own on/off choice is always preserved.
+                if (normalizedSettings.restaurantModeDefaultInitialized !== true) {
+                    normalizedSettings = { ...normalizedSettings, isRestaurantModeEnabled: true, restaurantModeDefaultInitialized: true };
+                    settingsChanged = true;
+                }
                 setSettings(normalizedSettings);
-                if (normalizedSettings.currency !== sett.currency || normalizedSettings.currencySymbol !== sett.currencySymbol) {
+                if (settingsChanged) {
                     await putInStore('settings', { key: 'store_config', ...normalizedSettings });
                 }
             }
@@ -1515,7 +1558,8 @@ export const AppProvider = ({ children }) => {
     }, [suppliers, createVoucher, showToast]);
     // Employees CRUD
     const saveEmployee = useCallback(async (employee) => {
-        const nextEmployee = { ...employee, authVersion: employee.authVersion || `AUTH-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, updatedAt: new Date().toISOString() };
+        const roleCode = String(employee?.role || 'custom').trim().toLowerCase();
+        const nextEmployee = { ...employee, permissions: normalizeEmployeePermissions(employee?.permissions || {}, roleCode), authVersion: employee.authVersion || `AUTH-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, updatedAt: new Date().toISOString() };
         await putInStore('employees', nextEmployee);
         await reloadData();
         showToast(`تم حفظ بيانات الموظف [${nextEmployee.name}] بنجاح`, 'success');

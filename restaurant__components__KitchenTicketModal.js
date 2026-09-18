@@ -1,7 +1,8 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Printer, X } from 'lucide-react';
-import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { printElementOnly } from './utils__export.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
+import { printElementOnly } from './utils__export.js?v=7.9.4.33-waiter-mobile-centered';
 
 const h = React.createElement;
 const money = (value) => Number(value || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -69,9 +70,10 @@ export const KitchenTicketModal = ({ order, isAdditionOnly = false, onClose }) =
     );
   };
 
-  return h('div', {
-    className: 'fixed inset-0 flex items-center justify-center bg-black/60 select-none',
-    style: { zIndex: 9999, padding: '10px' }
+  return createPortal(h('div', {
+    className: 'waiter-frost-overlay select-none',
+    style: { zIndex: 2147483600, padding: '10px' },
+    onMouseDown: (event) => { if (event.target === event.currentTarget) onClose?.(); }
   },
     h('div', {
       className: 'bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col',
@@ -160,5 +162,5 @@ export const KitchenTicketModal = ({ order, isAdditionOnly = false, onClose }) =
         )
       )
     )
-  );
+  ), document.body);
 };

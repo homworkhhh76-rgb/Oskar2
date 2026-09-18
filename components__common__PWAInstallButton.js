@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import React, { useState } from 'react';
-import { usePWAInstall } from './hooks__usePWAInstall.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { usePWAInstall } from './hooks__usePWAInstall.js?v=7.9.4.33-waiter-mobile-centered';
 import { Download, Smartphone, X } from 'lucide-react';
 export const PWAInstallButton = () => {
     const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { useApp } from './context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.33-waiter-mobile-centered';
+import { GENERAL_PAGE_PERMISSIONS, RESTAURANT_PAGE_PERMISSIONS, normalizeEmployeePermissions } from './utils__permissions.js?v=7.9.4.33-waiter-mobile-centered';
 import {
   Users, UserPlus, ShieldCheck, Trash2, Edit2, UserCheck, Download,
   UtensilsCrossed, ChefHat, LayoutGrid, Scale, X
@@ -9,49 +10,55 @@ import {
 const h = React.createElement;
 
 const defaultPermissions = {
+  // صلاحيات العمليات داخل الصفحات
   canDiscount: true,
   canEditPrice: false,
   canDeleteInvoice: false,
   canDeleteProducts: false,
   canManagePurchases: false,
-  canManageVouchers: true,
+  canManageVouchers: false,
   canManageInventory: false,
   canViewReports: false,
-  canAccessSettings: false,
-  canAccessRestaurantTables: false,
-  canAccessRestaurantWaiter: false,
-  canAccessRestaurantKitchen: false,
-  canAccessRestaurantOrders: false,
-  canAccessRestaurantWaste: false,
+
+  // صلاحيات دخول الصفحات — مغلقة افتراضياً حتى يتم اختيارها صراحة.
+  ...Object.fromEntries(GENERAL_PAGE_PERMISSIONS.map(([key]) => [key, false])),
+  ...Object.fromEntries(RESTAURANT_PAGE_PERMISSIONS.map(([key]) => [key, false])),
 };
 
 const allPermissions = Object.fromEntries(Object.keys(defaultPermissions).map(k => [k, true]));
-const restaurantPermissionLabels = {
-  canAccessRestaurantTables: 'الطاولات والصالات',
-  canAccessRestaurantWaiter: 'واجهة الجرسون',
-  canAccessRestaurantKitchen: 'شاشة المطبخ',
-  canAccessRestaurantWaste: 'الوصفات والهالك',
-};
+const restaurantPermissionLabels = Object.fromEntries(RESTAURANT_PAGE_PERMISSIONS.map(([key,,label]) => [key,label]));
 
 const presetForRole = role => {
   if (role === 'admin') return { roleName: 'مدير عام', permissions: { ...allPermissions } };
   if (role === 'waiter') return {
     roleName: 'جرسون',
-    permissions: { ...defaultPermissions, canManageVouchers: false, canDiscount: false, canAccessRestaurantTables: true, canAccessRestaurantWaiter: true }
+    permissions: { ...defaultPermissions, canDiscount:false, canAccessRestaurantTables:true, canAccessRestaurantWaiter:true }
   };
   if (role === 'kitchen') return {
     roleName: 'موظف مطبخ',
-    permissions: { ...defaultPermissions, canManageVouchers: false, canDiscount: false, canAccessRestaurantKitchen: true }
+    permissions: { ...defaultPermissions, canDiscount:false, canAccessRestaurantKitchen:true }
   };
   if (role === 'accountant') return {
     roleName: 'محاسب',
-    permissions: { ...defaultPermissions, canManagePurchases: true, canManageVouchers: true, canViewReports: true }
+    permissions: {
+      ...defaultPermissions,
+      canManagePurchases:true, canManageVouchers:true, canViewReports:true,
+      canAccessDashboard:true, canAccessSales:true, canAccessPurchases:true, canAccessVouchers:true,
+      canAccessCustomers:true, canAccessSuppliers:true, canAccessAccounts:true, canAccessExpenses:true, canAccessReports:true
+    }
   };
   if (role === 'inventory_mgr') return {
     roleName: 'مسؤول مخزون',
-    permissions: { ...defaultPermissions, canDiscount: false, canManageVouchers: false, canManagePurchases: true, canManageInventory: true }
+    permissions: {
+      ...defaultPermissions, canDiscount:false, canManagePurchases:true, canManageInventory:true,
+      canAccessProducts:true, canAccessCategories:true, canAccessInventory:true, canAccessPurchases:true, canAccessBarcodes:true
+    }
   };
-  if (role === 'cashier') return { roleName: 'كاشير', permissions: { ...defaultPermissions } };
+  if (role === 'cashier') return {
+    roleName: 'كاشير',
+    permissions: { ...defaultPermissions, canAccessCashier:true, canAccessSales:true, canAccessCustomers:true }
+  };
+  if (role === 'custom') return { roleName:'مخصص', permissions:{ ...defaultPermissions, canDiscount:false } };
   return null;
 };
 
@@ -65,18 +72,18 @@ export const EmployeesView = () => {
   const [roleName, setRoleName] = useState('كاشير');
   const [pin, setPin] = useState('');
   const [active, setActive] = useState(true);
-  const [permissions, setPermissions] = useState({ ...defaultPermissions });
+  const [permissions, setPermissions] = useState(() => ({ ...presetForRole('cashier').permissions }));
 
   const openAdd = () => {
     setEditingEmployee(null);
     setName(''); setPhone(''); setRole('cashier'); setRoleName('كاشير'); setPin(''); setActive(true);
-    setPermissions({ ...defaultPermissions });
+    setPermissions({ ...presetForRole('cashier').permissions });
     setIsModalOpen(true);
   };
   const openEdit = emp => {
     setEditingEmployee(emp);
     setName(emp.name || ''); setPhone(emp.phone || ''); setRole(emp.role || 'custom'); setRoleName(emp.roleName || 'موظف'); setPin(emp.pin || ''); setActive(emp.active !== false);
-    setPermissions({ ...defaultPermissions, ...(emp.permissions || {}) });
+    setPermissions({ ...defaultPermissions, ...normalizeEmployeePermissions(emp.permissions || {}, emp.role || 'custom') });
     setIsModalOpen(true);
   };
   const changeRole = selectedRole => {
@@ -99,7 +106,7 @@ export const EmployeesView = () => {
       role,
       roleName: roleName.trim() || 'موظف',
       pin: pin.trim() || undefined,
-      permissions: { ...defaultPermissions, ...permissions },
+      permissions: normalizeEmployeePermissions({ ...defaultPermissions, ...permissions }, role),
       active,
       authVersion: editingEmployee?.authVersion,
       createdAt: editingEmployee?.createdAt || new Date().toISOString(),
@@ -143,17 +150,17 @@ export const EmployeesView = () => {
     h('span', { className: 'text-slate-700 font-bold text-[11px]' }, label)
   );
 
-  const generalPermissions = [
+  const actionPermissions = [
     ['canDiscount', 'منح خصم في السلة'],
     ['canEditPrice', 'تعديل سعر البيع'],
     ['canDeleteInvoice', 'حذف وإلغاء الفواتير'],
     ['canDeleteProducts', 'حذف الأصناف'],
-    ['canManageVouchers', 'سندات القبض والصرف'],
-    ['canManagePurchases', 'المشتريات والتوريد'],
-    ['canManageInventory', 'الجرد وتحويلات المخزون'],
-    ['canViewReports', 'التقارير والأرباح'],
-    ['canAccessSettings', 'إعدادات النظام'],
+    ['canManageVouchers', 'تنفيذ سندات القبض والصرف'],
+    ['canManagePurchases', 'تنفيذ عمليات المشتريات'],
+    ['canManageInventory', 'تنفيذ الجرد وتحويلات المخزون'],
+    ['canViewReports', 'عرض بيانات التقارير داخل الصفحات المسموحة'],
   ];
+  const pagePermissions = GENERAL_PAGE_PERMISSIONS;
   const employeesPager = usePagination(employees || [], 50, 'employees');
 
   return h('div', { id: 'employees-view-container', className: 'p-3 sm:p-5 space-y-4 max-w-7xl mx-auto select-none min-h-[calc(100vh-4rem)] text-right', dir: 'rtl' },
@@ -163,7 +170,7 @@ export const EmployeesView = () => {
           h('div', { className: 'p-2 rounded-xl bg-emerald-50 text-emerald-600' }, h(Users, { className: 'w-5 h-5' })),
           h('h1', { className: 'text-lg font-black text-slate-900' }, 'إدارة الموظفين والصلاحيات')
         ),
-        h('p', { className: 'text-xs text-slate-500 mt-1' }, 'صلاحيات مستقلة لكل موظف، وتشمل صفحات المطعم والمطبخ كل صفحة على حدة.')
+        h('p', { className: 'text-xs text-slate-500 mt-1' }, 'حدد الصفحات التي يستطيع الموظف دخولها وصلاحيات العمليات داخل كل صفحة.')
       ),
       h('button', { onClick: openAdd, className: 'flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-sm' }, h(UserPlus, { className: 'w-4 h-4' }), 'إضافة موظف جديد')
     ),
@@ -178,7 +185,10 @@ export const EmployeesView = () => {
     h('div', { className: 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3' },
       employeesPager.pageItems.map(emp => {
         const perms = { ...defaultPermissions, ...(emp.permissions || {}) };
-        const restaurantPages = Object.entries(restaurantPermissionLabels).filter(([key]) => perms[key]).map(([, label]) => label);
+        const allowedPages = [
+          ...GENERAL_PAGE_PERMISSIONS.filter(([key]) => perms[key]).map(([, , label]) => label),
+          ...RESTAURANT_PAGE_PERMISSIONS.filter(([key]) => perms[key]).map(([, , label]) => label),
+        ];
         const isCurrent = activeEmployee?.id === emp.id;
         return h('div', { key: emp.id, className: `rounded-2xl border bg-white p-4 shadow-sm ${isCurrent ? 'border-emerald-400 ring-1 ring-emerald-100' : 'border-slate-200'}` },
           h('div', { className: 'flex items-start justify-between gap-3' },
@@ -189,9 +199,10 @@ export const EmployeesView = () => {
             h('span', { className: `shrink-0 px-2 py-1 rounded-lg text-[10px] font-black ${emp.active === false ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}` }, emp.active === false ? 'موقوف' : 'نشط')
           ),
           h('div', { className: 'mt-3 min-h-10 flex flex-wrap gap-1' },
-            restaurantPages.length
-              ? restaurantPages.map(label => h('span', { key: label, className: 'px-2 py-1 rounded-lg bg-amber-50 border border-amber-100 text-amber-800 text-[9px] font-black' }, label))
-              : h('span', { className: 'text-[10px] text-slate-400' }, 'لا توجد صلاحيات مطعم مفعلة')
+            allowedPages.length
+              ? allowedPages.slice(0, 6).map(label => h('span', { key: label, className: 'px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-800 text-[9px] font-black' }, label))
+              : h('span', { className: 'text-[10px] text-slate-400' }, 'لا توجد صفحات مسموحة'),
+            allowedPages.length > 6 ? h('span', { className: 'px-2 py-1 rounded-lg bg-slate-100 text-slate-600 text-[9px] font-black' }, `+${allowedPages.length - 6}`) : null
           ),
           h('div', { className: 'mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-1.5' },
             h('button', { onClick: () => switchEmployee(emp), className: `px-2.5 py-1.5 rounded-lg text-[10px] font-black ${isCurrent ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}` }, isCurrent ? 'الحساب الحالي' : 'تبديل للحساب'),
@@ -227,9 +238,15 @@ export const EmployeesView = () => {
             h('div', { className: 'min-w-0' }, h('label', { className: 'block text-[11px] font-black text-slate-700 mb-1' }, 'المسمى الوظيفي'), h('input', { value: roleName, onChange: e => setRoleName(e.target.value), className: 'w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none' }))
           ),
 
+          h('section', { className: 'p-3 rounded-2xl border border-emerald-200 bg-emerald-50/40' },
+            h('div', { className: 'font-black text-xs text-emerald-900' }, 'صلاحيات دخول الصفحات'),
+            h('div', { className: 'text-[10px] text-emerald-700 mt-0.5 mb-2' }, 'أي صفحة غير محددة لن تظهر للموظف ولن يستطيع فتحها حتى لو حاول الوصول إليها مباشرة.'),
+            h('div', { className: 'grid grid-cols-1 sm:grid-cols-2 gap-2' }, pagePermissions.map(([key,,label]) => permissionRow(key, label)))
+          ),
+
           h('section', { className: 'p-3 rounded-2xl border border-slate-200 bg-slate-50' },
-            h('div', { className: 'font-black text-xs text-slate-900 mb-2' }, 'الصلاحيات العامة'),
-            h('div', { className: 'grid grid-cols-1 sm:grid-cols-2 gap-2' }, generalPermissions.map(([key, label]) => permissionRow(key, label)))
+            h('div', { className: 'font-black text-xs text-slate-900 mb-2' }, 'صلاحيات العمليات داخل الصفحات'),
+            h('div', { className: 'grid grid-cols-1 sm:grid-cols-2 gap-2' }, actionPermissions.map(([key, label]) => permissionRow(key, label)))
           ),
 
           h('section', { className: 'p-3 rounded-2xl border border-amber-200 bg-amber-50/50' },

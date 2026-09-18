@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, X, Send, Sparkles, TrendingUp, PackageSearch, WalletCards, Receipt, ChefHat, Settings2, CheckCircle2, LoaderCircle, ShoppingCart, RotateCcw, BarChart3, FileDown, FileText, FileSpreadsheet, Paperclip, PackagePlus } from 'lucide-react';
-import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { askOscar, getAIConfig, aiHealthCheck, fileToDataUrl } from './services__ai.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { executeAIActions, isMutationAction } from './services__aiActions.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { useApp } from './context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.33-waiter-mobile-centered';
+import { askOscar, getAIConfig, aiHealthCheck, fileToDataUrl } from './services__ai.js?v=7.9.4.33-waiter-mobile-centered';
+import { executeAIActions, isMutationAction } from './services__aiActions.js?v=7.9.4.33-waiter-mobile-centered';
+import { canAccessPermission } from './utils__permissions.js?v=7.9.4.33-waiter-mobile-centered';
 
 const h = React.createElement;
 const DAY = 86400000;
@@ -134,8 +135,9 @@ const localInsights = (ctx) => {
 
 export const OscarAI = () => {
   const app=useApp(); const restaurant=useRestaurant();
+  const canAI=canAccessPermission('canAccessAI',{runtime:window.OscarActivation?.readRuntime?.()||null,currentUser:app.currentUser,activeEmployee:app.activeEmployee});
   const [open,setOpen]=useState(false),[input,setInput]=useState(''),[busy,setBusy]=useState(false),[messages,setMessages]=useState([]),[showSettings,setShowSettings]=useState(false),[connection,setConnection]=useState('');
-  useEffect(()=>{ const openOscarAI=()=>setOpen(true); window.addEventListener('oscar-ai-open',openOscarAI); return()=>window.removeEventListener('oscar-ai-open',openOscarAI); },[]);
+  useEffect(()=>{ const openOscarAI=()=>{if(canAI)setOpen(true);}; window.addEventListener('oscar-ai-open',openOscarAI); return()=>window.removeEventListener('oscar-ai-open',openOscarAI); },[canAI]);
   const [files,setFiles]=useState([]),[executing,setExecuting]=useState(false);
   const fileRef=useRef(null), scrollRef=useRef(null);
   const context=useMemo(()=>buildContext(app,restaurant),[app.invoices,app.purchases,app.expenses,app.products,app.customers,app.suppliers,app.accounts,app.warehouses,app.categories,app.stock,app.settings,app.activeTab,app.employees,restaurant.orders,restaurant.tables,restaurant.sections,restaurant.kitchenSections,restaurant.reservations,restaurant.wasteRecords]);
@@ -184,8 +186,8 @@ export const OscarAI = () => {
   const testConnection=async()=>{setConnection('جاري الفحص...');try{const r=await aiHealthCheck();setConnection(`الاتصال يعمل ✓ • ${r?.model||getAIConfig().model}`);}catch(e){setConnection(`فشل الاتصال: ${e.message}`);}};
   const quicks=[['ضيف صنف شوكولاتة، الكرتونة فيها 24 حبة','إضافة صنف',PackagePlus],['سجل فاتورة مشتريات من النص أو الملف','فاتورة مشتريات',Receipt],['ضيف عميل انور الندا','إضافة عميل',WalletCards],['سجل سند قبض 100 من العميل ...','سند قبض',FileDown],['سجل سند صرف 50 إلى ...','سند صرف',FileDown],['قديش صافي الربح اليوم حسب تقرير الأرباح؟','تقرير الربح',TrendingUp],['ايش أكثر المنتجات مبيعاً؟','تقرير المبيعات',BarChart3],['اعمل مرتجع مبيعات من الملف المرفق','مرتجع',RotateCcw]];
 
+  if(!canAI)return null;
   return h(React.Fragment,null,
-    h('button',{type:'button',onClick:()=>setOpen(true),title:'أوسكار AI',className:'fixed z-[2147481500] left-3 lg:left-6 bottom-20 lg:bottom-6 h-12 px-4 rounded-full bg-emerald-600 text-white shadow-2xl flex items-center gap-2 justify-center hover:bg-emerald-700 active:scale-95 border-2 border-white font-black'},h(Sparkles,{className:'w-5 h-5'}),h('span',{className:'text-xs whitespace-nowrap'},'أوسكار AI')),
     open&&h('div',{className:'oscar-ai-overlay fixed z-[2147481600] bg-black/45 backdrop-blur-[2px] flex justify-center',onClick:()=>setOpen(false)},
       h('section',{dir:'rtl',onClick:e=>e.stopPropagation(),className:'oscar-ai-panel w-full sm:max-w-3xl bg-white shadow-2xl overflow-hidden flex flex-col border border-slate-200'},
         h('header',{className:'shrink-0 p-3 border-b flex items-center justify-between gap-3 bg-gradient-to-l from-emerald-600 to-emerald-500 text-white'},
@@ -203,7 +205,7 @@ export const OscarAI = () => {
           h('div',{className:'flex items-end gap-2'},
             h('button',{type:'button',onClick:()=>fileRef.current?.click(),title:'إرفاق ملف',className:'h-10 shrink-0 px-3 rounded-xl border bg-slate-50 flex items-center justify-center gap-1.5 text-slate-700 font-bold text-[10px] hover:border-emerald-300'},h(Paperclip,{className:'w-4 h-4'}),h('span',null,'إرفاق ملف')),
             h('textarea',{value:input,onChange:e=>setInput(e.target.value),onKeyDown:e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();run();}},rows:1,placeholder:'اكتب استفسارك هنا',className:'flex-1 min-w-0 resize-none min-h-10 max-h-24 px-3 py-2.5 rounded-2xl border bg-slate-50 text-xs focus:outline-none focus:border-emerald-500'}),
-            h('button',{type:'button',disabled:busy||executing||(!input.trim()&&!files.length),onClick:()=>run(),className:'w-11 h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center disabled:opacity-40'},h(Send,{className:'w-4 h-4'}))
+            h('button',{id:'oscar-ai-send','data-enter-primary':'true',type:'button',disabled:busy||executing||(!input.trim()&&!files.length),onClick:()=>run(),className:'w-11 h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center disabled:opacity-40'},h(Send,{className:'w-4 h-4'}))
           ),
           h('input',{ref:fileRef,type:'file',accept:'image/*,application/pdf,.pdf,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel',multiple:true,className:'hidden',onChange:e=>{const picked=Array.from(e.target.files||[]).filter(f=>{const name=String(f?.name||'');const type=String(f?.type||'');return type.startsWith('image/')||type==='application/pdf'||/\.pdf$/i.test(name)||/\.(xlsx|xls)$/i.test(name)||/spreadsheet|ms-excel/i.test(type);});const next=[...files,...picked].slice(0,6);setFiles(next);if(picked.length<Array.from(e.target.files||[]).length)app.showToast?.('المسموح فقط: صور أو PDF أو Excel','warning');e.target.value='';}}),
           h('div',{className:'mt-1.5 text-[9px] text-slate-400'},'المرفقات المسموحة فقط: صور • PDF • Excel. ينفذ مباشرة ويطلب البيانات الإجبارية فقط.')

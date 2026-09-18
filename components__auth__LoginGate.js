@@ -1,14 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Upload, ShieldCheck, Building2, Wifi, WifiOff, Database, LogIn } from 'lucide-react';
-import { DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.33-waiter-mobile-centered';
 const h=React.createElement;
 export const LoginGate=({children})=>{
  const A=()=>window.OscarActivation;
  const [runtime,setRuntime]=useState(()=>A()?.readRuntime?.()||null);
  const [file,setFile]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const inputRef=useRef(null);
- useEffect(()=>{if(!runtime)return; if(navigator.onLine!==false){const fake={...runtime,app:A()?.constants?.APP_TAG,database:A()?.readDatabaseAccess?.(runtime.companyId)||runtime.database};A()?.verifyPayload?.(fake,{allowOffline:true}).catch(e=>{const msg=String(e?.message||e);if(/تم إيقاف|انتهت مدة|لا يطابق|غير مسجل|ملف مدير أحدث/.test(msg)){A()?.clearRuntime?.();setRuntime(null);setError(msg)}})}},[]);
- const open=async()=>{if(!file){setError('اختر ملف الدخول .mzauth أولاً.');return}setBusy(true);setError('');try{const payload=await A().parseActivationFile(file);await A().verifyPayload(payload,{allowOffline:true});const rt=A().activatePayload(payload);window.OscarCloudSync?.resetForTenant?.();setRuntime(rt)}catch(e){setError(String(e?.message||e||'تعذر فتح ملف الدخول.'))}finally{setBusy(false)}};
+ useEffect(()=>{if(!runtime)return;let cancelled=false;if(navigator.onLine!==false){const fake={...runtime,app:A()?.constants?.APP_TAG,database:A()?.readDatabaseAccess?.(runtime.companyId)||runtime.database};A()?.verifyPayload?.(fake,{allowOffline:true}).then(result=>{if(cancelled||!result?.account)return;const effective={...fake,account:{...(fake.account||{}),...result.account},permissions:result.account.permissions??fake.permissions};const before=JSON.stringify({role:fake.account?.role,roleName:fake.account?.roleName,permissions:fake.account?.permissions,updatedAt:fake.account?.updatedAt});const after=JSON.stringify({role:effective.account?.role,roleName:effective.account?.roleName,permissions:effective.account?.permissions,updatedAt:effective.account?.updatedAt});if(before!==after){const rt=A()?.activatePayload?.(effective);if(rt&&!cancelled)setRuntime(rt)}}).catch(e=>{if(cancelled)return;const msg=String(e?.message||e);if(/تم إيقاف|انتهت مدة|لا يطابق|غير مسجل|ملف مدير أحدث/.test(msg)){A()?.clearRuntime?.();setRuntime(null);setError(msg)}})}return()=>{cancelled=true}},[]);
+ const open=async()=>{if(!file){setError('اختر ملف الدخول .mzauth أولاً.');return}setBusy(true);setError('');try{const payload=await A().parseActivationFile(file);const verified=await A().verifyPayload(payload,{allowOffline:true});const effective=verified?.account?{...payload,account:{...(payload.account||{}),...verified.account},permissions:verified.account.permissions??payload.permissions}:payload;const rt=A().activatePayload(effective);window.OscarCloudSync?.resetForTenant?.();setRuntime(rt)}catch(e){setError(String(e?.message||e||'تعذر فتح ملف الدخول.'))}finally{setBusy(false)}};
  if(runtime)return children;
  return h('div',{className:'min-h-[100dvh] bg-slate-100 dark:bg-slate-950 flex items-center justify-center p-4 font-[Cairo]'},
   h('div',{className:'w-full max-w-5xl grid lg:grid-cols-2 bg-white dark:bg-slate-900 rounded-[28px] overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800'},

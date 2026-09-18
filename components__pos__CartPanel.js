@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { useApp } from './context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.33-waiter-mobile-centered';
 import { Trash2, Plus, Minus, PauseCircle, CreditCard, User, UserPlus, Tag, ChevronDown, Clock, X } from 'lucide-react';
 
 const h = React.createElement;
@@ -66,8 +66,10 @@ export const CartPanel = ({ onOpenPayment }) => {
   const rawGrandTotal = Math.max(0, beforeInvoiceDiscount - invoiceDiscountAmount);
   const grandTotal = settings.scaleModeEnabled ? Math.round(rawGrandTotal) : rawGrandTotal;
 
+  const hasSelectedCustomerInList = !!selectedCustomer?.id && (selectedCustomer.id === 'cust-walkin' || customers.some((c) => String(c.id) === String(selectedCustomer.id)));
   const customerOptions = [
     { id: 'cust-walkin', label: 'عميل نقدي', subLabel: 'الافتراضي للبيع النقدي المباشر' },
+    ...(!hasSelectedCustomerInList && selectedCustomer?.name ? [{ id:selectedCustomer.id, label:selectedCustomer.name, subLabel:'عميل طلب المطعم' }] : []),
     ...[...customers]
       .filter((c) => c && c.id !== 'cust-walkin' && !c.deletedAt)
       .sort((a,b) => String(a.name||'').localeCompare(String(b.name||''),'ar'))
@@ -88,7 +90,7 @@ export const CartPanel = ({ onOpenPayment }) => {
       h('div', { className: 'flex items-center gap-1.5' },
         h('div', { className: 'flex-1 min-w-0' }, h(SearchableDropdown, {
           id: 'cart-customer-select', options: customerOptions, selectedId: selectedCustomer?.id,
-          onSelect: (id) => { if (id === 'cust-walkin') setSelectedCustomer({ id:'cust-walkin', name:'عميل نقدي', balance:0, priceList:'retail', isVirtual:true }); else { const found = customers.find((c) => c.id === id); if (found) setSelectedCustomer(found); } },
+          onSelect: (id) => { if (id === 'cust-walkin') setSelectedCustomer({ id:'cust-walkin', name:'عميل نقدي', balance:0, priceList:'retail', isVirtual:true }); else { const found = customers.find((c) => c.id === id) || (String(selectedCustomer?.id) === String(id) ? selectedCustomer : null); if (found) setSelectedCustomer(found); } },
           icon: h(User, { className: 'w-4 h-4' }), placeholder: 'اختر العميل...',
         })),
         h('button', { type:'button', onClick:()=>setShowQuickCustomer(true), className:'shrink-0 w-9 h-9 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 flex items-center justify-center hover:bg-emerald-100', title:'إضافة عميل جديد' }, h(UserPlus,{className:'w-4.5 h-4.5'}))
@@ -142,7 +144,7 @@ export const CartPanel = ({ onOpenPayment }) => {
         h('div', { className: 'flex justify-between text-slate-600 dark:text-slate-400' }, h('span', null, 'المجموع:'), h('span', { className: 'font-mono font-bold' }, `${subtotal.toFixed(2)} ${settings.currencySymbol}`)),
         h('div', { className: 'flex justify-between text-base font-black pt-1 border-t border-slate-200 dark:border-slate-700' }, h('span', null, settings.scaleModeEnabled ? 'الصافي المقرب:' : 'الصافي:'), h('span', { className: 'text-emerald-600 font-mono' }, `${grandTotal.toFixed(2)} ${settings.currencySymbol}`))
       ),
-      h('button', { id: 'btn-checkout', disabled: cart.length === 0, onClick: onOpenPayment, className: 'w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-sm flex items-center justify-center gap-2 shadow-md' },
+      h('button', { id: 'btn-checkout', 'data-enter-primary':'true', disabled: cart.length === 0, onClick: onOpenPayment, className: 'w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-sm flex items-center justify-center gap-2 shadow-md' },
         h(CreditCard, { className: 'w-5 h-5' }), h('span', null, 'الدفع الفوري [F9]')
       ),
       h('div', { className: 'grid grid-cols-3 gap-1.5' },

@@ -1,13 +1,13 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { downloadProfessionalTablePDF, downloadProfessionalTableImage, downloadProfessionalTableExcel, downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel } from './utils__professionalExport.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { useApp } from './context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.33-waiter-mobile-centered';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.33-waiter-mobile-centered';
+import { downloadProfessionalTablePDF, downloadProfessionalTableImage, downloadProfessionalTableExcel, downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel } from './utils__professionalExport.js?v=7.9.4.33-waiter-mobile-centered';
+import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.33-waiter-mobile-centered';
 import { Search, Printer, RotateCcw, Download, Eye, X, AlertCircle, Trash2, Image as ImageIcon, FileSpreadsheet, } from 'lucide-react';
 export const SalesView = () => {
-    const { invoices, accounts, settings, activeEmployee, deleteInvoice, setShowThermalModal, createReturnInvoice, showToast, } = useApp();
+    const { invoices, accounts, settings, currentUser, deleteInvoice, setShowThermalModal, createReturnInvoice, showToast, } = useApp();
     const [search, setSearch] = useState('');
     const [filterType, setFilterType] = useState('all');
     const [filterPayment, setFilterPayment] = useState('all');
@@ -24,7 +24,7 @@ export const SalesView = () => {
     const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
     const tableContainerRef = useRef(null);
     const invoiceModalRef = useRef(null);
-    const canDeleteInvoice = activeEmployee?.permissions?.canDeleteInvoice ?? false;
+    const canDeleteInvoice = currentUser?.permissions?.canDeleteInvoice === true;
     // Filter invoices
     const filteredInvoices = invoices.filter((inv) => {
         if (filterType !== 'all' && inv.type !== filterType)

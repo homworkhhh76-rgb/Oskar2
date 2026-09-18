@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel, warmProfessionalExportLibraries } from './utils__professionalExport.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { useApp } from './context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
+import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.33-waiter-mobile-centered';
+import { downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel, warmProfessionalExportLibraries } from './utils__professionalExport.js?v=7.9.4.33-waiter-mobile-centered';
+import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.33-waiter-mobile-centered';
 import { Printer, X, Download, Image as ImageIcon, FileSpreadsheet } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 

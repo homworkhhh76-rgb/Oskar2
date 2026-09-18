@@ -1,23 +1,23 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.33-waiter-mobile-centered';
+import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
 import {
   ChefHat, Flame, Clock, Printer, CheckCircle2, Volume2, VolumeX,
-  Utensils, ShoppingBag, Trash2, StickyNote, TimerReset, CircleDot
+  Utensils, ShoppingBag, Trash2, StickyNote, TimerReset, CircleDot, X
 } from 'lucide-react';
-import { KitchenTicketModal } from './restaurant__components__KitchenTicketModal.js?v=7.9.4.20-modal-backdrop-rootfix';
-import { printKitchenTicketDirect } from './restaurant__services__kitchenPrint.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { KitchenTicketModal } from './restaurant__components__KitchenTicketModal.js?v=7.9.4.33-waiter-mobile-centered';
+import { printKitchenTicketDirect } from './restaurant__services__kitchenPrint.js?v=7.9.4.33-waiter-mobile-centered';
 
 const h = React.createElement;
 const noteText = notes => typeof notes === 'string' ? notes : String(notes?.kitchenNotes || notes?.general || '');
 
 export const RestaurantKDSView = () => {
-  const { orders, kitchenSections, updateOrderStatus, updateOrderItemStatus, cancelRestaurantOrder } = useRestaurant();
+  const { orders, updateOrderStatus, updateOrderItemStatus, cancelRestaurantOrder } = useRestaurant();
   const { settings, showToast } = useApp();
-  const [selectedSectionId, setSelectedSectionId] = useState('all');
   const [filterTab, setFilterTab] = useState('active');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [ticketModalOrder, setTicketModalOrder] = useState(null);
+  const [detailsModalOrder, setDetailsModalOrder] = useState(null);
   const autoPrintBusyRef = useRef(false);
   const [, tick] = useState(0);
 
@@ -70,7 +70,6 @@ export const RestaurantKDSView = () => {
 
   const filteredOrders = (orders || []).filter(order => {
     if (!order || ['cancelled', 'draft'].includes(order.status)) return false;
-    if (selectedSectionId !== 'all' && !(order.items || []).some(i => i.kitchenSectionId === selectedSectionId)) return false;
     if (filterTab === 'active') return activeStatuses.includes(order.status);
     if (filterTab === 'new') return order.status === 'sent';
     if (filterTab === 'preparing') return ['preparing', 'partially_ready'].includes(order.status);
@@ -143,17 +142,7 @@ export const RestaurantKDSView = () => {
       )
     ),
 
-    kitchenSections.length > 1 && h('div', { className: 'bg-white px-3 sm:px-5 py-2 border-b border-slate-200 flex gap-2 overflow-x-auto shrink-0 custom-scrollbar' },
-      h('button', {
-        onClick: () => setSelectedSectionId('all'),
-        className: `px-3 py-1.5 rounded-lg text-[11px] font-black whitespace-nowrap border ${selectedSectionId === 'all' ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 text-slate-600'}`
-      }, 'كل أقسام المطبخ'),
-      kitchenSections.map(s => h('button', {
-        key: s.id,
-        onClick: () => setSelectedSectionId(s.id),
-        className: `px-3 py-1.5 rounded-lg text-[11px] font-black whitespace-nowrap border ${selectedSectionId === s.id ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 text-slate-600'}`
-      }, s.name))
-    ),
+
 
     h('div', { className: 'flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 custom-scrollbar' },
       filteredOrders.length === 0
@@ -172,7 +161,8 @@ export const RestaurantKDSView = () => {
               const readyItems = items.filter(i => i.status === 'ready').length;
               return h('article', {
                 key: order.id,
-                className: `rounded-2xl border bg-white overflow-hidden shadow-sm ${isReady ? 'border-emerald-300' : overdue ? 'border-rose-300' : 'border-slate-200'}`
+                onClick: () => setDetailsModalOrder(order),
+                className: `rounded-2xl border bg-white overflow-hidden shadow-sm cursor-pointer transition hover:shadow-md ${isReady ? 'border-emerald-300' : overdue ? 'border-rose-300' : 'border-slate-200'}`
               },
                 h('div', { className: `p-3 border-b ${isReady ? 'bg-emerald-50 border-emerald-200' : overdue ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-100'} flex items-center justify-between gap-2` },
                   h('div', { className: 'flex items-center gap-2 min-w-0' },
@@ -180,9 +170,10 @@ export const RestaurantKDSView = () => {
                       order.orderType === 'dine_in' ? h(Utensils, { className: 'w-4 h-4' }) : h(ShoppingBag, { className: 'w-4 h-4' }),
                       h('span', { className: 'text-[9px] font-black mt-0.5' }, order.tableNumber || order.queueNumber || 'سفري')
                     ),
-                    h('div', { className: 'min-w-0' },
-                      h('div', { className: 'font-black text-sm text-slate-900 truncate' }, order.orderType === 'dine_in' ? `طاولة ${order.tableNumber || '-'}` : 'طلب سفري'),
-                      h('div', { className: 'text-[10px] text-slate-500 font-semibold truncate' }, `#${String(order.orderNumber || '').slice(-5)} • ${order.waiterName || 'جرسون'}`)
+                    h('div', { className: 'min-w-0 flex-1' },
+                      h('div', { className: 'font-black text-sm text-slate-900 truncate' }, order.orderType === 'dine_in' ? `طاولة ${order.tableNumber || order.tableName || '-'}` : 'طلب سفري'),
+                      h('div', { className: 'text-[10px] text-slate-700 font-black truncate' }, `العميل: ${order.customerName || '-'}`),
+                      h('div', { className: 'text-[10px] text-slate-500 font-semibold truncate' }, `الجرسون: ${order.waiterName || '-'} • #${String(order.orderNumber || '').slice(-5)}`)
                     )
                   ),
                   h('div', { className: `shrink-0 px-2 py-1 rounded-lg text-[10px] font-black flex items-center gap-1 ${overdue && !isReady ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'}` },
@@ -200,7 +191,7 @@ export const RestaurantKDSView = () => {
                     const ready = item.status === 'ready';
                     return h('button', {
                       key: item.id,
-                      onClick: () => toggleItemReady(order.id, item.id, item.status),
+                      onClick: (e) => { e.stopPropagation(); toggleItemReady(order.id, item.id, item.status); },
                       className: `w-full p-2.5 rounded-xl border text-right flex items-start justify-between gap-2 transition ${ready ? 'bg-emerald-50 text-emerald-900 border-emerald-200' : 'bg-slate-50 text-slate-900 border-slate-200 hover:bg-slate-100'}`
                     },
                       h('div', { className: 'min-w-0 flex-1' },
@@ -217,16 +208,53 @@ export const RestaurantKDSView = () => {
 
                 h('div', { className: 'p-3 border-t border-slate-100 bg-slate-50 flex items-center gap-2' },
                   h('div',{className:'flex items-center gap-2 shrink-0'},
-                    h('button', { onClick: () => setTicketModalOrder(order), className: 'w-10 h-10 p-0 rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 flex items-center justify-center shadow-sm', title: 'طباعة التذكرة' }, h(Printer, { className: 'w-4 h-4' })),
-                    h('button', { onClick: () => remove(order), className: 'w-10 h-10 p-0 rounded-xl border border-rose-300 bg-white text-rose-600 hover:bg-rose-50 flex items-center justify-center shadow-sm', title: 'حذف الطلب' }, h(Trash2, { className: 'w-4 h-4' }))
+                    h('button', { onClick: (e) => { e.stopPropagation(); setTicketModalOrder(order); }, className: 'w-10 h-10 p-0 rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 flex items-center justify-center shadow-sm', title: 'طباعة التذكرة' }, h(Printer, { className: 'w-4 h-4' })),
+                    h('button', { onClick: (e) => { e.stopPropagation(); remove(order); }, className: 'w-10 h-10 p-0 rounded-xl border border-rose-300 bg-white text-rose-600 hover:bg-rose-50 flex items-center justify-center shadow-sm', title: 'حذف الطلب' }, h(Trash2, { className: 'w-4 h-4' }))
                   ),
-                  order.status === 'sent' && h('button', { onClick: () => start(order.id), className: 'flex-1 h-10 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-[.98]' }, h(Flame, { className: 'w-4 h-4' }), 'بدء التحضير'),
-                  ['preparing', 'partially_ready'].includes(order.status) && h('button', { onClick: () => fullyReady(order.id), className: 'flex-1 h-10 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-[.98]' }, h(CheckCircle2, { className: 'w-4 h-4' }), 'جاهز بالكامل'),
-                  order.status === 'ready' && h('button', { onClick: () => served(order.id), className: 'flex-1 h-10 px-3 rounded-xl font-black text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-[.98]', style:{backgroundColor:'#0f766e',color:'#ffffff',border:'1px solid #0f766e'} }, h(TimerReset, { className: 'w-4 h-4' }), 'تم التسليم')
+                  order.status === 'sent' && h('button', { onClick: (e) => { e.stopPropagation(); start(order.id); }, className: 'flex-1 h-10 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-[.98]' }, h(Flame, { className: 'w-4 h-4' }), 'بدء التحضير'),
+                  ['preparing', 'partially_ready'].includes(order.status) && h('button', { onClick: (e) => { e.stopPropagation(); fullyReady(order.id); }, className: 'flex-1 h-10 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-[.98]' }, h(CheckCircle2, { className: 'w-4 h-4' }), 'جاهز بالكامل'),
+                  order.status === 'ready' && h('button', { onClick: (e) => { e.stopPropagation(); served(order.id); }, className: 'flex-1 h-10 px-3 rounded-xl font-black text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-[.98]', style:{backgroundColor:'#0f766e',color:'#ffffff',border:'1px solid #0f766e'} }, h(TimerReset, { className: 'w-4 h-4' }), 'تم التسليم')
                 )
               );
             })
           )
+    ),
+    detailsModalOrder && h('div', {
+      className: 'fixed inset-0 flex items-center justify-center bg-black/60 p-2 sm:p-4',
+      style: { zIndex: 9998 },
+      onClick: () => setDetailsModalOrder(null)
+    },
+      h('div', {
+        className: 'bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col w-full max-w-2xl',
+        style: { maxHeight: 'calc(100dvh - 150px)' },
+        onClick: e => e.stopPropagation()
+      },
+        h('div', { className: 'p-3 sm:p-4 border-b bg-white flex items-start justify-between gap-3 shrink-0' },
+          h('div', { className: 'min-w-0' },
+            h('div', { className: 'font-black text-lg text-slate-900' }, detailsModalOrder.orderType === 'dine_in' ? `طلب طاولة ${detailsModalOrder.tableNumber || detailsModalOrder.tableName || '-'}` : 'طلب سفري'),
+            h('div', { className: 'mt-1 text-xs text-slate-600 font-bold flex flex-wrap gap-x-3 gap-y-1' },
+              h('span', null, `العميل: ${detailsModalOrder.customerName || '-'}`),
+              h('span', null, `الجرسون: ${detailsModalOrder.waiterName || '-'}`),
+              detailsModalOrder.orderType === 'dine_in' ? h('span', null, `رقم الطاولة: ${detailsModalOrder.tableNumber || detailsModalOrder.tableName || '-'}`) : null
+            )
+          ),
+          h('button', { onClick: () => setDetailsModalOrder(null), className: 'w-10 h-10 rounded-xl border border-slate-200 bg-white text-slate-600 flex items-center justify-center shrink-0' }, h(X, { className: 'w-5 h-5' }))
+        ),
+        h('div', { className: 'flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-2 custom-scrollbar', style: { WebkitOverflowScrolling: 'touch' } },
+          (detailsModalOrder.items || []).filter(i => i.status !== 'cancelled').map((item, idx) => h('div', {
+            key: item.id || idx,
+            className: `rounded-xl border p-3 ${item.status === 'ready' ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`
+          },
+            h('div', { className: 'flex items-center justify-between gap-3' },
+              h('div', { className: 'font-black text-base text-slate-900' }, `${item.quantity} × ${item.productName}`),
+              h('div', { className: `text-[10px] font-black px-2 py-1 rounded-lg ${item.status === 'ready' ? 'bg-emerald-100 text-emerald-700' : 'bg-white text-slate-500 border border-slate-200'}` }, item.status === 'ready' ? 'جاهز' : 'قيد العمل')
+            ),
+            item.unitName ? h('div', { className: 'text-[11px] text-slate-600 font-bold mt-1' }, `الوحدة: ${item.unitName}`) : null,
+            item.notes ? h('div', { className: 'mt-2 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2' }, `ملاحظة: ${item.notes}`) : null
+          )),
+          noteText(detailsModalOrder.notes) ? h('div', { className: 'mt-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-sm font-black text-amber-950' }, `ملاحظات الطلب: ${noteText(detailsModalOrder.notes)}`) : null
+        )
+      )
     ),
     ticketModalOrder && h(KitchenTicketModal, { order: ticketModalOrder, onClose: () => setTicketModalOrder(null) })
   );

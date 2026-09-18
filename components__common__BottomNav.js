@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.20-modal-backdrop-rootfix';
+import { useApp } from './context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
+import { canAccessTab, canAccessPermission } from './utils__permissions.js?v=7.9.4.33-waiter-mobile-centered';
 import {
   ShoppingCart, ReceiptText, Package, Warehouse, Menu, X, LayoutDashboard, Truck,
   Boxes, Users, Building2, Wallet, Receipt, Barcode, BarChart3, Trash2, Settings,
@@ -11,31 +12,34 @@ const h = React.createElement;
 export const BottomNav = () => {
   const { activeTab, setActiveTab, cart, settings, currentUser, activeEmployee } = useApp();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
-  const runtimeAccount = window.OscarActivation?.readRuntime?.()?.account;
-  const roleText = String(currentUser?.role || '').toLowerCase();
-  const isAdmin = !!currentUser?.isCompanyManager || roleText === 'admin' || roleText.includes('مدير') || (!runtimeAccount && activeEmployee?.role === 'admin');
-  const perms = currentUser?.permissions || {};
-  const hasPermission = key => isAdmin || (Array.isArray(perms) ? perms.includes(key) : perms?.[key] === true);
+  const accessArgs = {
+    runtime: window.OscarActivation?.readRuntime?.() || null,
+    currentUser,
+    activeEmployee,
+    restaurantEnabled: !!settings.isRestaurantModeEnabled,
+  };
 
   const mainTabs = [
     { id:'pos', label:'الكاشير', icon:ShoppingCart, badge:cart.length || undefined },
     { id:'sales', label:'المبيعات', icon:ReceiptText },
     { id:'products', label:'الأصناف', icon:Package },
     { id:'inventory', label:'المخزون', icon:Warehouse },
-  ];
+  ].filter(tab => canAccessTab(tab.id, accessArgs));
 
   const restaurantTabs = settings.isRestaurantModeEnabled ? [
-    { id:'restaurant_tables', label:'الطاولات', icon:LayoutGrid, permission:'canAccessRestaurantTables' },
-    { id:'restaurant_waiter', label:'الجرسون', icon:UtensilsCrossed, permission:'canAccessRestaurantWaiter' },
-    { id:'restaurant_kitchen', label:'المطبخ', icon:ChefHat, permission:'canAccessRestaurantKitchen' },
-    { id:'restaurant_waste', label:'الوصفات والهالك', icon:Scale, permission:'canAccessRestaurantWaste' },
-  ].filter(item => hasPermission(item.permission)) : [];
+    { id:'restaurant_tables', label:'الطاولات', icon:LayoutGrid },
+    { id:'restaurant_waiter', label:'الجرسون', icon:UtensilsCrossed },
+    { id:'restaurant_kitchen', label:'المطبخ', icon:ChefHat },
+    { id:'restaurant_waste', label:'الوصفات والهالك', icon:Scale },
+  ].filter(item => canAccessTab(item.id, accessArgs)) : [];
 
   const moreTabs = [
-    { id:'oscar_ai', label:'أوسكار AI', icon:Sparkles },
+    ...(canAccessPermission('canAccessAI', accessArgs) ? [{ id:'oscar_ai', label:'أوسكار AI', icon:Sparkles }] : []),
     ...restaurantTabs,
     { id:'dashboard', label:'لوحة التحكم', icon:LayoutDashboard },
     { id:'purchases', label:'المشتريات', icon:Truck },
+    { id:'vouchers', label:'سندات القبض والصرف', icon:ReceiptText },
+    { id:'employees', label:'الموظفون والصلاحيات', icon:Users },
     { id:'categories', label:'التصنيفات', icon:Boxes },
     { id:'customers', label:'العملاء والديون', icon:Users },
     { id:'suppliers', label:'الموردون', icon:Building2 },
@@ -45,7 +49,7 @@ export const BottomNav = () => {
     { id:'reports', label:'التقارير والأرباح', icon:BarChart3 },
     { id:'trash', label:'سلة المحذوفات', icon:Trash2 },
     { id:'settings', label:'الإعدادات', icon:Settings },
-  ];
+  ].filter(item => item.id === 'oscar_ai' || canAccessTab(item.id, accessArgs));
 
   return h(React.Fragment, null,
     showMoreMenu && h('div', { id:'mobile-more-backdrop', onClick:()=>setShowMoreMenu(false), className:'lg:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex flex-col justify-end' },
