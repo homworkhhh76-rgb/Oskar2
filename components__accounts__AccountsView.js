@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import React, { useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.11-notifications-popup';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.11-notifications-popup';
+import { useApp } from './context__AppContext.js?v=7.9.4.12-motion-120hz';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.12-motion-120hz';
 import { Wallet, ArrowLeftRight, Plus, Lock, Unlock, Edit2, Trash2, } from 'lucide-react';
 export const AccountsView = () => {
     const { accounts, activeShift, openShift, closeShift, transferBetweenAccounts, saveAccount, deleteAccount, settings, showToast, } = useApp();

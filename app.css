@@ -4121,3 +4121,137 @@ select{font-family:'Cairo',sans-serif}
     border-radius:16px!important;
   }
 }
+
+/* ===== v7.9.4.12 High-refresh motion system (120Hz-friendly) =====
+   Compositor-only motion: transform + opacity. No layout-heavy animation. */
+:root{
+  --oscar-motion-fast:90ms;
+  --oscar-motion-page:165ms;
+  --oscar-motion-modal:175ms;
+  --oscar-motion-ease:cubic-bezier(.22,.78,.24,1);
+  --oscar-motion-spring:cubic-bezier(.2,.9,.25,1.08);
+}
+
+html,body,#root{
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+
+/* Page changes: very light slide/fade to keep navigation feeling instant. */
+.oscar-page-stage{
+  animation:oscar-page-in var(--oscar-motion-page) var(--oscar-motion-ease) both;
+  transform-origin:50% 18%;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+}
+@keyframes oscar-page-in{
+  from{opacity:.72;transform:translate3d(0,5px,0) scale(.997)}
+  to{opacity:1;transform:none}
+}
+
+/* Common modal/backdrop entrance. Targets existing overlays without changing their markup. */
+.oscar-ai-overlay,
+.oscar-employee-modal-overlay,
+.oscar-bounded-modal,
+.barcode-camera-overlay,
+[class*="fixed"][class*="inset-0"][class*="bg-black"]{
+  animation:oscar-backdrop-in 125ms ease-out both;
+}
+.oscar-ai-panel,
+.oscar-employee-modal-panel,
+.oscar-bounded-modal > section,
+.oscar-bounded-modal > div,
+[class*="fixed"][class*="inset-0"][class*="bg-black"] > form,
+[class*="fixed"][class*="inset-0"][class*="bg-black"] > div{
+  animation:oscar-modal-in var(--oscar-motion-modal) var(--oscar-motion-spring) both;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+}
+@keyframes oscar-backdrop-in{
+  from{opacity:0}
+  to{opacity:1}
+}
+@keyframes oscar-modal-in{
+  from{opacity:.35;transform:translate3d(0,8px,0) scale(.985)}
+  to{opacity:1;transform:none}
+}
+
+/* Dropdowns / floating menus should feel connected to the tapped control. */
+.searchable-dropdown-panel,
+[role="menu"],
+[role="listbox"]{
+  animation:oscar-pop-in 135ms var(--oscar-motion-spring) both;
+  transform-origin:top center;
+}
+@keyframes oscar-pop-in{
+  from{opacity:.45;transform:translate3d(0,-3px,0) scale(.985)}
+  to{opacity:1;transform:none}
+}
+
+/* Buttons and clickable cards: immediate tactile response, no slow 300ms feeling. */
+button,
+a[href],
+[role="button"],
+[class*="cursor-pointer"]{
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+  transition:transform var(--oscar-motion-fast) var(--oscar-motion-ease),opacity 110ms ease,filter 110ms ease;
+}
+button:not(:disabled):active,
+a[href]:active,
+[role="button"]:active,
+[class*="cursor-pointer"]:active{
+  transform:translate3d(0,1px,0) scale(.975);
+}
+
+/* Large clickable cards use a softer press so content never feels jumpy. */
+button[class*="rounded-2xl"]:active,
+button[class*="rounded-3xl"]:active,
+[class*="cursor-pointer"][class*="rounded-2xl"]:active,
+[class*="cursor-pointer"][class*="rounded-3xl"]:active{
+  transform:translate3d(0,1px,0) scale(.988);
+}
+
+/* Keep icon taps crisp on high-refresh screens. */
+button svg,[role="button"] svg{
+  pointer-events:none;
+}
+
+/* Smooth programmatic navigation while preserving native finger scrolling. */
+.custom-scrollbar,.slim-scrollbar,.scroll-chain-page{
+  scroll-behavior:smooth;
+}
+
+/* Avoid expensive animated shadows/filters on touch devices. */
+@media (hover:none) and (pointer:coarse){
+  button,[role="button"],[class*="cursor-pointer"]{
+    transition-property:transform,opacity!important;
+  }
+}
+
+/* Respect OS accessibility preference. */
+@media (prefers-reduced-motion:reduce){
+  .oscar-page-stage,
+  .oscar-ai-overlay,.oscar-ai-panel,
+  .oscar-employee-modal-overlay,.oscar-employee-modal-panel,
+  .oscar-bounded-modal,.oscar-bounded-modal > *,
+  .barcode-camera-overlay,
+  [class*="fixed"][class*="inset-0"][class*="bg-black"],
+  [class*="fixed"][class*="inset-0"][class*="bg-black"] > *,
+  .searchable-dropdown-panel,[role="menu"],[role="listbox"]{
+    animation:none!important;
+  }
+  button,a[href],[role="button"],[class*="cursor-pointer"]{
+    transition:none!important;
+  }
+  .custom-scrollbar,.slim-scrollbar,.scroll-chain-page{scroll-behavior:auto!important}
+}
+
+/* Prevent Tailwind transition-all on interactive controls from animating layout-heavy properties. */
+button.transition-all,
+[role="button"].transition-all,
+[class*="cursor-pointer"].transition-all{
+  transition-property:transform,opacity,background-color,border-color,color!important;
+  transition-duration:120ms!important;
+  transition-timing-function:var(--oscar-motion-ease)!important;
+}

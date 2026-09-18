@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState } from 'react';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.11-notifications-popup';
-import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.11-notifications-popup';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.12-motion-120hz';
+import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.12-motion-120hz';
 import { Trash2, Plus, BookOpen, Scale, AlertTriangle, } from 'lucide-react';
 export const RestaurantWasteView = () => {
     const { recipes, wasteLogs, addRecipe, updateRecipe, deleteRecipe, logWaste, } = useRestaurant();

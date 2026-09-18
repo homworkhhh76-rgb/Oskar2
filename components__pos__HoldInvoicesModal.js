@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.11-notifications-popup';
+import { useApp } from './context__AppContext.js?v=7.9.4.12-motion-120hz';
 import { PauseCircle, Trash2, ArrowRight, X, Clock, ShoppingCart } from 'lucide-react';
 export const HoldInvoicesModal = () => {
     const { showHoldInvoicesModal, setShowHoldInvoicesModal, heldInvoices, restoreHeldInvoice, deleteHeldInvoice, settings, } = useApp();

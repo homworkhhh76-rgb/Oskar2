@@ -1,12 +1,12 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.11-notifications-popup';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.11-notifications-popup';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.11-notifications-popup';
-import { exportToCSV, printReceiptElement } from './utils__export.js?v=7.9.4.11-notifications-popup';
-import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.11-notifications-popup';
-import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.11-notifications-popup';
-import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.11-notifications-popup';
+import { useApp } from './context__AppContext.js?v=7.9.4.12-motion-120hz';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.12-motion-120hz';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.12-motion-120hz';
+import { exportToCSV, printReceiptElement } from './utils__export.js?v=7.9.4.12-motion-120hz';
+import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.12-motion-120hz';
+import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.12-motion-120hz';
+import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.12-motion-120hz';
 import { Plus, Search, FileText, DollarSign, Download, Printer, Trash2, X, Edit, Image as ImageIcon, FileSpreadsheet, } from 'lucide-react';
 export const SuppliersView = () => {
     const { suppliers, purchases, accounts, settings, saveSupplier, softDeleteSupplier, recordSupplierPayment, showToast, } = useApp();

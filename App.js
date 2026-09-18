@@ -1,37 +1,37 @@
 import React, { useEffect, useState } from 'react';
-import { AppProvider, useApp } from './context__AppContext.js?v=7.9.4.11-notifications-popup';
-import { Header } from './components__common__Header.js?v=7.9.4.11-notifications-popup';
-import { Sidebar } from './components__common__Sidebar.js?v=7.9.4.11-notifications-popup';
-import { BottomNav } from './components__common__BottomNav.js?v=7.9.4.11-notifications-popup';
-import { Toast } from './components__common__Toast.js?v=7.9.4.11-notifications-popup';
-import { SyncModal } from './components__sync__SyncModal.js?v=7.9.4.11-notifications-popup';
-import { POSView } from './components__pos__POSView.js?v=7.9.4.11-notifications-popup';
-import { DashboardView } from './components__dashboard__DashboardView.js?v=7.9.4.11-notifications-popup';
-import { SalesView } from './components__sales__SalesView.js?v=7.9.4.11-notifications-popup';
-import { PurchasesView } from './components__purchases__PurchasesView.js?v=7.9.4.11-notifications-popup';
-import { ProductsView } from './components__products__ProductsView.js?v=7.9.4.11-notifications-popup';
-import { CategoriesView } from './components__categories__CategoriesView.js?v=7.9.4.11-notifications-popup';
-import { InventoryView } from './components__inventory__InventoryView.js?v=7.9.4.11-notifications-popup';
-import { CustomersView } from './components__customers__CustomersView.js?v=7.9.4.11-notifications-popup';
-import { SuppliersView } from './components__suppliers__SuppliersView.js?v=7.9.4.11-notifications-popup';
-import { AccountsView } from './components__accounts__AccountsView.js?v=7.9.4.11-notifications-popup';
-import { ExpensesView } from './components__expenses__ExpensesView.js?v=7.9.4.11-notifications-popup';
-import { VouchersView } from './components__vouchers__VouchersView.js?v=7.9.4.11-notifications-popup';
-import { EmployeesView } from './components__employees__EmployeesView.js?v=7.9.4.11-notifications-popup';
-import { BarcodesView } from './components__barcodes__BarcodesView.js?v=7.9.4.11-notifications-popup';
-import { ReportsView } from './components__reports__ReportsView.js?v=7.9.4.11-notifications-popup';
-import { TrashView } from './components__trash__TrashView.js?v=7.9.4.11-notifications-popup';
-import { SettingsView } from './components__settings__SettingsView.js?v=7.9.4.11-notifications-popup';
-import { ThermalReceiptModal } from './components__pos__ThermalReceiptModal.js?v=7.9.4.11-notifications-popup';
-import { DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.11-notifications-popup';
-import { LoginGate } from './components__auth__LoginGate.js?v=7.9.4.11-notifications-popup';
-import { RestaurantProvider } from './restaurant__context__RestaurantContext.js?v=7.9.4.11-notifications-popup';
-import { RestaurantTablesView } from './restaurant__components__RestaurantTablesView.js?v=7.9.4.11-notifications-popup';
-import { RestaurantWaiterView } from './restaurant__components__RestaurantWaiterView.js?v=7.9.4.11-notifications-popup';
-import { RestaurantKDSView } from './restaurant__components__RestaurantKDSView.js?v=7.9.4.11-notifications-popup';
-import { RestaurantWasteView } from './restaurant__components__RestaurantWasteView.js?v=7.9.4.11-notifications-popup';
-import { RestaurantSettingsPanel } from './restaurant__components__RestaurantSettingsPanel.js?v=7.9.4.11-notifications-popup';
-import { OscarAI } from './components__ai__OscarAI.js?v=7.9.4.11-notifications-popup';
+import { AppProvider, useApp } from './context__AppContext.js?v=7.9.4.12-motion-120hz';
+import { Header } from './components__common__Header.js?v=7.9.4.12-motion-120hz';
+import { Sidebar } from './components__common__Sidebar.js?v=7.9.4.12-motion-120hz';
+import { BottomNav } from './components__common__BottomNav.js?v=7.9.4.12-motion-120hz';
+import { Toast } from './components__common__Toast.js?v=7.9.4.12-motion-120hz';
+import { SyncModal } from './components__sync__SyncModal.js?v=7.9.4.12-motion-120hz';
+import { POSView } from './components__pos__POSView.js?v=7.9.4.12-motion-120hz';
+import { DashboardView } from './components__dashboard__DashboardView.js?v=7.9.4.12-motion-120hz';
+import { SalesView } from './components__sales__SalesView.js?v=7.9.4.12-motion-120hz';
+import { PurchasesView } from './components__purchases__PurchasesView.js?v=7.9.4.12-motion-120hz';
+import { ProductsView } from './components__products__ProductsView.js?v=7.9.4.12-motion-120hz';
+import { CategoriesView } from './components__categories__CategoriesView.js?v=7.9.4.12-motion-120hz';
+import { InventoryView } from './components__inventory__InventoryView.js?v=7.9.4.12-motion-120hz';
+import { CustomersView } from './components__customers__CustomersView.js?v=7.9.4.12-motion-120hz';
+import { SuppliersView } from './components__suppliers__SuppliersView.js?v=7.9.4.12-motion-120hz';
+import { AccountsView } from './components__accounts__AccountsView.js?v=7.9.4.12-motion-120hz';
+import { ExpensesView } from './components__expenses__ExpensesView.js?v=7.9.4.12-motion-120hz';
+import { VouchersView } from './components__vouchers__VouchersView.js?v=7.9.4.12-motion-120hz';
+import { EmployeesView } from './components__employees__EmployeesView.js?v=7.9.4.12-motion-120hz';
+import { BarcodesView } from './components__barcodes__BarcodesView.js?v=7.9.4.12-motion-120hz';
+import { ReportsView } from './components__reports__ReportsView.js?v=7.9.4.12-motion-120hz';
+import { TrashView } from './components__trash__TrashView.js?v=7.9.4.12-motion-120hz';
+import { SettingsView } from './components__settings__SettingsView.js?v=7.9.4.12-motion-120hz';
+import { ThermalReceiptModal } from './components__pos__ThermalReceiptModal.js?v=7.9.4.12-motion-120hz';
+import { DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.12-motion-120hz';
+import { LoginGate } from './components__auth__LoginGate.js?v=7.9.4.12-motion-120hz';
+import { RestaurantProvider } from './restaurant__context__RestaurantContext.js?v=7.9.4.12-motion-120hz';
+import { RestaurantTablesView } from './restaurant__components__RestaurantTablesView.js?v=7.9.4.12-motion-120hz';
+import { RestaurantWaiterView } from './restaurant__components__RestaurantWaiterView.js?v=7.9.4.12-motion-120hz';
+import { RestaurantKDSView } from './restaurant__components__RestaurantKDSView.js?v=7.9.4.12-motion-120hz';
+import { RestaurantWasteView } from './restaurant__components__RestaurantWasteView.js?v=7.9.4.12-motion-120hz';
+import { RestaurantSettingsPanel } from './restaurant__components__RestaurantSettingsPanel.js?v=7.9.4.12-motion-120hz';
+import { OscarAI } from './components__ai__OscarAI.js?v=7.9.4.12-motion-120hz';
 
 const h = React.createElement;
 const ScrollScreen = ({ children }) => h('div', { className:'scroll-chain-page h-full min-h-0 overflow-y-auto custom-scrollbar mobile-safe-bottom lg:pb-0' }, children);
@@ -149,7 +149,9 @@ const MainLayout = () => {
     h(Sidebar),
     h('div', { className:'flex-1 flex flex-col min-w-0 h-full min-h-0 overflow-hidden' },
       h(Header),
-      h('main', { className:'flex-1 min-h-0 overflow-hidden relative pb-16 lg:pb-0' }, screen),
+      h('main', { className:'flex-1 min-h-0 overflow-hidden relative pb-16 lg:pb-0' },
+        h('div', { key:activeTab, className:'oscar-page-stage h-full min-h-0 w-full overflow-hidden' }, screen)
+      ),
       h(BottomNav)
     ),
     h(ThermalReceiptModal),

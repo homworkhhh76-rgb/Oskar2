@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useApp } from './context__AppContext.js?v=7.9.4.11-notifications-popup';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.11-notifications-popup';
+import { useApp } from './context__AppContext.js?v=7.9.4.12-motion-120hz';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.12-motion-120hz';
 import { Trash2, Plus, Minus, CreditCard, User, UserPlus, ChevronDown, LayoutGrid, Search, PauseCircle, Clock, ShoppingBag, X } from 'lucide-react';
 
 const h = React.createElement;

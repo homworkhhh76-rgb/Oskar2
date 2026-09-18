@@ -1,0 +1,11 @@
+Oscar Accounting POS v7.9.4.12
+
+High-refresh motion update:
+- Lightweight page entrance transitions using only transform + opacity.
+- Modal/backdrop entrance animations.
+- Fast press feedback for buttons and clickable cards.
+- Dropdown pop animation.
+- Touch optimizations and 120Hz-friendly compositor motion.
+- Reduced-motion accessibility respected.
+
+Note: the app is optimized to take advantage of 90/120Hz displays, but the actual frame rate is controlled by the device, browser/WebView, thermal state and page workload.

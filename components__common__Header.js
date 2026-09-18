@@ -1,9 +1,9 @@
 import React, { useRef, useState, useMemo } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.11-notifications-popup';
-import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.11-notifications-popup';
-import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.11-notifications-popup';
+import { useApp } from './context__AppContext.js?v=7.9.4.12-motion-120hz';
+import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.12-motion-120hz';
+import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.12-motion-120hz';
 import { Wifi, WifiOff, RefreshCw, Maximize2, Minimize2, Clock, Store, Camera, Menu, LogOut, Building2, Bell } from 'lucide-react';
-import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.11-notifications-popup';
+import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.12-motion-120hz';
 
 const h = React.createElement;
 

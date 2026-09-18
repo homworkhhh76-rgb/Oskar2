@@ -1,5 +1,5 @@
 import React from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.11-notifications-popup';
+import { useApp } from './context__AppContext.js?v=7.9.4.12-motion-120hz';
 import { Package, Layers } from 'lucide-react';
 
 const h = React.createElement;
