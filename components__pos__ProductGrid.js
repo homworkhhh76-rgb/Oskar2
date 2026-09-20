@@ -1,5 +1,5 @@
 import React from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
+import { useApp } from './context__AppContext.js?v=7.9.4.36-stock-stable-1';
 import { Package, Layers } from 'lucide-react';
 
 const h = React.createElement;

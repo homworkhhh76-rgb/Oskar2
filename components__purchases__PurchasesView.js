@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.33-waiter-mobile-centered';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.33-waiter-mobile-centered';
-import { getBrandLogoDataUrl } from './brand__logo.js?v=7.9.4.33-waiter-mobile-centered';
-import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.33-waiter-mobile-centered';
-import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.33-waiter-mobile-centered';
-import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.33-waiter-mobile-centered';
+import { useApp } from './context__AppContext.js?v=7.9.4.36-stock-stable-1';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.36-stock-stable-1';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.36-stock-stable-1';
+import { getBrandLogoDataUrl } from './brand__logo.js?v=7.9.4.36-stock-stable-1';
+import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.36-stock-stable-1';
+import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.36-stock-stable-1';
+import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.36-stock-stable-1';
 import { Plus, Trash2, Building2, Eye, X, Image as ImageIcon, FileDown, FileSpreadsheet, Printer, AlertTriangle, ReceiptText, Sparkles, ScanLine } from 'lucide-react';
 
 const h = React.createElement;
@@ -197,8 +197,8 @@ export const PurchasesView = () => {
 
   const form = h('div', { className: 'rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-sm space-y-4' },
     h('div', { className:'rounded-2xl border border-emerald-200 bg-emerald-50 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3' },
-      h('div', { className:'flex items-center gap-2' }, h('div',{className:'w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center'},h(ScanLine,{className:'w-5 h-5'})), h('div',null,h('div',{className:'text-xs font-black text-emerald-900'},'تعبئة ذكية من صورة أو نص'),h('div',{className:'text-[10px] text-emerald-700'},'ارفع صورة أو اكتب الفاتورة بالنص؛ يقرأ المورد والأصناف والوحدات والأسعار'))),
-      h('button',{type:'button',onClick:()=>setShowAIScan(true),className:'px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-black flex items-center justify-center gap-2 shadow-sm'},h(Sparkles,{className:'w-4 h-4'}),'صورة / نص / تصوير')
+      h('div', { className:'flex items-center gap-2' }, h('div',{className:'w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center'},h(ScanLine,{className:'w-5 h-5'})), h('div',null,h('div',{className:'text-xs font-black text-emerald-900'},'تعبئة ذكية من صورة الفاتورة'),h('div',{className:'text-[10px] text-emerald-700'},'ارفع صورة الفاتورة؛ يقرأ المورد والمنتج والوحدة والكمية والسعر بدقة'))),
+      h('button',{type:'button',onClick:()=>setShowAIScan(true),className:'px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-black flex items-center justify-center gap-2 shadow-sm'},h(Sparkles,{className:'w-4 h-4'}),'قراءة صورة فاتورة')
     ),
     h('div', { className: 'grid grid-cols-1 sm:grid-cols-3 gap-3' },
       h(SearchableDropdown, { id: 'purchase-supplier', label: 'المورد:', options: supplierOpts, selectedId: supplierId, onSelect: setSupplierId, onQuickAdd: () => setShowQuickSupp(true), quickAddLabel: '+ مورد جديد', icon: h(Building2, { className: 'w-4 h-4' }) }),

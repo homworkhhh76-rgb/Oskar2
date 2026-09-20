@@ -1,1 +1,1 @@
-export { useApp } from './context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
+export { useApp } from './context__AppContext.js?v=7.9.4.36-stock-stable-1';

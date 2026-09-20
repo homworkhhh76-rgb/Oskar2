@@ -64,12 +64,16 @@ export const findBestSupplier = (name, suppliers=[]) => {
   return best && best.score>=0.58 ? best : null;
 };
 
-export const findBestProduct = (name, products=[]) => {
-  if(!name) return null;
+export const findBestProduct = (name, products=[], barcode='') => {
+  const wantedBarcode=String(barcode||'').replace(/\s+/g,'').trim();
+  if(!name && !wantedBarcode) return null;
   let best=null;
   products.forEach(p=>{
+    const unitBarcodes=(p?.units||[]).flatMap(u=>[...(Array.isArray(u?.barcodes)?u.barcodes:[]),u?.barcode]).filter(Boolean).map(x=>String(x).replace(/\s+/g,''));
+    const directBarcode=wantedBarcode && unitBarcodes.includes(wantedBarcode);
     const candidates=[p?.name,p?.sku,p?.internalCode,...(p?.aliases||[])].filter(Boolean);
-    const score=Math.max(0,...candidates.map(c=>stringScore(name,c)));
+    const textScore=name ? Math.max(0,...candidates.map(c=>stringScore(name,c))) : 0;
+    const score=directBarcode ? 1 : textScore;
     if(!best||score>best.score)best={product:p,score};
   });
   return best && best.score>=0.52 ? best : null;

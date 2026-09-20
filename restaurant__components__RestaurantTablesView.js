@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import React, { useState } from 'react';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.33-waiter-mobile-centered';
-import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.36-stock-stable-1';
+import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.36-stock-stable-1';
 import { LayoutGrid, Plus, Users, Receipt, ArrowRightLeft, Merge, Sparkles, Edit2, Trash2, XCircle, CheckCircle2, Coffee, DollarSign, Utensils, FolderPlus, } from 'lucide-react';
 const STATUS_CONFIG = {
     available: {

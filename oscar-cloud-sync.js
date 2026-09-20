@@ -110,6 +110,40 @@ function realtimePaths(){
   for(const store of REALTIME_STORES){const p=pre+encodeURIComponent(store)+'/';ranges.push([p,p+'\uffff']);}
   return ranges;
 }
+function revToMs(rev){const n=Number(rev||0);return n>100000000000000?Math.floor(n/1000):n}
+function isoMs(v){const t=new Date(v||0).getTime();return Number.isFinite(t)?t:0}
+function movementKey(productId,warehouseId){return String(productId||'')+'\u0001'+String(warehouseId||'')}
+async function prepareRemoteValue(store,key,value,remoteRev,{deleted=false,latestMovementMap=null,repairs=null}={}){
+  if(!bridge)return{skip:false,value};
+  if(store==='settings'&&key==='store_config'&&value&&typeof value==='object'){
+    try{
+      const local=await bridge.getFromStore?.('settings','store_config');
+      if(local?.activeWarehouseId){
+        return{skip:false,value:{...value,activeWarehouseId:local.activeWarehouseId}};
+      }
+    }catch(_){ }
+    return{skip:false,value};
+  }
+  if(store!=='stock')return{skip:false,value};
+  let local=null;try{local=await bridge.getFromStore?.('stock',actualKey('stock',key))}catch(_){local=null}
+  if(!local)return{skip:false,value};
+  const localTs=isoMs(local.updatedAt),remotePayloadTs=isoMs(value?.updatedAt),remoteTs=remotePayloadTs||revToMs(remoteRev);
+  if(localTs&&remoteTs&&localTs>remoteTs+2){if(repairs)repairs.push(local);return{skip:true,value:local}}
+  const localQty=Number(local.baseQuantity)||0,remoteQty=deleted?0:(Number(value?.baseQuantity)||0);
+  // Legacy cloud rows had no updatedAt. A zero/delete is accepted only when the latest
+  // stock movement agrees with it; otherwise preserve the verified local balance and repair cloud.
+  if(localQty>0&&remoteQty===0&&!remotePayloadTs){
+    const latest=latestMovementMap?.get(movementKey(local.productId,local.warehouseId));
+    const latestBalance=Number(latest?.newBaseBalance);
+    if(Number.isFinite(latestBalance)){
+      if(Math.abs(latestBalance-localQty)<0.000001){if(repairs)repairs.push(local);return{skip:true,value:local}}
+      if(Math.abs(latestBalance-remoteQty)<0.000001)return{skip:false,value};
+    }else if(local.balanceVerifiedByMovement){
+      if(repairs)repairs.push(local);return{skip:true,value:local};
+    }
+  }
+  return{skip:false,value};
+}
 async function pullRealtimeSnapshot({force=false}={}){
   if(realtimePullBusy||!bridge||!tenant()||navigator.onLine===false||document.visibilityState==='hidden')return{applied:0};
   const now=Date.now();if(!force&&now-lastRealtimePull<2200)return{applied:0};lastRealtimePull=now;realtimePullBusy=true;
@@ -130,9 +164,11 @@ async function pullRealtimeSnapshot({force=false}={}){
         if(local&&Number(local.rev||0)>remoteRev)continue;
         if(!force&&Number(seen[row.path]||0)>=remoteRev)continue;
         const deleted=Number(row.deleted)===1||env?.deleted===true;
+        const rawValue=env&&Object.prototype.hasOwnProperty.call(env,'v')?env.v:env;
+        const prepared=await prepareRemoteValue(parsed.store,parsed.key,rawValue,remoteRev,{deleted});
+        if(prepared.skip){seen[row.path]=remoteRev||Date.now();continue;}
         if(deleted)await bridge.deleteFromStore(parsed.store,actualKey(parsed.store,parsed.key),false);
-        else if(env&&Object.prototype.hasOwnProperty.call(env,'v'))await bridge.putInStore(parsed.store,env.v,false);
-        else if(env!=null)await bridge.putInStore(parsed.store,env,false);
+        else if(prepared.value!=null)await bridge.putInStore(parsed.store,prepared.value,false);
         else continue;
         seen[row.path]=remoteRev||Date.now();applied++;touched.add(parsed.store);
       }
@@ -157,13 +193,62 @@ async function pushPending(){
   }
   return{uploaded,remaining:pendingCount()}
 }
-async function applyRows(rows,batch){if(!bridge)return{applied:0};await hydratePending();const pending=readPending();let applied=0;const touched=new Set();suppress=true;try{for(const row of rows){const parsed=parsePath(row.path);if(!parsed||!STORES.has(parsed.store))continue;let env=null;try{env=typeof row.payload==='string'?JSON.parse(row.payload):row.payload}catch(_){env=null}const remoteRev=Number(row.updated_at||env?.rev||0),id=pk(parsed.store,parsed.key),local=pending[id];if(local&&Number(local.rev||0)>remoteRev)continue;const deleted=Number(row.deleted)===1||env?.deleted===true;if(deleted)await bridge.deleteFromStore(parsed.store,actualKey(parsed.store,parsed.key),false);else if(env&&Object.prototype.hasOwnProperty.call(env,'v'))await bridge.putInStore(parsed.store,env.v,false);else continue;applied++;touched.add(parsed.store)}}finally{suppress=false}const m=readMeta();m.remoteBatch=Math.max(Number(m.remoteBatch||0),Number(batch||0));m.batchInitialized=true;m.lastPullAt=Date.now();writeMeta(m);if(applied){try{await bridge.onApplied?.([...touched])}catch(_){}try{window.dispatchEvent(new CustomEvent('oscar:sync-applied',{detail:{applied,stores:[...touched],remoteBatch:batch}}))}catch(_){}broadcast('synced')}return{applied,changedStores:[...touched]}}
+async function applyRows(rows,batch){
+  if(!bridge)return{applied:0};
+  await hydratePending();
+  const pending=readPending(),touched=new Set(),repairs=[];let applied=0;
+  // Apply movements before stock balances. This lets us verify whether an incoming legacy zero
+  // is backed by an actual inventory movement instead of blindly erasing a valid local balance.
+  const ordered=[...(rows||[])].sort((a,b)=>{
+    const pa=parsePath(a.path),pb=parsePath(b.path),sa=pa?.store==='stock'?1:0,sb=pb?.store==='stock'?1:0;
+    return sa-sb;
+  });
+  suppress=true;
+  try{
+    let latestMovementMap=null;
+    for(const row of ordered){
+      const parsed=parsePath(row.path);if(!parsed||!STORES.has(parsed.store))continue;
+      let env=null;try{env=typeof row.payload==='string'?JSON.parse(row.payload):row.payload}catch(_){env=null}
+      const remoteRev=Number(row.updated_at||env?.rev||0),id=pk(parsed.store,parsed.key),localPending=pending[id];
+      if(localPending&&Number(localPending.rev||0)>remoteRev)continue;
+      const deleted=Number(row.deleted)===1||env?.deleted===true;
+      const rawValue=env&&Object.prototype.hasOwnProperty.call(env,'v')?env.v:env;
+      if(parsed.store==='stock'&&!latestMovementMap){
+        latestMovementMap=new Map();
+        try{
+          const movements=await bridge.getAllFromStore('stock_movements');
+          for(const mov of movements||[]){
+            if(!mov?.productId||!mov?.warehouseId)continue;
+            const k=movementKey(mov.productId,mov.warehouseId),t=isoMs(mov.date||mov.createdAt);
+            const prev=latestMovementMap.get(k),pt=isoMs(prev?.date||prev?.createdAt);
+            if(!prev||t>=pt)latestMovementMap.set(k,mov);
+          }
+        }catch(_){latestMovementMap=new Map()}
+      }
+      const prepared=await prepareRemoteValue(parsed.store,parsed.key,rawValue,remoteRev,{deleted,latestMovementMap,repairs});
+      if(prepared.skip)continue;
+      if(deleted)await bridge.deleteFromStore(parsed.store,actualKey(parsed.store,parsed.key),false);
+      else if(prepared.value!=null)await bridge.putInStore(parsed.store,prepared.value,false);
+      else continue;
+      applied++;touched.add(parsed.store);
+    }
+  }finally{suppress=false}
+  // Repair any stale legacy cloud zero using the local balance that was verified by movements.
+  if(repairs.length){
+    const unique=new Map();for(const row of repairs)unique.set(keyString('stock',row),row);
+    for(const row of unique.values()){try{await captureStoreChange('stock',row)}catch(_){}}
+  }
+  const m=readMeta();m.remoteBatch=Math.max(Number(m.remoteBatch||0),Number(batch||0));m.batchInitialized=true;m.lastPullAt=Date.now();writeMeta(m);
+  if(applied){try{await bridge.onApplied?.([...touched])}catch(_){}try{window.dispatchEvent(new CustomEvent('oscar:sync-applied',{detail:{applied,stores:[...touched],remoteBatch:batch}}))}catch(_){}broadcast('synced')}
+  if(repairs.length)requestSync(40);
+  return{applied,changedStores:[...touched]}
+}
 async function pullChanges({force=false}={}){const s=await ensureSchema(),m=readMeta(),remote=await remoteBatch(s),last=Number(m.remoteBatch||0),pre=prefix(),hi=pre+'\uffff';if(!force&&m.batchInitialized&&remote<=last)return{applied:0,remoteBatch:remote,remoteRows:0};let r;if(!m.batchInitialized||(force&&last===0)){[r]=await s.d.pipeline(s.c,[{sql:`SELECT path,payload,deleted,updated_at,sync_batch FROM ${s.table} WHERE path>=? AND path<? ORDER BY path`,args:[pre,hi]}],60000)}else{[r]=await s.d.pipeline(s.c,[{sql:`SELECT path,payload,deleted,updated_at,sync_batch FROM ${s.table} WHERE path>=? AND path<? AND sync_batch>? ORDER BY sync_batch,path`,args:[pre,hi,last]}],60000)}const rows=s.d.rows(r);const out=await applyRows(rows,remote);if(!rows.length){m.remoteBatch=remote;m.batchInitialized=true;m.lastPullAt=Date.now();writeMeta(m)}return{...out,remoteBatch:remote,remoteRows:rows.length}}
 async function syncNow({manual=false,force=false}={}){await hydratePending().catch(()=>{});if(busy){rerunRequested=true;return{busy:true,remaining:pendingCount()}}if(!tenant())return{unavailable:true};if(navigator.onLine===false){emitStatus({state:'offline'});return{offline:true,remaining:pendingCount()}}busy=true;emitStatus({state:'syncing'});try{const pushed=pendingCount()?await pushPending():{uploaded:0,remaining:0};const pulled=await pullChanges({force:!!force});const rt=await pullRealtimeSnapshot({force:!!force});const changedStores=[...new Set([...(pulled.changedStores||[]),...(rt.changedStores||[])])];const result={...pushed,...pulled,realtimeApplied:Number(rt.applied||0),changedStores,remaining:pendingCount(),success:true};emitStatus({state:'success',lastSuccessAt:Date.now(),result});return result}catch(e){console.error('[OscarSync]',e);emitStatus({state:'error',message:String(e?.message||e)});return{error:true,message:String(e?.message||e),remaining:pendingCount()}}finally{busy=false;emitStatus();if(rerunRequested||pendingCount()){rerunRequested=false;requestSync(25)}}}
 function requestSync(delay=120){if(!tenant()||navigator.onLine===false)return;clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncNow({force:false}).catch(()=>{}),Math.max(60,delay))}
 async function checkRemote({force=false}={}){if(busy||!tenant()||navigator.onLine===false||document.visibilityState==='hidden')return;const now=Date.now();if(!force&&now-lastProbe<350)return;lastProbe=now;if(pendingCount())return syncNow({force:false});try{const s=await ensureSchema(),r=await remoteBatch(s),m=readMeta();if(!m.batchInitialized||r>Number(m.remoteBatch||0))return syncNow({force:false});return pullRealtimeSnapshot({force:!!force})}catch(e){emitStatus({state:'error',message:String(e?.message||e)})}}
 function startProbe(){if(probeTimer)return;const tick=async()=>{try{await checkRemote()}catch(_){}probeTimer=setTimeout(tick,500)};probeTimer=setTimeout(tick,80)}
-async function initialize(opts={}){bridge=opts.bridge||bridge;if(!tenant()||!bridge)return{tenant:tenant(),unavailable:true};initialized=true;await hydratePending();setupBroadcast();startProbe();emitStatus({state:'ready'});if(navigator.onLine===false)return{tenant:tenant(),offline:true,remoteRows:0,remaining:pendingCount()};const pulled=await pullChanges({force:!readMeta().batchInitialized});const rt=await pullRealtimeSnapshot({force:true});if(pendingCount())requestSync(80);return{tenant:tenant(),...pulled,realtimeApplied:Number(rt.applied||0),changedStores:[...new Set([...(pulled.changedStores||[]),...(rt.changedStores||[])])],remaining:pendingCount()}}
+async function initialize(opts={}){bridge=opts.bridge||bridge;if(!tenant()||!bridge)return{tenant:tenant(),unavailable:true};initialized=true;if(pendingHydrated){const early={...(pendingCache||{})};pendingHydrated=false;pendingCache=null;hydratePromise=null;await hydratePending();for(const[id,o]of Object.entries(early)){const cur=readPending()[id];if(!cur||Number(o.rev||0)>=Number(cur.rev||0))await persistPendingOp(id,o);}}else{await hydratePending();}setupBroadcast();startProbe();emitStatus({state:'ready'});if(navigator.onLine===false)return{tenant:tenant(),offline:true,remoteRows:0,remaining:pendingCount()};const pulled=await pullChanges({force:!readMeta().batchInitialized});const rt=await pullRealtimeSnapshot({force:true});if(pendingCount())requestSync(80);return{tenant:tenant(),...pulled,realtimeApplied:Number(rt.applied||0),changedStores:[...new Set([...(pulled.changedStores||[]),...(rt.changedStores||[])])],remaining:pendingCount()}}
 function setupBroadcast(){try{bc?.close?.();bc='BroadcastChannel'in window?new BroadcastChannel('oscar-cloud-sync-v2'):null;if(bc)bc.onmessage=e=>{const m=e.data||{};if(m.tenant!==tenant()||m.deviceId===deviceId())return;if(m.type==='local-change'||m.type==='synced')setTimeout(()=>checkRemote({force:true}),m.type==='synced'?20:120)}}catch(_){bc=null}}
 function resetForTenant(){schemaTenant='';lastProbe=0;lastRealtimePull=0;rerunRequested=false;pendingCache=null;pendingHydrated=false;hydratePromise=null;setupBroadcast();if(bridge)hydratePending().catch(()=>{});emitStatus({state:'tenant-reset'})}
 window.addEventListener('online',()=>{emitStatus({state:'online'});pendingCount()?requestSync(40):checkRemote({force:true})});

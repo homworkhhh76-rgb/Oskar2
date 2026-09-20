@@ -1,9 +1,9 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, migrateLegacyDatabaseIfNeeded, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.33-waiter-mobile-centered';
-import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.33-waiter-mobile-centered';
-import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.33-waiter-mobile-centered';
-import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.33-waiter-mobile-centered';
+import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, migrateLegacyDatabaseIfNeeded, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.36-stock-stable-1';
+import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.36-stock-stable-1';
+import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.36-stock-stable-1';
+import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.36-stock-stable-1';
 const AppContext = createContext(null);
 const recordTime = (item = {}) => {
     const fields = ['createdAt', 'date', 'timestamp', 'startTime', 'updatedAt'];
@@ -23,6 +23,50 @@ const normalizeCurrencySettings = (value) => {
     const symbol = String(value.currencySymbol || '').trim();
     if (currency === 'ILS' && symbol === '₪') return value;
     return { ...value, currency: 'ILS', currencySymbol: '₪' };
+};
+const normalizeActiveWarehouseSettings = (value, warehouseRows = []) => {
+    if (!value) return value;
+    const rows = Array.isArray(warehouseRows) ? warehouseRows.filter(Boolean) : [];
+    if (!rows.length) return value;
+    const wanted = String(value.activeWarehouseId || '');
+    if (wanted && rows.some(w => String(w.id) === wanted)) return value;
+    const fallback = rows.find(w => w?.isDefault) || rows.find(w => w?.id === 'wh-main') || rows[0];
+    return fallback?.id ? { ...value, activeWarehouseId: fallback.id } : value;
+};
+// Legacy stock rows did not carry a modification timestamp. Backfill it from the
+// latest local stock movement when possible so stale cloud balances cannot win by accident.
+const backfillLocalStockMetadata = async () => {
+    try {
+        const [rows, movements] = await Promise.all([
+            getAllFromStore('stock'),
+            getAllFromStore('stock_movements'),
+        ]);
+        if (!Array.isArray(rows) || !rows.length) return false;
+        const latest = new Map();
+        for (const mov of (movements || [])) {
+            if (!mov?.productId || !mov?.warehouseId) continue;
+            const key = `${mov.productId}\u0001${mov.warehouseId}`;
+            const time = new Date(mov.date || mov.createdAt || 0).getTime();
+            if (!Number.isFinite(time) || time <= 0) continue;
+            const prev = latest.get(key);
+            if (!prev || time > prev.time) latest.set(key, { time, mov });
+        }
+        const patched = [];
+        for (const row of rows) {
+            if (!row || row.updatedAt) continue;
+            const hit = latest.get(`${row.productId}\u0001${row.warehouseId}`);
+            if (!hit) continue;
+            const next = { ...row, updatedAt: new Date(hit.time).toISOString() };
+            const movementBalance = Number(hit.mov?.newBaseBalance);
+            const rowBalance = Number(row.baseQuantity);
+            if (Number.isFinite(movementBalance) && Number.isFinite(rowBalance) && Math.abs(movementBalance - rowBalance) < 0.000001) {
+                next.balanceVerifiedByMovement = true;
+            }
+            patched.push(next);
+        }
+        if (patched.length) await bulkPut('stock', patched, false);
+        return patched.length > 0;
+    } catch (_) { return false; }
 };
 export const AppProvider = ({ children }) => {
     const [isLoaded, setIsLoaded] = useState(false);
@@ -180,8 +224,8 @@ export const AppProvider = ({ children }) => {
                 setActiveEmployee((prev) => emps.find((e) => e.id === loginAccountId) || emps.find((e) => e.id === prev.id) || emps[0]);
             }
             if (sett) {
-                let normalizedSettings = normalizeCurrencySettings(sett);
-                let settingsChanged = normalizedSettings.currency !== sett.currency || normalizedSettings.currencySymbol !== sett.currencySymbol;
+                let normalizedSettings = normalizeActiveWarehouseSettings(normalizeCurrencySettings(sett), whs || []);
+                let settingsChanged = normalizedSettings.currency !== sett.currency || normalizedSettings.currencySymbol !== sett.currencySymbol || normalizedSettings.activeWarehouseId !== sett.activeWarehouseId;
                 // One-time migration: restaurant mode is enabled by default from v7.9.4.22 onward.
                 // After this marker is written, the user's own on/off choice is always preserved.
                 if (normalizedSettings.restaurantModeDefaultInitialized !== true) {
@@ -230,11 +274,11 @@ export const AppProvider = ({ children }) => {
         if (wanted.has('partner_statements')) jobs.push(getAllFromStore('partner_statements').then(v => setPartnerStatements(newestFirst(v))));
         if (wanted.has('vouchers')) jobs.push(getAllFromStore('vouchers').then(v => setVouchers((v || []).sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()))));
         if (wanted.has('employees')) jobs.push(getAllFromStore('employees').then(v => { if(v?.length){ setEmployees(newestFirst(v)); const loginId=window.OscarActivation?.readRuntime?.()?.account?.id; setActiveEmployee(prev => v.find(e=>e.id===loginId)||v.find(e=>e.id===prev?.id)||v[0]); } }));
-        if (wanted.has('settings')) jobs.push(getFromStore('settings','store_config').then(async v => {
+        if (wanted.has('settings')) jobs.push(Promise.all([getFromStore('settings','store_config'), getAllFromStore('warehouses')]).then(async ([v, whRows]) => {
             if (!v) return;
-            const normalizedSettings = normalizeCurrencySettings(v);
+            const normalizedSettings = normalizeActiveWarehouseSettings(normalizeCurrencySettings(v), whRows || []);
             setSettings(normalizedSettings);
-            if (normalizedSettings.currency !== v.currency || normalizedSettings.currencySymbol !== v.currencySymbol) {
+            if (normalizedSettings.currency !== v.currency || normalizedSettings.currencySymbol !== v.currencySymbol || normalizedSettings.activeWarehouseId !== v.activeWarehouseId) {
                 await putInStore('settings', { key: 'store_config', ...normalizedSettings });
             }
         }));
@@ -245,23 +289,24 @@ export const AppProvider = ({ children }) => {
     useEffect(() => {
         let isMounted = true;
         setIsCloudReady(false);
-        // Safety timeout: Never let the app hang on the loading screen
-        const safetyTimer = setTimeout(() => {
-            if (isMounted) {
-                setIsLoaded(true);
-            }
-        }, 1200);
         initializeDatabase({ deferSeed: true })
             .then(async () => {
             if (!isMounted) return;
+            // Prepare the real local stock before the application is allowed to render.
+            // This removes the brief false-zero state and gives sync reliable legacy metadata.
+            await backfillLocalStockMetadata();
             let existingSettings = await getFromStore('settings', 'store_config');
-            // Existing installations open immediately from IndexedDB. Cloud work happens after the UI is usable.
-            if (existingSettings) await reloadData();
+            // Existing installations open from the complete local IndexedDB snapshot first.
+            // The UI is released only after products + stock + settings are all loaded, never with an empty stock array.
+            if (existingSettings) {
+                await reloadData();
+                if (isMounted) setIsLoaded(true);
+            }
             let syncResult = null;
             try {
                 syncResult = await window.OscarCloudSync?.initialize?.({
                     bridge: {
-                        putInStore, deleteFromStore, getAllFromStore,
+                        putInStore, deleteFromStore, getAllFromStore, getFromStore,
                         onApplied: async (stores) => { if (isMounted) await reloadStores(stores || []); }
                     }
                 });
@@ -298,7 +343,6 @@ export const AppProvider = ({ children }) => {
             }
         })
             .finally(() => {
-            clearTimeout(safetyTimer);
             if (isMounted) {
                 setIsCloudReady(true);
                 setIsLoaded(true);
@@ -315,13 +359,11 @@ export const AppProvider = ({ children }) => {
             syncChannel.addEventListener('message', handleMessage);
             return () => {
                 isMounted = false;
-                clearTimeout(safetyTimer);
-                syncChannel.removeEventListener('message', handleMessage);
+                    syncChannel.removeEventListener('message', handleMessage);
             };
         }
         return () => {
             isMounted = false;
-            clearTimeout(safetyTimer);
         };
     }, [reloadData, reloadStores]);
     useEffect(() => {
@@ -353,21 +395,33 @@ export const AppProvider = ({ children }) => {
             window.removeEventListener('offline', handleOffline);
         };
     }, []);
+    // Keep the active warehouse valid even if an older synced settings record arrives.
+    // This is intentionally silent: inventory must never flash or stay at zero because of a stale warehouse id.
+    useEffect(() => {
+        if (!isLoaded || !warehouses.length) return;
+        const normalized = normalizeActiveWarehouseSettings(settings, warehouses);
+        if (!normalized || normalized.activeWarehouseId === settings.activeWarehouseId) return;
+        setSettings(normalized);
+        putInStore('settings', { key: 'store_config', ...normalized }).catch(() => {});
+    }, [isLoaded, warehouses, settings]);
     // Active shift
     const activeShift = useMemo(() => {
         return shifts.find((s) => s.status === 'open') || null;
     }, [shifts]);
     // Get current stock for a product in a warehouse (or all warehouses)
     const getProductStock = useCallback((productId, warehouseId) => {
-        const targetWh = warehouseId || settings.activeWarehouseId;
-        if (warehouseId) {
-            const item = stock.find((s) => s.productId === productId && s.warehouseId === targetWh);
-            return item ? item.baseQuantity : 0;
+        const requestedWh = warehouseId || settings.activeWarehouseId;
+        const targetWh = requestedWh && warehouses.some(w => String(w.id) === String(requestedWh))
+            ? requestedWh
+            : (warehouses.find(w => w?.isDefault)?.id || warehouses.find(w => w?.id === 'wh-main')?.id || warehouses[0]?.id || '');
+        if (warehouseId || targetWh) {
+            const item = stock.find((s) => s.productId === productId && String(s.warehouseId) === String(targetWh));
+            return item ? Number(item.baseQuantity) || 0 : 0;
         }
         return stock
             .filter((s) => s.productId === productId)
-            .reduce((sum, s) => sum + s.baseQuantity, 0);
-    }, [stock, settings.activeWarehouseId]);
+            .reduce((sum, s) => sum + (Number(s.baseQuantity) || 0), 0);
+    }, [stock, settings.activeWarehouseId, warehouses]);
     // Cart operations
     const addToCart = useCallback((product, unit, quantity = 1) => {
         const targetUnit = unit || product.units.find((u) => u.isDefaultSale) || product.units[0];
@@ -821,8 +875,8 @@ export const AppProvider = ({ children }) => {
         const purchaseInvoice={id:'pur-'+Date.now(),invoiceNumber,supplierInvoiceNumber:payload.supplierInvoiceNumber||'',date:purchaseDate,supplierId:payload.supplierId,supplierName:payload.supplierName,warehouseId,warehouseName:targetWarehouse.name||'صالة العرض',items:items.map((it,idx)=>({id:`pur-it-${Date.now()}-${idx}`,...it})),subtotal,discountType:payload.discountType||'fixed',discountValue:Number(payload.discountValue)||0,discountTotal,taxTotal:0,grandTotal,paidAmount,remainingAmount:remaining,paymentType:payload.paymentType,payments,notes:payload.notes||'',syncId,isSynced:false,createdAt:now};
         await putInStore('purchases',purchaseInvoice);
         const updatedProducts=products.map(p=>({...p,fifoBatches:Array.isArray(p.fifoBatches)?p.fifoBatches.map(b=>({...b})):[]})); const updatedStockList=[...stock],newMovements=[];
-        for(const item of items){const pi=updatedProducts.findIndex(p=>p.id===item.productId);const si=updatedStockList.findIndex(x=>x.productId===item.productId&&x.warehouseId===warehouseId);const currentBaseStock=si>=0?Number(updatedStockList[si].baseQuantity)||0:0;const baseQty=Math.max(0,Number(item.baseQuantity)||0);const newBaseStock=currentBaseStock+baseQty;
-          if(pi>=0){const currentCost=Number(updatedProducts[pi].costPrice)||0;const unitCost=((Number(item.unitPrice)||0)*ratio)/Math.max(0.00000001,(Number(item.conversionFactor)||1));let batches=updatedProducts[pi].fifoBatches||[];if(currentBaseStock>0&&!batches.some(b=>(b.warehouseId===warehouseId||!b.warehouseId)&&Number(b.remainingBaseQty)>0)){batches.push({id:`legacy-${item.productId}-${warehouseId}`,purchaseId:'legacy',warehouseId,receivedAt:'2000-01-01T00:00:00.000Z',expiryDate:updatedProducts[pi].expiryDate||'',unitCost:currentCost,remainingBaseQty:currentBaseStock});}batches.push({id:`batch-${purchaseInvoice.id}-${item.productId}-${Math.random().toString(36).slice(2,6)}`,purchaseId:purchaseInvoice.id,warehouseId,receivedAt:purchaseDate,expiryDate:item.expiryDate||updatedProducts[pi].expiryDate||'',unitCost,remainingBaseQty:baseQty});const oldVal=Math.max(0,currentBaseStock)*currentCost,newVal=baseQty*unitCost,totalUnits=Math.max(0,currentBaseStock)+baseQty,newWAC=totalUnits>0?(oldVal+newVal)/totalUnits:unitCost;updatedProducts[pi]={...updatedProducts[pi],costPrice:parseFloat(newWAC.toFixed(4)),fifoBatches:batches,updatedAt:now};}
+        for(const item of items){const pi=updatedProducts.findIndex(p=>p.id===item.productId);const si=updatedStockList.findIndex(x=>x.productId===item.productId&&x.warehouseId===warehouseId);const currentBaseStock=si>=0?Number(updatedStockList[si].baseQuantity)||0:0;const currentTotalBaseStock=updatedStockList.filter(x=>x.productId===item.productId).reduce((sum,row)=>sum+Math.max(0,Number(row.baseQuantity)||0),0);const baseQty=Math.max(0,Number(item.baseQuantity)||0);const newBaseStock=currentBaseStock+baseQty;
+          if(pi>=0){const currentCost=Number(updatedProducts[pi].costPrice)||0;const unitCost=((Number(item.unitPrice)||0)*ratio)/Math.max(0.00000001,(Number(item.conversionFactor)||1));let batches=updatedProducts[pi].fifoBatches||[];if(currentBaseStock>0&&!batches.some(b=>(b.warehouseId===warehouseId||!b.warehouseId)&&Number(b.remainingBaseQty)>0)){batches.push({id:`legacy-${item.productId}-${warehouseId}`,purchaseId:'legacy',warehouseId,receivedAt:'2000-01-01T00:00:00.000Z',expiryDate:updatedProducts[pi].expiryDate||'',unitCost:currentCost,remainingBaseQty:currentBaseStock});}batches.push({id:`batch-${purchaseInvoice.id}-${item.productId}-${Math.random().toString(36).slice(2,6)}`,purchaseId:purchaseInvoice.id,warehouseId,receivedAt:purchaseDate,expiryDate:item.expiryDate||updatedProducts[pi].expiryDate||'',unitCost,remainingBaseQty:baseQty});const oldVal=Math.max(0,currentTotalBaseStock)*currentCost,newVal=baseQty*unitCost,totalUnits=Math.max(0,currentTotalBaseStock)+baseQty,newWAC=totalUnits>0?(oldVal+newVal)/totalUnits:unitCost;updatedProducts[pi]={...updatedProducts[pi],costPrice:parseFloat(newWAC.toFixed(4)),fifoBatches:batches,updatedAt:now};}
           if(si>=0)updatedStockList[si]={...updatedStockList[si],baseQuantity:newBaseStock};else updatedStockList.push({productId:item.productId,warehouseId,baseQuantity:newBaseStock});
           newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:purchaseDate,productId:item.productId,productName:item.productName,warehouseId,warehouseName:targetWarehouse.name||'صالة العرض',type:'purchase',unitName:item.unitName,quantityInUnit:item.quantity,conversionFactor:item.conversionFactor,baseQuantityChange:baseQty,newBaseBalance:newBaseStock,referenceId:purchaseInvoice.id,referenceType:'PURCHASE',userId:currentUser.id,userName:currentUser.name});}
         await bulkPut('products',updatedProducts);await bulkPut('stock',updatedStockList);await bulkPut('stock_movements',newMovements);
@@ -1166,10 +1220,40 @@ export const AppProvider = ({ children }) => {
         showToast('تم حذف التصنيف', 'info');
     }, [reloadData, showToast]);
     const saveCustomer = useCallback(async (customer) => {
-        await putInStore('customers', customer);
+        const existing = customers.find((c) => c.id === customer.id);
+        const openingBalanceAmount = Math.max(0, Number(customer.openingBalanceAmount) || 0);
+        const openingBalanceSide = customer.openingBalanceSide === 'theirs' ? 'theirs' : 'ours';
+        const oldOpeningAmount = Math.max(0, Number(existing?.openingBalanceAmount) || 0);
+        const oldOpeningSide = existing?.openingBalanceSide === 'theirs' ? 'theirs' : 'ours';
+        const oldOpeningSigned = oldOpeningAmount > 0 ? (oldOpeningSide === 'ours' ? oldOpeningAmount : -oldOpeningAmount) : 0;
+        const newOpeningSigned = openingBalanceAmount > 0 ? (openingBalanceSide === 'ours' ? openingBalanceAmount : -openingBalanceAmount) : 0;
+        const currentBalance = existing ? (Number(existing.balance) || 0) : (Number(customer.balance) || 0);
+        const nextBalance = currentBalance - oldOpeningSigned + newOpeningSigned;
+        const nextCustomer = { ...customer, openingBalanceAmount, openingBalanceSide, balance: nextBalance };
+        await putInStore('customers', nextCustomer);
+        const openingStatementId = `stmt-opening-customer-${customer.id}`;
+        if (openingBalanceAmount > 0) {
+            await putInStore('partner_statements', {
+                id: openingStatementId,
+                partnerType: 'customer',
+                partnerId: customer.id,
+                partnerName: customer.name,
+                date: customer.createdAt || new Date().toISOString(),
+                type: 'opening',
+                referenceType: 'OPENING_BALANCE',
+                referenceId: customer.id,
+                referenceNumber: 'OPENING',
+                description: `رصيد افتتاحي للعميل - ${openingBalanceSide === 'ours' ? 'لنا' : 'علينا'}`,
+                debit: newOpeningSigned > 0 ? openingBalanceAmount : 0,
+                credit: newOpeningSigned < 0 ? openingBalanceAmount : 0,
+                runningBalance: newOpeningSigned,
+            });
+        } else if (oldOpeningAmount > 0) {
+            await deleteFromStore('partner_statements', openingStatementId);
+        }
         await reloadData();
         showToast(`تم حفظ العميل: ${customer.name}`, 'success');
-    }, [reloadData, showToast]);
+    }, [customers, reloadData, showToast]);
     const deleteCustomer = useCallback(async (customerId) => {
         const cust = customers.find((c) => c.id === customerId);
         if (cust) {
@@ -1188,10 +1272,41 @@ export const AppProvider = ({ children }) => {
         showToast(`تم استرجاع العميل «${cust.name}»`, 'success');
     }, [customers, reloadData, showToast]);
     const saveSupplier = useCallback(async (supplier) => {
-        await putInStore('suppliers', supplier);
+        const existing = suppliers.find((s) => s.id === supplier.id);
+        const openingBalanceAmount = Math.max(0, Number(supplier.openingBalanceAmount) || 0);
+        const openingBalanceSide = supplier.openingBalanceSide === 'ours' ? 'ours' : 'theirs';
+        const oldOpeningAmount = Math.max(0, Number(existing?.openingBalanceAmount) || 0);
+        const oldOpeningSide = existing?.openingBalanceSide === 'ours' ? 'ours' : 'theirs';
+        // Supplier balance convention: positive = علينا للمورد, negative = لنا عند المورد.
+        const oldOpeningSigned = oldOpeningAmount > 0 ? (oldOpeningSide === 'theirs' ? oldOpeningAmount : -oldOpeningAmount) : 0;
+        const newOpeningSigned = openingBalanceAmount > 0 ? (openingBalanceSide === 'theirs' ? openingBalanceAmount : -openingBalanceAmount) : 0;
+        const currentBalance = existing ? (Number(existing.balance) || 0) : (Number(supplier.balance) || 0);
+        const nextBalance = currentBalance - oldOpeningSigned + newOpeningSigned;
+        const nextSupplier = { ...supplier, openingBalanceAmount, openingBalanceSide, balance: nextBalance };
+        await putInStore('suppliers', nextSupplier);
+        const openingStatementId = `stmt-opening-supplier-${supplier.id}`;
+        if (openingBalanceAmount > 0) {
+            await putInStore('partner_statements', {
+                id: openingStatementId,
+                partnerType: 'supplier',
+                partnerId: supplier.id,
+                partnerName: supplier.name,
+                date: supplier.createdAt || new Date().toISOString(),
+                type: 'opening',
+                referenceType: 'OPENING_BALANCE',
+                referenceId: supplier.id,
+                referenceNumber: 'OPENING',
+                description: `رصيد افتتاحي للمورد - ${openingBalanceSide === 'ours' ? 'لنا' : 'علينا'}`,
+                debit: newOpeningSigned < 0 ? openingBalanceAmount : 0,
+                credit: newOpeningSigned > 0 ? openingBalanceAmount : 0,
+                runningBalance: newOpeningSigned,
+            });
+        } else if (oldOpeningAmount > 0) {
+            await deleteFromStore('partner_statements', openingStatementId);
+        }
         await reloadData();
         showToast(`تم حفظ المورد: ${supplier.name}`, 'success');
-    }, [reloadData, showToast]);
+    }, [suppliers, reloadData, showToast]);
     const deleteSupplier = useCallback(async (supplierId) => {
         const supp = suppliers.find((s) => s.id === supplierId);
         if (supp) {

@@ -45,14 +45,14 @@ const actionTypes = [
 
 const assistantSystem = `أنت "أوسكار AI" داخل نظام أوسكار المحاسبي. هذه المحادثة مخصصة فقط لست فئات: إضافة صنف أو مجموعة أصناف، إضافة فاتورة مشتريات، إضافة عميل، سند قبض أو سند صرف، التقارير والتحليل، والمرتجعات. لا تنفذ أي نوع آخر من المهام ولا تقدم دعماً فنياً أو شرحاً لاستخدام البرنامج.
 
-افهم العربية واللهجات والأرقام العربية والإنجليزية. استخدم أقل كلمات ممكنة ولا تخترع بيانات. يمكن أن تستقبل نصاً مكتوباً أو صوراً أو PDF أو ملف Excel تم تحويل محتواه إلى نص منظم.
+افهم العربية واللهجات والأرقام العربية والإنجليزية. استخدم أقل كلمات ممكنة ولا تخترع بيانات. يمكن أن تستقبل نصاً مكتوباً أو صوراً، والمرفقات المدعومة صور فقط.
 
 قواعد التنفيذ:
 1) التنفيذ مباشر من أول رسالة بدون نعم/تأكيد/تابع. لا يوجد تراجع من المحادثة.
 2) لا تسأل عن أي حقل اختياري. استخدم "-" للنص الاختياري غير المذكور و0 للأرقام الاختيارية عند الحاجة. اسأل فقط عن معلومة إجبارية لا يمكن تنفيذ العملية بدونها.
-3) إضافة الصنف: الاسم فقط إلزامي. إذا لم توجد وحدات استخدم وحدة حبة بعامل 1. افهم شجرة الوحدات مثل: "الكرتونة فيها 24 حبة" => units=[{name:"حبة",factor:1},{name:"كرتونة",factor:24}]. افهم المخزون الافتتاحي بأي وحدة مثل "10 كراتين و12 حبة" => openingStock=[{unitName:"كرتونة",quantity:10},{unitName:"حبة",quantity:12}]. الأسعار والباركود والتصنيف والحد الأدنى اختيارية ولا تسأل عنها. إذا كان المرفق Excel وفيه جدول أصناف، أنشئ create_product لكل صف صالح يحمل اسم صنف، وتجاهل الصفوف الفارغة والعناوين. لا تعد إنشاء صنف موجود في catalog بنفس الاسم أو SKU. إذا أُرفق Excel بدون نص وكان واضحاً أنه قائمة أصناف فاعتبر المطلوب إضافة الأصناف. لا تضع الحقول الاختيارية غير الموجودة في الملف لتقليل حجم JSON.
+3) إضافة الصنف: الاسم فقط إلزامي. إذا لم توجد وحدات استخدم وحدة حبة بعامل 1. افهم شجرة الوحدات مثل: "الكرتونة فيها 24 حبة" => units=[{name:"حبة",factor:1},{name:"كرتونة",factor:24}]. افهم المخزون الافتتاحي بأي وحدة مثل "10 كراتين و12 حبة" => openingStock=[{unitName:"كرتونة",quantity:10},{unitName:"حبة",quantity:12}]. الأسعار والباركود والتصنيف والحد الأدنى اختيارية ولا تسأل عنها. إذا كانت الصورة تحتوي قائمة أصناف واضحة فاقرأ الأسماء والوحدات والباركود الظاهر فقط، ولا تعد إنشاء صنف موجود في catalog بنفس الاسم أو SKU. لا تضع الحقول الاختيارية غير الموجودة لتقليل حجم JSON.
 4) إضافة العميل: الاسم فقط إلزامي، واحفظ الاسم كاملاً كما كتبه المستخدم. مثال "ضيف عميل انور الندا" => name="انور الندا". الهاتف والعنوان والملاحظات غير إلزامية ولا تسأل عنها.
-5) فاتورة المشتريات: المورد والبنود ضروريان. المخزن غير المذكور = الافتراضي. paidAmount غير المذكور = 0 (دين). رقم فاتورة المورد والتاريخ والملاحظات اختيارية. افهم الصورة أو PDF أو Excel أو النص المرفق، وطابق الأصناف والوحدات الموجودة. إذا كان الصنف غير موجود لا تنشئه ضمن فاتورة المشتريات تلقائياً؛ أبلغ أن الصنف يحتاج إضافته كصنف مستقل.
+5) فاتورة المشتريات: المورد والبنود ضروريان. المخزن غير المذكور = الافتراضي. paidAmount غير المذكور = 0 (دين). رقم فاتورة المورد والتاريخ والملاحظات اختيارية. عند وجود صورة فاتورة اقرأ الصفوف بصرياً بدقة: اسم المنتج، الوحدة، الكمية، سعر الوحدة، وإجمالي السطر، ثم طابقها مع catalog. لا تخلط بين سعر الوحدة وإجمالي السطر. إذا ظهر الاثنان استخدم عنوان العمود وموقع الرقم. إذا ظهر واحد فقط فلا تخترع الثاني إلا إذا أمكن حسابه حساباً مؤكداً من الكمية والإجمالي. إذا كان الصنف غير موجود لا تنشئه ضمن الفاتورة تلقائياً؛ أبلغ أنه يحتاج إضافته كصنف مستقل.
 6) سند القبض/الصرف: المبلغ ضروري. إذا الحساب غير مذكور استخدم الحساب الافتراضي، وإن لم يوجد افتراضي ويوجد حساب واحد استخدمه. الطرف اختياري ويمكن أن يكون customer/supplier/other. النوع receipt للقبض وpayment للصرف.
 7) المرتجع: المقصود مرتجع مبيعات. طابق فاتورة البيع الأصلية والأصناف والكميات ولا تتجاوز الكمية المباعة. إذا العميل مسجل ولم يذكر طريقة الرد استخدم customer_balance، وإذا نقدي استخدم account والحساب الافتراضي.
 8) التقارير: لا تنشئ action لمجرد سؤال المستخدم عن رقم أو تحليل. أجب من بيانات النظام الحالية. "الربح" يعني reportMetrics.*.netProfit من نفس منطق تقرير الأرباح، وليس المبيعات. استخدم analytics للأكثر مبيعاً والناقص والراكد وforecast للتوقعات. إذا طلب المستخدم تصدير بيانات/تقرير، استخدم export_data فقط.
@@ -72,13 +72,26 @@ export_data: {dataset:"sales"|"purchases"|"products"|"inventory"|"customers"|"su
 
 أرجع JSON فقط بلا Markdown:
 {"answer":"رد عربي قصير جداً أو السؤال الضروري فقط","needs_confirmation":false,"missing_fields":[],"action":null,"actions":[]}
-إذا كانت عملية واحدة ضعها في action. إذا كان ملف Excel يحتوي عدة أصناف ضع كل صنف في actions. للتقارير التحليلية action=null والجواب في answer.`;
+إذا كانت عملية واحدة ضعها في action. إذا كانت صورة واضحة تحتوي عدة أصناف مطلوب إضافتها، ضع كل صنف في actions. للتقارير التحليلية action=null والجواب في answer.`;
 
-const scanSystem = `أنت محرك قراءة فاتورة مشتريات داخل أوسكار المحاسبي. قد تستقبل صوراً أو PDF أو Excel محولاً إلى نص منظم أو نصاً مكتوباً أو أكثر من نوع معاً.
-استخرج المورد ورقم الفاتورة والتاريخ والعملة والخصم والمدفوع وكل البنود. لا تخترع رقماً غير ظاهر/مذكور.
-افهم الوحدات المتكافئة لغوياً: حبة/قطعة/pcs، كرتونة/carton/box، باكيت/pack، مشطاح/طبلية/pallet، كيلو/kg، غرام/g، لتر/l، مل/ml، دزينة/dozen، كيس/bag.
-قد تكون عدة صور أو صفحات PDF أو أوراق Excel؛ اجمعها وتجنب تكرار البنود المتداخلة. إذا النص يضيف المورد أو المدفوع فادمجه مع المرفقات.
-أرجع JSON فقط:
+const scanSystem = `أنت محرك رؤية متخصص لقراءة صور فواتير المشتريات داخل أوسكار المحاسبي. المرفقات صور فقط، وقد تكون الفاتورة مطبوعة أو مكتوبة بخط اليد أو موزعة على عدة صور.
+
+اقرأ الصورة بصرياً وليس بالتخمين. افحص كامل الورقة من أعلى لأسفل ومن اليمين لليسار، وحدد عناوين الأعمدة ومواقع الأرقام قبل استخراج أي صف.
+
+استخرج عند ظهوره: المورد، الهاتف، الرقم الضريبي، رقم الفاتورة، التاريخ، العملة، الإجمالي قبل الخصم، الخصم، الإجمالي النهائي، المدفوع، ثم كل بند.
+لكل بند استخرج بدقة: name اسم المنتج كما يظهر، barcode إن كان واضحاً، unit الوحدة، quantity الكمية، unitPrice سعر الوحدة، total إجمالي السطر.
+
+قواعد مهمة جداً:
+1) لا تخترع أي اسم أو رقم غير ظاهر. إذا لم تتأكد اترك النص فارغاً أو الرقم 0 وأضف تحذيراً.
+2) ميّز بين الكمية وسعر الوحدة وإجمالي السطر بالاعتماد على عنوان العمود، موضع الرقم، وتسلسل الصف.
+3) إذا كان total واضحاً وquantity وunitPrice واضحين، تحقق أن quantity × unitPrice قريب من total. إذا لم يتطابق فلا تعدل الأرقام من عندك؛ اخفض confidence وأضف warning.
+4) إذا كانت الوحدة مكتوبة بجانب الصنف مثل "كرتونة" أو "حبة" أو "علبة" فاحفظها كما ظهرت. افهم المرادفات: حبة/قطعة/pcs، كرتونة/carton/box، باكيت/pack، مشطاح/طبلية/pallet، كيلو/kg، غرام/g، لتر/l، مل/ml، دزينة/dozen، كيس/bag، علبة/can/jar.
+5) الأرقام العربية ٠١٢٣٤٥٦٧٨٩ والهندية ۰۱۲۳۴۵۶۷۸۹ حوّلها لأرقام عادية داخل JSON.
+6) لو هناك أكثر من صورة لنفس الفاتورة، ادمج الصفوف بالترتيب وتجنب تكرار الصفوف المتداخلة بين صورتين.
+7) لا تستخدم قائمة الأصناف المرسلة لك لاختراع نص غير واضح؛ استخدمها فقط للمساعدة في المطابقة بعد أن تقرأ ما هو ظاهر في الصورة.
+8) confidence لكل بند من 0 إلى 1 ويعكس وضوح قراءة الاسم والوحدة والكمية والسعر معاً.
+
+أرجع JSON فقط بلا Markdown وبنفس الشكل تماماً:
 {"supplier":{"name":"","phone":"","taxNumber":""},"invoiceNumber":"","date":null,"currency":"","subtotal":0,"discount":0,"grandTotal":0,"paidAmount":null,"items":[{"name":"","barcode":"","unit":"","quantity":1,"unitPrice":0,"total":0,"confidence":0}],"confidence":0,"warnings":[]}`;
 
 const normText = (v='') => String(v).toLowerCase().replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[^a-z0-9\u0600-\u06ff]+/g,' ').replace(/\s+/g,' ').trim();
@@ -185,54 +198,35 @@ const withTimeout = async (ms, fn) => {
   const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),ms);
   try{return await fn(controller.signal);}catch(err){if(err?.name==='AbortError')throw new Error('انتهت مهلة اتصال الذكاء الاصطناعي. حاول مرة أخرى.');throw err;}finally{clearTimeout(timer);}
 };
-const isExcelFile = (file) => {
-  const type=String(file?.type||'').toLowerCase();
-  const name=String(file?.name||'').toLowerCase();
-  return type==='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || type==='application/vnd.ms-excel' || /\.(xlsx|xls)$/i.test(name);
+const isImageFile = (file) => {
+  const type=String(file?.type || '').toLowerCase();
+  const name=String(file?.name || '').toLowerCase();
+  return type.startsWith('image/') || /\.(?:jpe?g|png|webp|gif|bmp)$/i.test(name);
 };
-
-const excelFileToText = async (file) => {
-  let XLSX;
-  try { XLSX = await import('xlsx'); }
-  catch { throw new Error('تعذر تحميل قارئ Excel. تأكد من اتصال الإنترنت ثم حاول مرة أخرى.'); }
-  const buffer=await file.arrayBuffer();
-  let workbook;
-  try { workbook=XLSX.read(buffer,{type:'array',cellDates:true,raw:false}); }
-  catch { throw new Error(`تعذر قراءة ملف Excel: ${String(file?.name||'الملف')}`); }
-  const chunks=[`[ملف Excel: ${String(file?.name||'Excel')}]`];
-  let chars=chunks[0].length, totalRows=0;
-  for(const sheetName of (workbook.SheetNames||[]).slice(0,8)){
-    const sheet=workbook.Sheets?.[sheetName]; if(!sheet)continue;
-    const rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false,blankrows:false});
-    if(!rows.length)continue;
-    chunks.push(`\n[ورقة: ${sheetName}]`); chars+=sheetName.length+12;
-    for(const row of rows.slice(0,250)){
-      const values=(Array.isArray(row)?row:[]).map(v=>String(v??'').replace(/[\t\r\n]+/g,' ').trim());
-      if(!values.some(Boolean))continue;
-      const line=values.join('\t').slice(0,2500);
-      if(chars+line.length>70000 || totalRows>=600){chunks.push('[تم اختصار بقية الصفوف لتقليل حجم الطلب]');return chunks.join('\n');}
-      chunks.push(line); chars+=line.length+1; totalRows++;
-    }
+const imageMimeFromName = (name='') => {
+  const n=String(name||'').toLowerCase();
+  if(/\.png$/i.test(n))return 'image/png';
+  if(/\.webp$/i.test(n))return 'image/webp';
+  if(/\.gif$/i.test(n))return 'image/gif';
+  if(/\.bmp$/i.test(n))return 'image/bmp';
+  return 'image/jpeg';
+};
+const fileToImageDataUrl = async (file) => {
+  let url=await fileToDataUrl(file);
+  if(!/^data:image\//i.test(url) && /;base64,/i.test(url)){
+    url=url.replace(/^data:[^;]*;base64,/i,`data:${imageMimeFromName(file?.name)};base64,`);
   }
-  return chunks.join('\n');
+  return url;
 };
 
 const fileParts = async (files=[]) => {
-  const usable=(Array.isArray(files)?files:[]).slice(0,6).filter(f=>{
-    const type=String(f?.type||'').toLowerCase(); const name=String(f?.name||'').toLowerCase();
-    return !!f && (type.startsWith('image/') || type==='application/pdf' || name.endsWith('.pdf') || isExcelFile(f));
-  });
+  const incoming=Array.isArray(files)?files:[];
+  const usable=incoming.slice(0,8).filter(isImageFile);
+  if(incoming.length && !usable.length) throw new Error('المرفقات المدعومة في Oscar AI هي الصور فقط.');
   const parts=[];
   for(const f of usable){
-    if(isExcelFile(f)){
-      const text=await excelFileToText(f);
-      parts.push({type:'text',text});
-      continue;
-    }
-    const url=await fileToDataUrl(f);
-    const isPdf=String(f?.type||'').toLowerCase()==='application/pdf'||/\.pdf$/i.test(String(f?.name||''));
-    if(isPdf)parts.push({type:'file',file:{filename:String(f.name||'document.pdf'),file_data:url}});
-    else parts.push({type:'image_url',image_url:{url}});
+    const url=await fileToImageDataUrl(f);
+    parts.push({type:'image_url',image_url:{url,detail:'high'}});
   }
   return parts;
 };
@@ -243,10 +237,9 @@ export const askOscar = async ({ message, history=[], context={}, files=[] }={})
   const media=await fileParts(files);
   const compactContext=compactContextForQuery(context||{},q,media.length>0);
   const contextText=JSON.stringify(compactContext).slice(0,110000);
-  const userContent=media.length?[{type:'text',text:q||'نفذ المطلوب من الملف المرفق حسب بيانات النظام.'},...media]:q;
+  const userContent=media.length?[{type:'text',text:q||'حلل الصورة المرفقة. إذا كانت فاتورة مشتريات فاقرأ المورد وكل صف: المنتج والوحدة والكمية وسعر الوحدة، ثم أنشئ create_purchase مع مطابقة الأصناف والوحدات الموجودة في بيانات النظام. لا تخترع أي رقم غير واضح.'},...media]:q;
   const messages=[{role:'system',content:assistantSystem},{role:'system',content:`بيانات النظام الحالية (JSON):\n${contextText}`},...cleanHistory,{role:'user',content:userContent}];
-  const hasExcel=(Array.isArray(files)?files:[]).some(isExcelFile);
-  const out=await openRouterCall(messages,{temperature:0.05,max_tokens:hasExcel?6500:2200,signal});
+  const out=await openRouterCall(messages,{temperature:0.04,max_tokens:3200,signal});
   const parsed=parseJsonLoose(out.text);
   if(parsed){
     let actions=Array.isArray(parsed.actions)?parsed.actions.filter(Boolean):[];
@@ -266,16 +259,36 @@ export const askOscar = async ({ message, history=[], context={}, files=[] }={})
   return {answer:out.text||'لم يصل رد.',action:null,actions:[],needs_confirmation:false,missing_fields:[],model:out.model};
 });
 
-export const scanPurchaseInvoice = async ({ files=[], text='', catalog={} }={}) => {
-  if(!files.length&&!String(text||'').trim())throw new Error('أرفق صورة أو PDF أو Excel للفاتورة أو اكتب بيانات الفاتورة');
-  const attachments=await fileParts(files);
+export const scanPurchaseInvoice = async ({ files=[], catalog={} }={}) => {
+  const imageFiles=(Array.isArray(files)?files:[]).filter(isImageFile).slice(0,8);
+  if(!imageFiles.length)throw new Error('أرفق صورة فاتورة واضحة. يدعم هذا الاستيراد الصور فقط.');
+  const attachments=await fileParts(imageFiles);
   return withTimeout(120000, async signal => {
     const supplierNames=(catalog.suppliers||[]).slice(0,250).map(x=>x?.name).filter(Boolean);
-    const productList=(catalog.products||[]).slice(0,700).map(p=>({name:p?.name,sku:p?.sku,units:(p?.units||[]).map(u=>u?.name).filter(Boolean)}));
-    const prompt=`اقرأ/حلل فاتورة المشتريات.\nنص المستخدم الإضافي: ${String(text||'').slice(0,6000)||'(لا يوجد)'}\nالموردون الموجودون للمساعدة في المطابقة: ${JSON.stringify(supplierNames)}\nالأصناف والوحدات الموجودة للمساعدة فقط: ${JSON.stringify(productList)}`;
-    const content=attachments.length?[{type:'text',text:prompt},...attachments]:prompt;
-    const out=await openRouterCall([{role:'system',content:scanSystem},{role:'user',content}],{temperature:0.03,max_tokens:3000,signal});
-    const parsed=parseJsonLoose(out.text); if(!parsed)throw new Error('تعذر تفسير نتيجة قراءة الفاتورة. حاول بملف أو نص أوضح.');
+    const productList=(catalog.products||[]).slice(0,700).map(p=>({
+      name:p?.name,
+      sku:p?.sku,
+      units:(p?.units||[]).map(u=>({name:u?.name,barcodes:(u?.barcodes||[]).slice(0,6)}))
+    }));
+    const prompt=`هذه ${imageFiles.length>1?'عدة صور لنفس فاتورة المشتريات أو صفحات متتابعة':'صورة فاتورة مشتريات'}. اقرأها بدقة عالية وصفاً صفاً.
+الموردون الموجودون للمساعدة في المطابقة فقط: ${JSON.stringify(supplierNames)}
+الأصناف والوحدات والباركود الموجودة للمساعدة في المطابقة فقط: ${JSON.stringify(productList)}
+أولوية القراءة: اسم المنتج ← الوحدة ← الكمية ← سعر الوحدة ← إجمالي السطر. لا تخلط سعر الوحدة بإجمالي السطر، ولا تستبدل النص المرئي باسم من القائمة إلا عند تطابق واضح.`;
+    const content=[{type:'text',text:prompt},...attachments];
+    const out=await openRouterCall([{role:'system',content:scanSystem},{role:'user',content}],{temperature:0,max_tokens:4200,signal});
+    const parsed=parseJsonLoose(out.text);
+    if(!parsed)throw new Error('لم أستطع استخراج جدول الفاتورة من الصورة. صوّر الورقة كاملة وبوضوح ثم حاول مرة أخرى.');
+    if(!Array.isArray(parsed.items))parsed.items=[];
+    parsed.items=parsed.items.filter(item=>safe(item?.name)||Number(item?.quantity)>0||Number(item?.unitPrice)>0||Number(item?.total)>0).map(item=>({
+      name:safe(item?.name),
+      barcode:safe(item?.barcode),
+      unit:safe(item?.unit),
+      quantity:Number(item?.quantity)||1,
+      unitPrice:Number(item?.unitPrice)||0,
+      total:Number(item?.total)||0,
+      confidence:Math.max(0,Math.min(1,Number(item?.confidence)||0))
+    }));
+    if(!parsed.items.length)throw new Error('لم تظهر أصناف قابلة للقراءة في الصورة. قرّب الكاميرا من جدول الأصناف وأعد التصوير.');
     return {result:parsed,model:out.model};
   });
 };

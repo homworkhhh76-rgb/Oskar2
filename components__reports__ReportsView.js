@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
-import { exportToCSV } from './utils__export.js?v=7.9.4.33-waiter-mobile-centered';
+import { useApp } from './context__AppContext.js?v=7.9.4.36-stock-stable-1';
+import { exportToCSV } from './utils__export.js?v=7.9.4.36-stock-stable-1';
 import { Download, Package, } from 'lucide-react';
 export const ReportsView = () => {
     const { invoices, expenses, products, customers, suppliers, settings, getProductStock, } = useApp();

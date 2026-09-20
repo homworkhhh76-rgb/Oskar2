@@ -1,4 +1,4 @@
-import { renderElementTableCanvas, resolveExportElement } from './utils__canvasRenderer.js?v=7.9.4.33-waiter-mobile-centered';
+import { renderElementTableCanvas, resolveExportElement } from './utils__canvasRenderer.js?v=7.9.4.36-stock-stable-1';
 
 const safe=v=>String(v||'export').replace(/[\\/:*?"<>|]+/g,'-').trim()||'export';
 const withExt=(name,ext)=>safe(name).toLowerCase().endsWith(ext)?safe(name):safe(name)+ext;

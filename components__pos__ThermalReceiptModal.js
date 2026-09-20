@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
-import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.33-waiter-mobile-centered';
-import { downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel, warmProfessionalExportLibraries } from './utils__professionalExport.js?v=7.9.4.33-waiter-mobile-centered';
-import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.33-waiter-mobile-centered';
-import { Printer, X, Download, Image as ImageIcon, FileSpreadsheet } from 'lucide-react';
+import { useApp } from './context__AppContext.js?v=7.9.4.36-stock-stable-1';
+import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.36-stock-stable-1';
+import { downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel, warmProfessionalExportLibraries } from './utils__professionalExport.js?v=7.9.4.36-stock-stable-1';
+import { renderInvoiceCanvas } from './utils__canvasRenderer.js?v=7.9.4.36-stock-stable-1';
+import { smartPrinter } from './services__printer.js?v=7.9.4.36-stock-stable-1';
+import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-stock-stable-1';
+import { Printer, X, Download, Image as ImageIcon, FileSpreadsheet, Bluetooth } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 
 const h = React.createElement;
@@ -14,12 +16,16 @@ function money(value) {
 }
 
 export const ThermalReceiptModal = () => {
-    const { showThermalModal, setShowThermalModal, settings } = useApp();
+    const { showThermalModal, setShowThermalModal, settings, showToast } = useApp();
     const [paperWidth, setPaperWidth] = useState(settings.printerWidth || '80mm');
     const barcodeRef = useRef(null);
     const receiptContainerRef = useRef(null);
     const [isExporting, setIsExporting] = useState(false);
+    const [printerState, setPrinterState] = useState(() => smartPrinter.getState());
     const logoSrc = getBrandLogoDataUrl(settings);
+
+    useEffect(() => smartPrinter.subscribe(setPrinterState), []);
+    useEffect(() => { smartPrinter.autoReconnect().catch(() => {}); }, []);
 
     useEffect(() => {
         if (!showThermalModal) return;
@@ -58,6 +64,24 @@ export const ThermalReceiptModal = () => {
         const source = receiptContainerRef.current;
         if (!source) return;
         await printElementOnly(source, paperWidth, `فاتورة ${invoice.invoiceNumber}`);
+    };
+
+    const handleBluetoothPrint = async () => {
+        if (!printerState.connected) {
+            showToast('اربط طابعة Bluetooth / Serial من الإعدادات أولاً.', 'warning');
+            return;
+        }
+        if (isExporting) return;
+        setIsExporting(true);
+        try {
+            const canvas = await renderInvoiceCanvas(invoice, { ...settings, printerWidth: paperWidth }, { paperWidth });
+            await smartPrinter.printCanvas(canvas, { paperWidth: paperWidth === '58mm' ? '58mm' : '80mm' });
+            showToast(`تم إرسال الفاتورة إلى ${printerState.name || 'الطابعة'}`, 'success');
+        } catch (err) {
+            showToast(err?.message || 'فشل إرسال الفاتورة إلى الطابعة', 'error');
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     const withExporting = async (action) => {
@@ -121,6 +145,9 @@ export const ThermalReceiptModal = () => {
                 exportButton('btn-download-receipt-excel', handleDownloadExcel, FileSpreadsheet, 'Excel احترافي', 'text-emerald-600', 'تنزيل الفاتورة كملف Excel احترافي'),
                 exportButton('btn-download-receipt-pdf', handleDownloadPDF, Download, 'PDF احترافي', 'text-rose-600', 'تنزيل الفاتورة كملف PDF احترافي'),
                 exportButton('btn-download-receipt-image', handleDownloadImage, ImageIcon, 'صورة', 'text-blue-600', 'تنزيل الفاتورة كصورة'),
+                h('button', { id: 'btn-bluetooth-print', onClick: handleBluetoothPrint, disabled: isExporting, className: `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-bold shadow-xs transition disabled:opacity-50 ${printerState.connected ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-500 hover:bg-slate-600'}`, title: printerState.connected ? `متصل: ${printerState.name || 'طابعة'}` : 'اربط الطابعة من الإعدادات' },
+                    h(Bluetooth, { className: 'w-4 h-4' }), h('span', { className: 'hidden sm:inline' }, printerState.connected ? 'طباعة Bluetooth' : 'ربط الطابعة')
+                ),
                 h('button', { id: 'btn-trigger-print', onClick: handlePrint, className: 'flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition' },
                     h(Printer, { className: 'w-4 h-4' }), h('span', null, 'طباعة الفاتورة فقط')
                 ),

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { X, ScanLine, Upload, AlertTriangle, CheckCircle2, LoaderCircle, Sparkles, FileText, FileSpreadsheet } from 'lucide-react';
-import { useApp } from './context__AppContext.js?v=7.9.4.33-waiter-mobile-centered';
-import { scanPurchaseInvoice } from './services__ai.js?v=7.9.4.33-waiter-mobile-centered';
-import { findBestSupplier, findBestProduct, findBestUnit } from './utils__aiMatching.js?v=7.9.4.33-waiter-mobile-centered';
+import { X, ScanLine, Upload, AlertTriangle, CheckCircle2, LoaderCircle, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { useApp } from './context__AppContext.js?v=7.9.4.36-stock-stable-1';
+import { scanPurchaseInvoice } from './services__ai.js?v=7.9.4.36-stock-stable-1';
+import { findBestSupplier, findBestProduct, findBestUnit } from './utils__aiMatching.js?v=7.9.4.36-stock-stable-1';
 
 const h = React.createElement;
 const n = (v) => Number(v || 0) || 0;
@@ -14,7 +14,6 @@ export const PurchaseAIScanModal = ({ open, onClose, onApply }) => {
   const suppliers = (app.suppliers || []).filter(Boolean);
   const [files, setFiles] = useState([]);
   const [previews, setPreviews] = useState([]);
-  const [sourceText, setSourceText] = useState('');
   const [busy, setBusy] = useState(false);
   const [raw, setRaw] = useState(null);
   const [supplierMatch, setSupplierMatch] = useState('');
@@ -25,7 +24,6 @@ export const PurchaseAIScanModal = ({ open, onClose, onApply }) => {
     if (!open) {
       setFiles([]);
       setPreviews([]);
-      setSourceText('');
       setBusy(false);
       setRaw(null);
       setSupplierMatch('');
@@ -35,9 +33,9 @@ export const PurchaseAIScanModal = ({ open, onClose, onApply }) => {
   }, [open]);
 
   useEffect(() => {
-    const rows = files.map((file) => { const name=String(file?.name||''); const isPdf=/application\/pdf/i.test(file?.type||'')||/\.pdf$/i.test(name); const isExcel=/\.(xlsx|xls)$/i.test(name)||/spreadsheet|ms-excel/i.test(file?.type||''); return { file, isPdf, isExcel, url:(!isPdf&&!isExcel)?URL.createObjectURL(file):'' }; });
+    const rows = files.map((file) => ({ file, url: URL.createObjectURL(file) }));
     setPreviews(rows);
-    return () => rows.forEach((row) => { if(row.url) URL.revokeObjectURL(row.url); });
+    return () => rows.forEach((row) => { if (row.url) URL.revokeObjectURL(row.url); });
   }, [files]);
 
   const loadResult = (result) => {
@@ -46,7 +44,7 @@ export const PurchaseAIScanModal = ({ open, onClose, onApply }) => {
     const sm = findBestSupplier(parsed?.supplier?.name, suppliers);
     setSupplierMatch(sm?.supplier?.id || '');
     const mapped = (parsed?.items || []).map((item, index) => {
-      const pm = findBestProduct(item?.name, products);
+      const pm = findBestProduct(item?.name, products, item?.barcode);
       const product = pm?.product || null;
       const um = product ? findBestUnit(item?.unit, product) : null;
       return {
@@ -68,8 +66,8 @@ export const PurchaseAIScanModal = ({ open, onClose, onApply }) => {
   };
 
   const analyze = async () => {
-    if (!files.length && !sourceText.trim()) {
-      setError('أرفق صورة أو PDF أو Excel للفاتورة أو اكتب بيانات الفاتورة بالنص.');
+    if (!files.length) {
+      setError('أرفق صورة واضحة لفاتورة المشتريات.');
       return;
     }
     setBusy(true);
@@ -82,10 +80,10 @@ export const PurchaseAIScanModal = ({ open, onClose, onApply }) => {
           id: product.id,
           name: product.name,
           sku: product.sku || product.internalCode,
-          units: (product.units || []).map((unit) => ({ id: unit.id, name: unit.name, factor: unit.conversionToBase })),
+          units: (product.units || []).map((unit) => ({ id: unit.id, name: unit.name, factor: unit.conversionToBase, barcodes: Array.isArray(unit.barcodes) ? unit.barcodes : (unit.barcode ? [unit.barcode] : []) })),
         })),
       };
-      const response = await scanPurchaseInvoice({ files, text: sourceText, catalog });
+      const response = await scanPurchaseInvoice({ files, catalog });
       loadResult(response?.result || response);
     } catch (err) {
       setError(String(err?.message || err));
@@ -159,7 +157,7 @@ export const PurchaseAIScanModal = ({ open, onClose, onApply }) => {
       date: raw?.date || '',
       discount: n(raw?.discount),
       paidAmount: raw?.paidAmount == null ? null : n(raw.paidAmount),
-      notes: `تمت التعبئة عبر Oscar AI${files.length ? ' من مرفق' : ''}${sourceText.trim() ? ' + نص' : ''}${raw?.currency ? ` • العملة المقروءة: ${raw.currency}` : ''}`,
+      notes: `تمت التعبئة عبر Oscar AI من صورة${files.length > 1 ? ' متعددة' : ''}${raw?.currency ? ` • العملة المقروءة: ${raw.currency}` : ''}`,
       raw,
     });
     onClose?.();
@@ -250,31 +248,35 @@ export const PurchaseAIScanModal = ({ open, onClose, onApply }) => {
   if (!open) return null;
 
   const uploadBlock = h('div', { className: 'rounded-2xl border border-emerald-200 bg-emerald-50/50 p-3 sm:p-4 space-y-3' },
-    h('div', { className: 'flex items-center gap-2' }, h(FileText, { className: 'w-4 h-4 text-emerald-700' }), h('div', { className: 'font-black text-xs' }, 'اكتب بيانات الفاتورة أو ملاحظات إضافية')),
-    h('textarea', {
-      value: sourceText,
-      onChange: (event) => setSourceText(event.target.value),
-      rows: 3,
-      placeholder: 'مثال: المورد شركة النور، رقم الفاتورة 125، المدفوع 200 شيكل. أو اكتب الفاتورة كاملة.',
-      className: 'w-full resize-y min-h-20 px-3 py-2.5 rounded-xl border bg-white text-xs leading-6 focus:outline-none focus:border-emerald-500',
-    }),
+    h('div', { className: 'flex items-center gap-2' }, h(ImageIcon, { className: 'w-4 h-4 text-emerald-700' }), h('div', { className: 'font-black text-xs' }, 'أرفق صورة فاتورة المشتريات')),
+    h('div', { className: 'text-[10px] text-slate-500 leading-5' }, 'يدعم الصور فقط. يقرأ اسم المنتج والوحدة والكمية وسعر الوحدة وإجمالي السطر، مع المورد ورقم الفاتورة والتاريخ إن كانت ظاهرة.'),
     h('div', { className: 'flex flex-col sm:flex-row sm:items-center justify-between gap-3' },
       h('div', null,
-        h('div', { className: 'font-black text-xs' }, 'إرفاق ملف'),
-        h('div', { className: 'text-[10px] text-slate-500 mt-1' }, 'المسموح: صور أو PDF أو Excel، ويمكن دمج المرفقات مع النص.')
+        h('div', { className: 'font-black text-xs' }, 'صورة أو عدة صور للفاتورة'),
+        h('div', { className: 'text-[10px] text-slate-500 mt-1' }, 'لأفضل نتيجة: صوّر الورقة كاملة، بإضاءة جيدة، وبدون قصّ الأعمدة أو الأسعار.')
       ),
-      h('div', { className: 'flex gap-2 flex-wrap' },
-        h('label', { className: 'cursor-pointer inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-emerald-200 text-emerald-700 text-xs font-black shadow-sm' },
-          h(Upload, { className: 'w-4 h-4' }),
-          'إرفاق ملف',
-          h('input', { type: 'file', accept: 'image/*,application/pdf,.pdf,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel', multiple: true, className: 'hidden', onChange: (event) => { const picked=Array.from(event.target.files||[]).filter((file)=>{const name=String(file?.name||'');const type=String(file?.type||'');return type.startsWith('image/')||type==='application/pdf'||/\.pdf$/i.test(name)||/\.(xlsx|xls)$/i.test(name)||/spreadsheet|ms-excel/i.test(type);}); setFiles(picked.slice(0,6)); if(picked.length<Array.from(event.target.files||[]).length) app.showToast?.('المسموح فقط: صور أو PDF أو Excel','warning'); } })
-        )
+      h('label', { className: 'cursor-pointer inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-emerald-200 text-emerald-700 text-xs font-black shadow-sm' },
+        h(Upload, { className: 'w-4 h-4' }),
+        'إرفاق صورة',
+        h('input', { type: 'file', accept: 'image/*', multiple: true, className: 'hidden', onChange: (event) => {
+          const all = Array.from(event.target.files || []);
+          const picked = all.filter((file) => String(file?.type || '').toLowerCase().startsWith('image/') || /\.(?:jpe?g|png|webp|gif|bmp)$/i.test(String(file?.name || '')));
+          setFiles(picked.slice(0, 8));
+          if (picked.length < all.length) app.showToast?.('المسموح فقط صور الفاتورة', 'warning');
+          if (picked.length > 8) app.showToast?.('يمكن تحليل حتى 8 صور في المرة الواحدة', 'warning');
+          event.target.value = '';
+        } })
       )
     ),
-    previews.length ? h('div', { className: 'grid grid-cols-3 sm:grid-cols-6 gap-2' }, ...previews.map((item, index) => item.isPdf ? h('div', { key: index, className: 'w-full aspect-square rounded-xl border bg-white flex flex-col items-center justify-center p-2 text-center' }, h(FileText, { className: 'w-7 h-7 text-rose-500' }), h('span', { className: 'mt-1 text-[9px] text-slate-600 line-clamp-2' }, item.file?.name || 'PDF')) : item.isExcel ? h('div', { key: index, className: 'w-full aspect-square rounded-xl border bg-white flex flex-col items-center justify-center p-2 text-center' }, h(FileSpreadsheet, { className: 'w-7 h-7 text-emerald-600' }), h('span', { className: 'mt-1 text-[9px] text-slate-600 line-clamp-2' }, item.file?.name || 'Excel')) : h('img', { key: index, src: item.url, className: 'w-full aspect-square object-cover rounded-xl border bg-white' }))) : null,
-    (files.length || sourceText.trim()) ? h('button', { type: 'button', disabled: busy, onClick: analyze, className: 'w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-black flex items-center justify-center gap-2 disabled:opacity-50' },
+    previews.length ? h('div', { className: 'grid grid-cols-3 sm:grid-cols-6 gap-2' }, ...previews.map((item, index) =>
+      h('div', { key: index, className: 'relative' },
+        h('img', { src: item.url, alt: `صورة الفاتورة ${index + 1}`, className: 'w-full aspect-square object-cover rounded-xl border bg-white' }),
+        h('button', { type: 'button', onClick: () => setFiles((prev) => prev.filter((_, idx) => idx !== index)), className: 'absolute top-1 left-1 w-6 h-6 rounded-full bg-slate-900/80 text-white flex items-center justify-center', title: 'حذف الصورة' }, h(X, { className: 'w-3.5 h-3.5' }))
+      )
+    )) : null,
+    files.length ? h('button', { type: 'button', disabled: busy, onClick: analyze, className: 'w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-black flex items-center justify-center gap-2 disabled:opacity-50' },
       busy ? h(LoaderCircle, { className: 'w-4 h-4 animate-spin' }) : h(Sparkles, { className: 'w-4 h-4' }),
-      busy ? 'جاري تحليل الفاتورة...' : 'تحليل وتعبئة الفاتورة'
+      busy ? 'جاري قراءة الصورة بدقة...' : 'قراءة الصورة وتعبئة الفاتورة'
     ) : null
   );
 
@@ -316,7 +318,7 @@ export const PurchaseAIScanModal = ({ open, onClose, onApply }) => {
           h('div', { className: 'w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0' }, h(ScanLine, { className: 'w-5 h-5' })),
           h('div', { className: 'min-w-0' },
             h('div', { className: 'font-black text-sm truncate' }, 'تعبئة فاتورة المشتريات بالذكاء الاصطناعي'),
-            h('div', { className: 'text-[10px] text-slate-500' }, 'صورة أو PDF أو Excel أو نص ويمكن دمجهم معاً')
+            h('div', { className: 'text-[10px] text-slate-500' }, 'قراءة احترافية من صور الفواتير فقط')
           )
         ),
         h('button', { type: 'button', onClick: onClose, title: 'إغلاق', className: 'w-9 h-9 rounded-xl bg-slate-900 text-white shadow flex items-center justify-center hover:bg-slate-700' }, h(X, { className: 'w-5 h-5 stroke-[3]' }))
