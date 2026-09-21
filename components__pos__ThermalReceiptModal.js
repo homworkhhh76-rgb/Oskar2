@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.36-customer-portal-stable-2';
-import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.36-customer-portal-stable-2';
-import { downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel, warmProfessionalExportLibraries } from './utils__professionalExport.js?v=7.9.4.36-customer-portal-stable-2';
-import { renderInvoiceCanvas } from './utils__canvasRenderer.js?v=7.9.4.36-customer-portal-stable-2';
-import { smartPrinter } from './services__printer.js?v=7.9.4.36-customer-portal-stable-2';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-customer-portal-stable-2';
+import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-1';
+import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.36-github-shift-fix-1';
+import { downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel, warmProfessionalExportLibraries } from './utils__professionalExport.js?v=7.9.4.36-github-shift-fix-1';
+import { renderInvoiceCanvas } from './utils__canvasRenderer.js?v=7.9.4.36-github-shift-fix-1';
+import { smartPrinter } from './services__printer.js?v=7.9.4.36-github-shift-fix-1';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-github-shift-fix-1';
 import { Printer, X, Download, Image as ImageIcon, FileSpreadsheet, Bluetooth } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 

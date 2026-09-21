@@ -1,9 +1,9 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.36-customer-portal-stable-2';
-import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.36-customer-portal-stable-2';
-import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.36-customer-portal-stable-2';
-import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.36-customer-portal-stable-2';
+import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.36-github-shift-fix-1';
+import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.36-github-shift-fix-1';
+import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.36-github-shift-fix-1';
+import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.36-github-shift-fix-1';
 const AppContext = createContext(null);
 const recordTime = (item = {}) => {
     const fields = ['createdAt', 'date', 'timestamp', 'startTime', 'updatedAt'];
@@ -32,6 +32,37 @@ const normalizeActiveWarehouseSettings = (value, warehouseRows = []) => {
     if (wanted && rows.some(w => String(w.id) === wanted)) return value;
     const fallback = rows.find(w => w?.isDefault) || rows.find(w => w?.id === 'wh-main') || rows[0];
     return fallback?.id ? { ...value, activeWarehouseId: fallback.id } : value;
+};
+const finiteNumber = (value, fallback = 0) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+};
+const normalizeAccountRecord = (account) => {
+    if (!account || typeof account !== 'object') return account;
+    return { ...account, balance: finiteNumber(account.balance, 0) };
+};
+const normalizeShiftRecord = (shift) => {
+    if (!shift || typeof shift !== 'object') return shift;
+    const openingCash = finiteNumber(shift.openingCash, 0);
+    const totalCashSales = finiteNumber(shift.totalCashSales, 0);
+    const totalOtherSales = finiteNumber(shift.totalOtherSales, 0);
+    const totalCashReturns = finiteNumber(shift.totalCashReturns, 0);
+    const totalCashExpenses = finiteNumber(shift.totalCashExpenses, 0);
+    const expectedCash = Number.isFinite(Number(shift.expectedCash))
+        ? Number(shift.expectedCash)
+        : openingCash + totalCashSales - totalCashReturns - totalCashExpenses;
+    return {
+        ...shift,
+        shiftNumber: Math.max(0, Math.trunc(finiteNumber(shift.shiftNumber, 0))),
+        openingCash,
+        totalCashSales,
+        totalOtherSales,
+        totalCashReturns,
+        totalCashExpenses,
+        expectedCash,
+        actualCash: shift.actualCash == null ? shift.actualCash : finiteNumber(shift.actualCash, 0),
+        difference: shift.difference == null ? shift.difference : finiteNumber(shift.difference, 0),
+    };
 };
 // Legacy stock rows did not carry a modification timestamp. Backfill it from the
 // latest local stock movement when possible so stale cloud balances cannot win by accident.
@@ -207,12 +238,22 @@ export const AppProvider = ({ children }) => {
             const registeredCustomers = (custs || []).filter((c) => c && c.id !== CASH_CUSTOMER.id);
             setCustomers(newestFirst(registeredCustomers));
             setSuppliers(newestFirst(supps));
-            const orderedAccounts = newestFirst(accs);
+            const normalizedAccounts = (accs || []).map(normalizeAccountRecord);
+            const orderedAccounts = newestFirst(normalizedAccounts);
             orderedAccounts.sort((a, b) => Number(Boolean(b?.isDefault)) - Number(Boolean(a?.isDefault)));
             setAccounts(orderedAccounts);
             setTransfers((trans || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
             setExpenses((exps || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-            setShifts((shfts || []).sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()));
+            const normalizedShifts = (shfts || []).map(normalizeShiftRecord).sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+            setShifts(normalizedShifts);
+            // Fresh GitHub Pages installs pull records from Turso into a new IndexedDB.
+            // Older cloud rows may contain money fields as strings; write one corrected copy back
+            // so cashboxes and shifts remain numeric on every following load/device.
+            const accountRepairNeeded = (accs || []).some((row) => typeof row?.balance !== 'number' || !Number.isFinite(row?.balance));
+            const shiftMoneyFields = ['openingCash','totalCashSales','totalOtherSales','totalCashReturns','totalCashExpenses','expectedCash'];
+            const shiftRepairNeeded = (shfts || []).some((row) => shiftMoneyFields.some((field) => typeof row?.[field] !== 'number' || !Number.isFinite(row?.[field])));
+            if (accountRepairNeeded && normalizedAccounts.length) await bulkPut('accounts', normalizedAccounts);
+            if (shiftRepairNeeded && normalizedShifts.length) await bulkPut('shifts', normalizedShifts);
             setAuditLogs((audits || []).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
             setHeldInvoices(newestFirst(helds));
             setSyncQueue(window.OscarCloudSync?.pendingItems?.() || syncs || []);
@@ -265,10 +306,10 @@ export const AppProvider = ({ children }) => {
         if (wanted.has('purchases')) jobs.push(getAllFromStore('purchases').then(v => setPurchases((v || []).sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()))));
         if (wanted.has('customers')) jobs.push(getAllFromStore('customers').then(v => { const real=(v||[]).filter(c=>c&&c.id!==CASH_CUSTOMER.id); setCustomers(newestFirst(real)); setSelectedCustomer(prev => (!prev || prev.id===CASH_CUSTOMER.id) ? CASH_CUSTOMER : (real.find(c=>c.id===prev.id)||CASH_CUSTOMER)); }));
         if (wanted.has('suppliers')) jobs.push(getAllFromStore('suppliers').then(v => setSuppliers(newestFirst(v))));
-        if (wanted.has('accounts')) jobs.push(getAllFromStore('accounts').then(v => { const x=newestFirst(v); x.sort((a,b)=>Number(Boolean(b?.isDefault))-Number(Boolean(a?.isDefault))); setAccounts(x); }));
+        if (wanted.has('accounts')) jobs.push(getAllFromStore('accounts').then(v => { const x=newestFirst((v || []).map(normalizeAccountRecord)); x.sort((a,b)=>Number(Boolean(b?.isDefault))-Number(Boolean(a?.isDefault))); setAccounts(x); }));
         if (wanted.has('transfers')) jobs.push(getAllFromStore('transfers').then(v => setTransfers((v || []).sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()))));
         if (wanted.has('expenses')) jobs.push(getAllFromStore('expenses').then(v => setExpenses((v || []).sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()))));
-        if (wanted.has('shifts')) jobs.push(getAllFromStore('shifts').then(v => setShifts((v || []).sort((a,b)=>new Date(b.startTime).getTime()-new Date(a.startTime).getTime()))));
+        if (wanted.has('shifts')) jobs.push(getAllFromStore('shifts').then(v => setShifts((v || []).map(normalizeShiftRecord).sort((a,b)=>new Date(b.startTime).getTime()-new Date(a.startTime).getTime()))));
         if (wanted.has('audit_logs')) jobs.push(getAllFromStore('audit_logs').then(v => setAuditLogs((v || []).sort((a,b)=>new Date(b.timestamp).getTime()-new Date(a.timestamp).getTime()))));
         if (wanted.has('held_invoices')) jobs.push(getAllFromStore('held_invoices').then(v => setHeldInvoices(newestFirst(v))));
         if (wanted.has('partner_statements')) jobs.push(getAllFromStore('partner_statements').then(v => setPartnerStatements(newestFirst(v))));
@@ -410,7 +451,8 @@ export const AppProvider = ({ children }) => {
     }, [isLoaded, warehouses, settings]);
     // Active shift
     const activeShift = useMemo(() => {
-        return shifts.find((s) => s.status === 'open') || null;
+        const found = shifts.find((s) => s.status === 'open') || null;
+        return found ? normalizeShiftRecord(found) : null;
     }, [shifts]);
     // Get current stock for a product in a warehouse (or all warehouses)
     const getProductStock = useCallback((productId, warehouseId) => {
@@ -1332,7 +1374,7 @@ export const AppProvider = ({ children }) => {
         // Always keep one starred/default account. The starred account is used automatically
         // in every account/cashbox dropdown across POS, vouchers, expenses and purchases.
         const mustBeDefault = Boolean(account.isDefault) || accounts.length === 0 || !accounts.some((a) => a.isDefault && a.id !== account.id);
-        const nextAccount = { ...account, isDefault: mustBeDefault };
+        const nextAccount = normalizeAccountRecord({ ...account, isDefault: mustBeDefault });
         if (nextAccount.isDefault) {
             for (const existing of accounts) {
                 if (existing.id !== nextAccount.id && existing.isDefault) {
@@ -1365,12 +1407,19 @@ export const AppProvider = ({ children }) => {
         const toAcc = accounts.find((a) => a.id === toId);
         if (!fromAcc || !toAcc)
             return;
-        if (fromAcc.balance < amount) {
+        const numericAmount = finiteNumber(amount, 0);
+        const fromBalance = finiteNumber(fromAcc.balance, 0);
+        const toBalance = finiteNumber(toAcc.balance, 0);
+        if (numericAmount <= 0) {
+            showToast('يرجى إدخال مبلغ تحويل صالح', 'warning');
+            return;
+        }
+        if (fromBalance < numericAmount) {
             showToast('الرصيد في الحساب المصدر غير كافٍ!', 'error');
             return;
         }
-        await putInStore('accounts', { ...fromAcc, balance: fromAcc.balance - amount });
-        await putInStore('accounts', { ...toAcc, balance: toAcc.balance + amount });
+        await putInStore('accounts', normalizeAccountRecord({ ...fromAcc, balance: fromBalance - numericAmount }));
+        await putInStore('accounts', normalizeAccountRecord({ ...toAcc, balance: toBalance + numericAmount }));
         const transferRecord = {
             id: 'trans-' + Date.now(),
             date: new Date().toISOString(),
@@ -1378,7 +1427,7 @@ export const AppProvider = ({ children }) => {
             fromAccountName: fromAcc.name,
             toAccountId: toId,
             toAccountName: toAcc.name,
-            amount,
+            amount: numericAmount,
             notes,
             userId: currentUser.id,
             userName: currentUser.name,
@@ -1789,20 +1838,27 @@ export const AppProvider = ({ children }) => {
     }, [purchases, stock, suppliers, accounts, reloadData, showToast]);
     // Cashier Shifts
     const openShift = useCallback(async (openingCash) => {
-        const newShift = {
+        const normalizedOpeningCash = Math.max(0, finiteNumber(openingCash, 0));
+        const currentOpen = shifts.find((s) => s?.status === 'open');
+        if (currentOpen) {
+            showToast('يوجد وردية مفتوحة بالفعل', 'warning');
+            return;
+        }
+        const lastShiftNumber = shifts.reduce((max, row) => Math.max(max, Math.trunc(finiteNumber(row?.shiftNumber, 0))), 0);
+        const newShift = normalizeShiftRecord({
             id: 'shift-' + Date.now(),
-            shiftNumber: (shifts[0]?.shiftNumber || 0) + 1,
+            shiftNumber: lastShiftNumber + 1,
             cashierId: currentUser.id,
             cashierName: currentUser.name,
             startTime: new Date().toISOString(),
-            openingCash,
+            openingCash: normalizedOpeningCash,
             totalCashSales: 0,
             totalOtherSales: 0,
             totalCashReturns: 0,
             totalCashExpenses: 0,
-            expectedCash: openingCash,
+            expectedCash: normalizedOpeningCash,
             status: 'open',
-        };
+        });
         await putInStore('shifts', newShift);
         await reloadData();
         showToast('تم فتح الوردية بنجاح', 'success');
@@ -1810,15 +1866,17 @@ export const AppProvider = ({ children }) => {
     const closeShift = useCallback(async (actualCash, notes) => {
         if (!activeShift)
             return;
-        const diff = actualCash - activeShift.expectedCash;
-        const closedShift = {
-            ...activeShift,
+        const normalizedShift = normalizeShiftRecord(activeShift);
+        const normalizedActualCash = Math.max(0, finiteNumber(actualCash, 0));
+        const diff = normalizedActualCash - finiteNumber(normalizedShift.expectedCash, 0);
+        const closedShift = normalizeShiftRecord({
+            ...normalizedShift,
             endTime: new Date().toISOString(),
-            actualCash,
+            actualCash: normalizedActualCash,
             difference: diff,
             status: 'closed',
             notes,
-        };
+        });
         await putInStore('shifts', closedShift);
         await reloadData();
         showToast(`تم إغلاق الوردية. الفرق: ${diff >= 0 ? `+${diff}` : diff} ${settings.currencySymbol}`, diff === 0 ? 'success' : 'warning');

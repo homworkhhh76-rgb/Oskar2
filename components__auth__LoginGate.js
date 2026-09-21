@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Upload, ShieldCheck, Building2, Wifi, WifiOff, Database, LogIn } from 'lucide-react';
-import { DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-customer-portal-stable-2';
+import { DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-github-shift-fix-1';
 const h=React.createElement;
 export const LoginGate=({children})=>{
  const A=()=>window.OscarActivation;

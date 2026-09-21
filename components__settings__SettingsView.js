@@ -1,11 +1,11 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useEffect } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.36-customer-portal-stable-2';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.36-customer-portal-stable-2';
-import { usePWAInstall } from './hooks__usePWAInstall.js?v=7.9.4.36-customer-portal-stable-2';
-import { db } from './services__db.js?v=7.9.4.36-customer-portal-stable-2';
-import { smartPrinter } from './services__printer.js?v=7.9.4.36-customer-portal-stable-2';
-import { materializeLogoSource, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-customer-portal-stable-2';
+import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-1';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.36-github-shift-fix-1';
+import { usePWAInstall } from './hooks__usePWAInstall.js?v=7.9.4.36-github-shift-fix-1';
+import { db } from './services__db.js?v=7.9.4.36-github-shift-fix-1';
+import { smartPrinter } from './services__printer.js?v=7.9.4.36-github-shift-fix-1';
+import { materializeLogoSource, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-github-shift-fix-1';
 import { Store, Printer, ShieldCheck, Building2, Database, Download, Upload, RefreshCw, Trash2, Save, Edit2, X, Bluetooth, Cable, } from 'lucide-react';
 export const SettingsView = () => {
     const { settings, updateSettings, warehouses, saveWarehouse, deleteWarehouse, showToast, refreshData, } = useApp();

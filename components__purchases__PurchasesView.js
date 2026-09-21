@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.36-customer-portal-stable-2';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.36-customer-portal-stable-2';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.36-customer-portal-stable-2';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl } from './brand__logo.js?v=7.9.4.36-customer-portal-stable-2';
-import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.36-customer-portal-stable-2';
-import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.36-customer-portal-stable-2';
-import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.36-customer-portal-stable-2';
+import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-1';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.36-github-shift-fix-1';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.36-github-shift-fix-1';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl } from './brand__logo.js?v=7.9.4.36-github-shift-fix-1';
+import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.36-github-shift-fix-1';
+import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.36-github-shift-fix-1';
+import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.36-github-shift-fix-1';
 import { Plus, Trash2, Building2, Eye, X, Image as ImageIcon, FileDown, FileSpreadsheet, Printer, AlertTriangle, ReceiptText, Sparkles, ScanLine } from 'lucide-react';
 
 const h = React.createElement;

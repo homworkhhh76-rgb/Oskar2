@@ -1,4 +1,4 @@
-import { getAllFromStore, getFromStore, saveToStore } from './restaurant__services__db.js?v=7.9.4.36-customer-portal-stable-2';
+import { getAllFromStore, getFromStore, saveToStore } from './restaurant__services__db.js?v=7.9.4.36-github-shift-fix-1';
 // Default Sections
 export const DEFAULT_RESTAURANT_SECTIONS = [
     { id: 'sec-indoor', name: 'الصالة الداخلية', displayOrder: 1 },
