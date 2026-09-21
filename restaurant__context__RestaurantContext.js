@@ -1,8 +1,8 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { getAllFromStore, getFromStore, deleteFromStore, putInStore, syncChannel, } from './restaurant__services__db.js?v=7.9.4.36-github-shift-fix-1';
-import { initRestaurantDefaults, generateOrderNumber, generateTakeawayQueueNumber, generateKitchenTicketId, playChimeSound, } from './restaurant__services__restaurantService.js?v=7.9.4.36-github-shift-fix-1';
-import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.36-github-shift-fix-1';
+import { getAllFromStore, getFromStore, deleteFromStore, putInStore, syncChannel, } from './restaurant__services__db.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { initRestaurantDefaults, generateOrderNumber, generateTakeawayQueueNumber, generateKitchenTicketId, playChimeSound, } from './restaurant__services__restaurantService.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
 const RestaurantContext = createContext(null);
 const RESTAURANT_STORES = new Set([
     'restaurant_sections',

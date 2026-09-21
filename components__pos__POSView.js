@@ -1,14 +1,14 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-1';
-import { ProductGrid } from './components__pos__ProductGrid.js?v=7.9.4.36-github-shift-fix-1';
-import { CartPanel } from './components__pos__CartPanel.js?v=7.9.4.36-github-shift-fix-1';
-import { FullCartView } from './components__pos__FullCartView.js?v=7.9.4.36-github-shift-fix-1';
-import { PaymentModal } from './components__pos__PaymentModal.js?v=7.9.4.36-github-shift-fix-1';
-import { CameraScannerModal } from './components__pos__CameraScannerModal.js?v=7.9.4.36-github-shift-fix-1';
-import { HoldInvoicesModal } from './components__pos__HoldInvoicesModal.js?v=7.9.4.36-github-shift-fix-1';
-import { RestaurantPendingOrdersModal } from './restaurant__components__RestaurantPendingOrdersModal.js?v=7.9.4.36-github-shift-fix-1';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.36-github-shift-fix-1';
+import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { ProductGrid } from './components__pos__ProductGrid.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { CartPanel } from './components__pos__CartPanel.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { FullCartView } from './components__pos__FullCartView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { PaymentModal } from './components__pos__PaymentModal.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { CameraScannerModal } from './components__pos__CameraScannerModal.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { HoldInvoicesModal } from './components__pos__HoldInvoicesModal.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { RestaurantPendingOrdersModal } from './restaurant__components__RestaurantPendingOrdersModal.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
 import { Barcode, Camera, Maximize2, UtensilsCrossed } from 'lucide-react';
 export const POSView = () => {
     const { cart, handleScannedBarcode, setShowCameraModal, holdCurrentInvoice, posCartLayout, setPosCartLayout, settings } = useApp();

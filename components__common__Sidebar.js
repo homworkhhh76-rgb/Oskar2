@@ -1,7 +1,7 @@
 import React from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-1';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-github-shift-fix-1';
-import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.36-github-shift-fix-1';
+import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.36-github-shift-fix-2-qr-green';
 import {
   LayoutDashboard, ShoppingCart, ReceiptText, Truck, Package, Boxes, Warehouse,
   Users, Building2, Wallet, Receipt, FileSpreadsheet, UserCheck, Barcode, BarChart3,

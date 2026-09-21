@@ -1,10 +1,10 @@
 import React, { useRef, useState, useMemo } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-1';
-import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.36-github-shift-fix-1';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-github-shift-fix-1';
+import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-github-shift-fix-2-qr-green';
 import { Wifi, WifiOff, RefreshCw, Maximize2, Minimize2, Clock, Store, Camera, Menu, LogOut, Building2, Bell } from 'lucide-react';
-import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.36-github-shift-fix-1';
-import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.36-github-shift-fix-1';
+import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.36-github-shift-fix-2-qr-green';
 
 const h = React.createElement;
 

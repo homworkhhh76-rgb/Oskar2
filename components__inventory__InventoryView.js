@@ -1,13 +1,13 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-1';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.36-github-shift-fix-1';
-import { formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.36-github-shift-fix-1';
-import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.36-github-shift-fix-1';
-import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.36-github-shift-fix-1';
-import { downloadProfessionalTablePDF, downloadProfessionalTableExcel, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.36-github-shift-fix-1';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.36-github-shift-fix-1';
-import { TransferForm } from './components__inventory__TransferForm.js?v=7.9.4.36-github-shift-fix-1';
+import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { downloadProfessionalTablePDF, downloadProfessionalTableExcel, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { TransferForm } from './components__inventory__TransferForm.js?v=7.9.4.36-github-shift-fix-2-qr-green';
 import { ArrowLeftRight, Building2, Download, Search, Image as ImageIcon, FileSpreadsheet, Trash2, } from 'lucide-react';
 export const InventoryView = () => {
     const { products, warehouses, settings, getProductStock, adjustStockCount, transferStock, recordDamagedStock, showToast, } = useApp();

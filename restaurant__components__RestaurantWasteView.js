@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState } from 'react';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.36-github-shift-fix-1';
-import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.36-github-shift-fix-1';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
 import { Trash2, Plus, BookOpen, Scale, AlertTriangle, } from 'lucide-react';
 export const RestaurantWasteView = () => {
     const { recipes, wasteLogs, addRecipe, updateRecipe, deleteRecipe, logWaste, } = useRestaurant();

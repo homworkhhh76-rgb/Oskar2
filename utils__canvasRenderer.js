@@ -1,5 +1,5 @@
-import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-github-shift-fix-1';
-import { code128Geometry } from './utils__code128.js?v=7.9.4.36-github-shift-fix-1';
+import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { code128Geometry } from './utils__code128.js?v=7.9.4.36-github-shift-fix-2-qr-green';
 
 const imageCache = new Map();
 const num = v => { const n=Number(v); return Number.isFinite(n)?n:0; };

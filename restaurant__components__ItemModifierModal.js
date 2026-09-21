@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState } from 'react';
-import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.36-github-shift-fix-1';
+import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
 import { Plus, Minus, X, Check, UtensilsCrossed } from 'lucide-react';
 // Preset common modifiers for restaurants & cafés
 const SIZES = [

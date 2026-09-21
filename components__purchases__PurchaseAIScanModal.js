@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { X, ScanLine, Upload, AlertTriangle, CheckCircle2, LoaderCircle, Sparkles, Image as ImageIcon } from 'lucide-react';
-import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-1';
-import { scanPurchaseInvoice } from './services__ai.js?v=7.9.4.36-github-shift-fix-1';
-import { findBestSupplier, findBestProduct, findBestUnit } from './utils__aiMatching.js?v=7.9.4.36-github-shift-fix-1';
+import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { scanPurchaseInvoice } from './services__ai.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { findBestSupplier, findBestProduct, findBestUnit } from './utils__aiMatching.js?v=7.9.4.36-github-shift-fix-2-qr-green';
 
 const h = React.createElement;
 const n = (v) => Number(v || 0) || 0;

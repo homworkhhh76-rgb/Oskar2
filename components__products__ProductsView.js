@@ -1,14 +1,14 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-1';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.36-github-shift-fix-1';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.36-github-shift-fix-1';
-import { BarcodeCameraModal } from './components__pos__CameraScannerModal.js?v=7.9.4.36-github-shift-fix-1';
-import { calculateUnitConversions, formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.36-github-shift-fix-1';
-import { exportToCSV } from './utils__export.js?v=7.9.4.36-github-shift-fix-1';
-import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.36-github-shift-fix-1';
-import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.36-github-shift-fix-1';
-import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.36-github-shift-fix-1';
+import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { BarcodeCameraModal } from './components__pos__CameraScannerModal.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { calculateUnitConversions, formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { exportToCSV } from './utils__export.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.36-github-shift-fix-2-qr-green';
 import { Plus, Search, Trash2, Edit, Layers, FolderTree, X, Download, Image as ImageIcon, FileSpreadsheet, Camera, } from 'lucide-react';
 const h = React.createElement;
 const normalizeArabicDigits = (value) => String(value ?? '')
