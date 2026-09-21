@@ -1,7 +1,7 @@
 import React from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.36-stock-stable-1';
-import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-stock-stable-1';
-import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.36-stock-stable-1';
+import { useApp } from './context__AppContext.js?v=7.9.4.36-customer-portal-stable-2';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-customer-portal-stable-2';
+import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.36-customer-portal-stable-2';
 import {
   LayoutDashboard, ShoppingCart, ReceiptText, Truck, Package, Boxes, Warehouse,
   Users, Building2, Wallet, Receipt, FileSpreadsheet, UserCheck, Barcode, BarChart3,
@@ -68,7 +68,7 @@ export const Sidebar = () => {
   const brand = (compact=false) => h('div', { className:`${compact?'p-3 pl-12':'p-3.5'} border-b border-slate-100 bg-white shrink-0` },
     h('button', { type:'button', onClick:()=>go(firstAllowedTab(accessArgs) || 'no_access'), className:'w-full flex items-center gap-2.5 text-right min-w-0' },
       h('img', {
-        src:getBrandLogoDataUrl(settings),
+        src:getBrandLogoDisplayUrl(settings),
         onError:e=>{e.currentTarget.onerror=null;e.currentTarget.src=DEFAULT_LOGO_DATA_URL;},
         className:'w-10 h-10 object-contain rounded-xl border border-emerald-100 bg-white shrink-0',
         alt:settings.storeName || 'أوسكار المحاسبي'

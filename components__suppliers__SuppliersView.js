@@ -1,12 +1,12 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.36-stock-stable-1';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.36-stock-stable-1';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.36-stock-stable-1';
-import { exportToCSV, printReceiptElement } from './utils__export.js?v=7.9.4.36-stock-stable-1';
-import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.36-stock-stable-1';
-import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.36-stock-stable-1';
-import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.36-stock-stable-1';
+import { useApp } from './context__AppContext.js?v=7.9.4.36-customer-portal-stable-2';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.36-customer-portal-stable-2';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.36-customer-portal-stable-2';
+import { exportToCSV, printReceiptElement } from './utils__export.js?v=7.9.4.36-customer-portal-stable-2';
+import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.36-customer-portal-stable-2';
+import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.36-customer-portal-stable-2';
+import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.36-customer-portal-stable-2';
 import { Plus, Search, FileText, DollarSign, Download, Printer, Trash2, X, Edit, Image as ImageIcon, FileSpreadsheet, } from 'lucide-react';
 const normalizeOpeningBalanceInput = (value) => {
     let raw = String(value ?? '')

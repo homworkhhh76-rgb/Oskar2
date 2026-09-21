@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.36-stock-stable-1';
-import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.36-stock-stable-1';
-import { downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel, warmProfessionalExportLibraries } from './utils__professionalExport.js?v=7.9.4.36-stock-stable-1';
-import { renderInvoiceCanvas } from './utils__canvasRenderer.js?v=7.9.4.36-stock-stable-1';
-import { smartPrinter } from './services__printer.js?v=7.9.4.36-stock-stable-1';
-import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-stock-stable-1';
+import { useApp } from './context__AppContext.js?v=7.9.4.36-customer-portal-stable-2';
+import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.36-customer-portal-stable-2';
+import { downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel, warmProfessionalExportLibraries } from './utils__professionalExport.js?v=7.9.4.36-customer-portal-stable-2';
+import { renderInvoiceCanvas } from './utils__canvasRenderer.js?v=7.9.4.36-customer-portal-stable-2';
+import { smartPrinter } from './services__printer.js?v=7.9.4.36-customer-portal-stable-2';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-customer-portal-stable-2';
 import { Printer, X, Download, Image as ImageIcon, FileSpreadsheet, Bluetooth } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 
@@ -22,7 +22,7 @@ export const ThermalReceiptModal = () => {
     const receiptContainerRef = useRef(null);
     const [isExporting, setIsExporting] = useState(false);
     const [printerState, setPrinterState] = useState(() => smartPrinter.getState());
-    const logoSrc = getBrandLogoDataUrl(settings);
+    const logoSrc = getBrandLogoDisplayUrl(settings);
 
     useEffect(() => smartPrinter.subscribe(setPrinterState), []);
     useEffect(() => { smartPrinter.autoReconnect().catch(() => {}); }, []);
@@ -67,16 +67,13 @@ export const ThermalReceiptModal = () => {
     };
 
     const handleBluetoothPrint = async () => {
-        if (!printerState.connected) {
-            showToast('اربط طابعة Bluetooth / Serial من الإعدادات أولاً.', 'warning');
-            return;
-        }
         if (isExporting) return;
         setIsExporting(true);
         try {
             const canvas = await renderInvoiceCanvas(invoice, { ...settings, printerWidth: paperWidth }, { paperWidth });
             await smartPrinter.printCanvas(canvas, { paperWidth: paperWidth === '58mm' ? '58mm' : '80mm' });
-            showToast(`تم إرسال الفاتورة إلى ${printerState.name || 'الطابعة'}`, 'success');
+            const state = smartPrinter.getState();
+            showToast(`تم إرسال الفاتورة إلى ${state.name || state.preferredName || 'الطابعة'}`, 'success');
         } catch (err) {
             showToast(err?.message || 'فشل إرسال الفاتورة إلى الطابعة', 'error');
         } finally {

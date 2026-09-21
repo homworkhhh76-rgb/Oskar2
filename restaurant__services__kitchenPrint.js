@@ -1,4 +1,4 @@
-import { printElementOnly } from './utils__export.js?v=7.9.4.36-stock-stable-1';
+import { printElementOnly } from './utils__export.js?v=7.9.4.36-customer-portal-stable-2';
 
 const esc = (value) => String(value ?? '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')

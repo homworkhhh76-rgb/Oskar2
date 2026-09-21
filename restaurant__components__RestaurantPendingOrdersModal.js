@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Search, X, UtensilsCrossed, Clock3, UserRound, Trash2, ShoppingCart, RefreshCw } from 'lucide-react';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.36-stock-stable-1';
-import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.36-stock-stable-1';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.36-customer-portal-stable-2';
+import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.36-customer-portal-stable-2';
 
 const h = React.createElement;
 const STATUS_LABELS = {

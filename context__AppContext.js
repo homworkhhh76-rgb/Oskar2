@@ -1,9 +1,9 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, migrateLegacyDatabaseIfNeeded, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.36-stock-stable-1';
-import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.36-stock-stable-1';
-import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.36-stock-stable-1';
-import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.36-stock-stable-1';
+import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.36-customer-portal-stable-2';
+import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.36-customer-portal-stable-2';
+import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.36-customer-portal-stable-2';
+import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.36-customer-portal-stable-2';
 const AppContext = createContext(null);
 const recordTime = (item = {}) => {
     const fields = ['createdAt', 'date', 'timestamp', 'startTime', 'updatedAt'];
@@ -295,6 +295,9 @@ export const AppProvider = ({ children }) => {
             // Prepare the real local stock before the application is allowed to render.
             // This removes the brief false-zero state and gives sync reliable legacy metadata.
             await backfillLocalStockMetadata();
+            // Old production builds accidentally inserted demo company data into new keys.
+            // Remove only the untouched demo pack; never touch real user-entered records.
+            await cleanupLegacyDemoSeedIfPristine();
             let existingSettings = await getFromStore('settings', 'store_config');
             // Existing installations open from the complete local IndexedDB snapshot first.
             // The UI is released only after products + stock + settings are all loaded, never with an empty stock array.
@@ -311,6 +314,10 @@ export const AppProvider = ({ children }) => {
                     }
                 });
             } catch (syncError) { console.warn('Cloud sync bootstrap warning:', syncError); }
+            // If an older client had already uploaded the demo pack into this new tenant,
+            // clean it after the first pull as well. Deletions are queued back to cloud.
+            const cleanedRemoteDemo = await cleanupLegacyDemoSeedIfPristine();
+            if (cleanedRemoteDemo && isMounted) await reloadData();
             if (isMounted) setIsCloudReady(true);
             // Remove the old persisted walk-in customer. Cash customer is now virtual POS-only.
             try {
@@ -325,11 +332,8 @@ export const AppProvider = ({ children }) => {
             if (showroomNormalized && existingSettings) await reloadStores(['warehouses', 'settings']);
             if (!existingSettings) {
                 existingSettings = await getFromStore('settings', 'store_config');
-                // Upgrade an existing single-company installation only when this company has no cloud/local data yet.
-                if (!existingSettings && Number(syncResult?.remoteRows || 0) === 0) {
-                    const migrated = await migrateLegacyDatabaseIfNeeded();
-                    if (migrated) existingSettings = await getFromStore('settings', 'store_config');
-                }
+                // A brand-new company starts empty. Never import an unidentified legacy
+                // database because it may belong to another activation/company.
                 if (!existingSettings) await seedDatabaseDefaults();
                 await reloadData();
             }

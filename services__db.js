@@ -1,8 +1,8 @@
-import { calculateUnitConversions } from './utils__unitTree.js?v=7.9.4.36-stock-stable-1';
+import { calculateUnitConversions } from './utils__unitTree.js?v=7.9.4.36-customer-portal-stable-2';
 const DB_BASE_NAME = 'Oscar_Accounting_POS_DB';
 const DB_VERSION = 6;
 export const getTenantId = () => String(window.OscarActivation?.readRuntime?.()?.companyId || 'local').trim() || 'local';
-const dbNameForTenant = () => `${DB_BASE_NAME}__${encodeURIComponent(getTenantId())}`;
+const dbNameForTenant = (tenantId = getTenantId()) => `${DB_BASE_NAME}__${encodeURIComponent(String(tenantId || 'local').trim() || 'local')}`;
 let cachedTenant = '';
 // Realtime sync broadcast channel for cross-tab communication
 export const syncChannel = typeof window !== 'undefined' && 'BroadcastChannel' in window
@@ -10,6 +10,22 @@ export const syncChannel = typeof window !== 'undefined' && 'BroadcastChannel' i
     : null;
 let cachedDB = null;
 let dbOpenPromise = null;
+let openingTenant = '';
+
+// Close a cached connection immediately when a different company is activated.
+// This prevents an in-flight/open IndexedDB handle from ever leaking into the next tenant.
+if (typeof window !== 'undefined') {
+    window.addEventListener('oscar:activation-loaded', (event) => {
+        const nextTenant = String(event?.detail?.companyId || '').trim();
+        if (cachedDB && cachedTenant && nextTenant && cachedTenant !== nextTenant) {
+            try { cachedDB.close(); } catch {}
+            cachedDB = null;
+            cachedTenant = '';
+            dbOpenPromise = null;
+            openingTenant = '';
+        }
+    });
+}
 let storageStatusPromise = null;
 export async function enablePersistentLocalStorage() {
     if (storageStatusPromise) return storageStatusPromise;
@@ -39,34 +55,47 @@ function openDB() {
     }
     if (cachedDB && cachedTenant !== wantedTenant) { try { cachedDB.close(); } catch {} cachedDB = null; dbOpenPromise = null; }
     if (dbOpenPromise) {
-        return dbOpenPromise;
+        if (openingTenant === wantedTenant) return dbOpenPromise;
+        // A database for another tenant is still opening. Let it settle, close it,
+        // then open the database that belongs to the currently active company.
+        return dbOpenPromise.catch(() => null).then(() => {
+            if (cachedDB && cachedTenant !== wantedTenant) { try { cachedDB.close(); } catch {} cachedDB = null; cachedTenant = ''; }
+            dbOpenPromise = null;
+            openingTenant = '';
+            return openDB();
+        });
     }
+    openingTenant = wantedTenant;
     dbOpenPromise = new Promise((resolve, reject) => {
         try {
             if (typeof window === 'undefined' || !window.indexedDB) {
                 throw new Error('IndexedDB is not supported');
             }
-            const request = indexedDB.open(dbNameForTenant(), DB_VERSION);
+            const request = indexedDB.open(dbNameForTenant(wantedTenant), DB_VERSION);
             request.onblocked = () => {
                 console.warn('IndexedDB version upgrade blocked by another connection');
             };
             request.onerror = () => {
                 dbOpenPromise = null;
+                openingTenant = '';
                 reject(request.error || new Error('Failed to open database'));
             };
             request.onsuccess = () => {
                 cachedDB = request.result;
                 cachedTenant = wantedTenant;
+                openingTenant = wantedTenant;
                 cachedDB.onclose = () => {
                     cachedDB = null;
                     cachedTenant = '';
                     dbOpenPromise = null;
+                    openingTenant = '';
                 };
                 cachedDB.onversionchange = () => {
                     cachedDB?.close();
                     cachedDB = null;
                     cachedTenant = '';
                     dbOpenPromise = null;
+                    openingTenant = '';
                 };
                 resolve(cachedDB);
             };
@@ -118,6 +147,7 @@ function openDB() {
         }
         catch (e) {
             dbOpenPromise = null;
+            openingTenant = '';
             reject(e);
         }
     });
@@ -964,93 +994,137 @@ export async function ensurePrimaryShowroomWarehouse() {
     } catch { return false; }
 }
 
-// Seed initial database if empty
+// Seed a NEW company with production-safe empty data only.
+// Never inject demo products/customers/suppliers/stock into a real activation key.
 export async function seedDatabaseDefaults() {
     const settings = await getFromStore('settings', 'store_config');
-    if (!settings) {
-        const companyName = String(window.OscarActivation?.readRuntime?.()?.companyName || '').trim();
-        await putInStore('settings', { key: 'store_config', ...DEFAULT_SETTINGS, ...(companyName ? { storeName: companyName } : {}) });
-        await bulkPut('warehouses', DEFAULT_WAREHOUSES);
-        await bulkPut('categories', DEFAULT_CATEGORIES);
-        await bulkPut('accounts', DEFAULT_ACCOUNTS);
-        await bulkPut('customers', DEFAULT_CUSTOMERS);
-        await bulkPut('suppliers', DEFAULT_SUPPLIERS);
-        await bulkPut('products', getDemoProducts());
-        await bulkPut('stock', getDemoStock());
-        await bulkPut('employees', DEFAULT_EMPLOYEES);
-        await bulkPut('vouchers', DEFAULT_VOUCHERS);
-        await putInStore('shifts', DEFAULT_SHIFT);
-        // Initial audit log
-        await putInStore('audit_logs', {
-            id: 'log-init',
-            timestamp: new Date().toISOString(),
-            userId: 'usr-admin',
-            userName: 'مدير النظام',
-            action: 'تهيئة النظام',
-            targetType: 'SYSTEM',
-            targetId: 'initial_setup',
-            details: 'تم بدء تشغيل أوسكار المحاسبي بنجاح مع البيانات التأسيسية وشجرة الوحدات.',
+    if (settings) return false;
+    const rt = window.OscarActivation?.readRuntime?.() || {};
+    const companyId = String(rt.companyId || '').trim();
+    const companyName = String(rt.companyName || '').trim();
+    await putInStore('settings', {
+        key: 'store_config',
+        ...DEFAULT_SETTINGS,
+        ...(companyName ? { storeName: companyName } : {}),
+        tenantId: companyId,
+        seedMode: 'production-empty',
+    });
+    await bulkPut('warehouses', [{ ...DEFAULT_WAREHOUSES[0], isDefault: true }]);
+    await bulkPut('accounts', [{ ...DEFAULT_ACCOUNTS[0], balance: 0, isDefault: true }]);
+    const account = rt.account || null;
+    if (account?.id) {
+        await putInStore('employees', {
+            ...account,
+            id: account.id,
+            name: account.name || account.displayName || 'مدير النظام',
+            displayName: account.displayName || account.name || 'مدير النظام',
+            role: account.role || (rt.type === 'company-manager' ? 'admin' : 'custom'),
+            roleName: account.roleName || account.role || (rt.type === 'company-manager' ? 'مدير النظام' : 'موظف'),
+            active: account.active !== false,
+            system: account.system !== false,
+            permissions: account.permissions ?? rt.permissions ?? {},
+            createdAt: account.createdAt || new Date().toISOString(),
         });
+    }
+    await putInStore('audit_logs', {
+        id: `log-init-${companyId || Date.now()}`,
+        timestamp: new Date().toISOString(),
+        userId: account?.id || 'system',
+        userName: account?.name || account?.displayName || 'مدير النظام',
+        action: 'تهيئة النظام',
+        targetType: 'SYSTEM',
+        targetId: 'initial_setup',
+        details: 'تم بدء قاعدة شركة جديدة فارغة بدون بيانات تجريبية.',
+    });
+    return true;
+}
+
+// Older builds seeded six demo products and sample customers/suppliers into every new key.
+// Remove that exact untouched demo pack only when the tenant has no real business activity.
+// User-entered data is never cleared or overwritten.
+export async function cleanupLegacyDemoSeedIfPristine() {
+    try {
+        const [products, customers, suppliers, invoices, purchases, movements, transfers, expenses, statements, vouchers] = await Promise.all([
+            getAllFromStore('products'), getAllFromStore('customers'), getAllFromStore('suppliers'),
+            getAllFromStore('invoices'), getAllFromStore('purchases'), getAllFromStore('stock_movements'),
+            getAllFromStore('transfers'), getAllFromStore('expenses'), getAllFromStore('partner_statements'), getAllFromStore('vouchers'),
+        ]);
+        const demoProductIds = new Set(['prod-water','prod-cola','prod-rice','prod-milk','prod-bisc','prod-ariel']);
+        const demoCustomerIds = new Set(['cust-1','cust-2','cust-3']);
+        const demoSupplierIds = new Set(['supp-1','supp-2','supp-3']);
+        const demoVoucherIds = new Set(['vouch-1','vouch-2']);
+        const hasRealActivity = [invoices,purchases,movements,transfers,expenses,statements].some(rows => Array.isArray(rows) && rows.length > 0);
+        const hasDemoProducts = Array.isArray(products) && products.some(p => demoProductIds.has(String(p?.id || '')));
+        const onlyKnownProducts = Array.isArray(products) && products.every(p => demoProductIds.has(String(p?.id || '')));
+        const onlyKnownCustomers = Array.isArray(customers) && customers.every(x => demoCustomerIds.has(String(x?.id || '')));
+        const onlyKnownSuppliers = Array.isArray(suppliers) && suppliers.every(x => demoSupplierIds.has(String(x?.id || '')));
+        const onlyKnownVouchers = Array.isArray(vouchers) && vouchers.every(x => demoVoucherIds.has(String(x?.id || '')));
+        if (hasRealActivity || !hasDemoProducts || !onlyKnownProducts || !onlyKnownCustomers || !onlyKnownSuppliers || !onlyKnownVouchers) return false;
+
+        for (const p of products || []) if (demoProductIds.has(String(p?.id || ''))) await deleteFromStore('products', p.id);
+        const stockRows = await getAllFromStore('stock');
+        for (const row of stockRows || []) if (demoProductIds.has(String(row?.productId || ''))) await deleteFromStore('stock', [row.productId, row.warehouseId]);
+        for (const x of customers || []) if (demoCustomerIds.has(String(x?.id || ''))) await deleteFromStore('customers', x.id);
+        for (const x of suppliers || []) if (demoSupplierIds.has(String(x?.id || ''))) await deleteFromStore('suppliers', x.id);
+        for (const x of vouchers || []) if (demoVoucherIds.has(String(x?.id || ''))) await deleteFromStore('vouchers', x.id);
+
+        const categories = await getAllFromStore('categories');
+        const demoCategoryIds = new Set(['cat-drinks','cat-dairy','cat-food','cat-sweets','cat-cleaners','cat-frozen','cat-bakery']);
+        for (const x of categories || []) if (demoCategoryIds.has(String(x?.id || ''))) await deleteFromStore('categories', x.id);
+        const shifts = await getAllFromStore('shifts');
+        for (const x of shifts || []) if (String(x?.id || '') === 'shift-1') await deleteFromStore('shifts', x.id);
+        const audits = await getAllFromStore('audit_logs');
+        for (const x of audits || []) if (String(x?.id || '') === 'log-init') await deleteFromStore('audit_logs', x.id);
+        const warehouses = await getAllFromStore('warehouses');
+        for (const x of warehouses || []) if (String(x?.id || '') === 'wh-shop') await deleteFromStore('warehouses', x.id);
+
+        // Sample accounts contained fake opening balances. Replace only the untouched demo set.
+        const accounts = await getAllFromStore('accounts');
+        const demoAccountIds = new Set(['acc-cash','acc-bank','acc-wallet','acc-card']);
+        const accountsAreDemoOnly = Array.isArray(accounts) && accounts.length > 0 && accounts.every(x => demoAccountIds.has(String(x?.id || '')));
+        if (accountsAreDemoOnly) {
+            for (const x of accounts) await deleteFromStore('accounts', x.id);
+            await putInStore('accounts', { ...DEFAULT_ACCOUNTS[0], balance: 0, isDefault: true });
+        }
+
+        // Remove sample employees but keep the real account embedded in the activation file.
+        const rt = window.OscarActivation?.readRuntime?.() || {};
+        const loginAccount = rt.account || null;
+        const employees = await getAllFromStore('employees');
+        const demoEmployeeIds = new Set(['emp-admin','emp-cashier-1','emp-accountant']);
+        for (const x of employees || []) {
+            if (demoEmployeeIds.has(String(x?.id || '')) && String(x?.id || '') !== String(loginAccount?.id || '')) await deleteFromStore('employees', x.id);
+        }
+        if (loginAccount?.id) {
+            await putInStore('employees', {
+                ...loginAccount,
+                id: loginAccount.id,
+                name: loginAccount.name || loginAccount.displayName || 'مدير النظام',
+                displayName: loginAccount.displayName || loginAccount.name || 'مدير النظام',
+                role: loginAccount.role || (rt.type === 'company-manager' ? 'admin' : 'custom'),
+                roleName: loginAccount.roleName || loginAccount.role || (rt.type === 'company-manager' ? 'مدير النظام' : 'موظف'),
+                active: loginAccount.active !== false,
+                system: loginAccount.system !== false,
+                permissions: loginAccount.permissions ?? rt.permissions ?? {},
+                createdAt: loginAccount.createdAt || new Date().toISOString(),
+            });
+        }
+        const cfg = await getFromStore('settings', 'store_config');
+        if (cfg) await putInStore('settings', { ...cfg, tenantId: String(rt.companyId || ''), seedMode: 'production-empty' });
+        return true;
+    } catch (error) {
+        console.warn('Demo seed cleanup skipped:', error);
+        return false;
     }
 }
 
 // One-time upgrade path: move the data from the old single-company database
 // into the first tenant database only when that tenant is still empty.
 export async function migrateLegacyDatabaseIfNeeded() {
-    const tenantId = getTenantId();
-    if (!tenantId || tenantId === 'local') return false;
-    const marker = `oscar_legacy_migrated_v1::${encodeURIComponent(tenantId)}`;
-    const claimKey = 'oscar_legacy_claimed_v1';
-    try {
-        if (localStorage.getItem(marker) === '1') return false;
-        const claimedBy = localStorage.getItem(claimKey);
-        if (claimedBy && claimedBy !== tenantId) { localStorage.setItem(marker, '1'); return false; }
-    } catch {}
-    try {
-        const currentSettings = await getFromStore('settings', 'store_config');
-        if (currentSettings) { try { localStorage.setItem(marker, '1'); } catch {} return false; }
-        const legacyCandidates = ['Oscar_Accounting_POS_DB', 'AlMezan_POS_DB'];
-        let legacyDbName = legacyCandidates[0];
-        if (indexedDB.databases) {
-            const list = await indexedDB.databases();
-            const names = new Set((list || []).map(x => x?.name).filter(Boolean));
-            legacyDbName = legacyCandidates.find(name => names.has(name)) || '';
-            if (!legacyDbName) { try { localStorage.setItem(marker, '1'); } catch {} return false; }
-        }
-        const legacy = await new Promise((resolve, reject) => {
-            const req = indexedDB.open(legacyDbName);
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = () => reject(req.error || new Error('تعذر فتح قاعدة البيانات القديمة'));
-            req.onupgradeneeded = () => {};
-        });
-        const stores = ['products','categories','warehouses','stock','stock_movements','invoices','purchases','customers','suppliers','partner_statements','accounts','transfers','expenses','shifts','audit_logs','held_invoices','settings','vouchers','employees'];
-        let copied = 0;
-        try {
-            for (const storeName of stores) {
-                if (!legacy.objectStoreNames.contains(storeName)) continue;
-                const rows = await new Promise((resolve, reject) => {
-                    const tx = legacy.transaction(storeName, 'readonly');
-                    const req = tx.objectStore(storeName).getAll();
-                    req.onsuccess = () => resolve(req.result || []);
-                    req.onerror = () => reject(req.error);
-                });
-                if (rows.length) {
-                    await bulkPut(storeName, rows, true);
-                    copied += rows.length;
-                }
-            }
-        } finally { try { legacy.close(); } catch {} }
-        if (copied) await ensurePrimaryShowroomWarehouse().catch(() => {});
-        try { localStorage.setItem(marker, '1'); if (copied) localStorage.setItem(claimKey, tenantId); } catch {}
-        if (copied) {
-            try { window.dispatchEvent(new CustomEvent('oscar:legacy-migrated', { detail: { copied, tenantId } })); } catch {}
-            window.OscarCloudSync?.requestSync?.(50);
-        }
-        return copied > 0;
-    } catch (e) {
-        console.warn('Legacy database migration skipped:', e);
-        return false;
-    }
+    // Disabled intentionally. A legacy single-company database has no trustworthy
+    // tenant identity, so automatically copying it into a newly created key can
+    // mix one company's data into another. Existing tenant databases are untouched.
+    return false;
 }
 
 export async function initializeDatabase(options = {}) {

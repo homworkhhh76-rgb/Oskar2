@@ -90,7 +90,7 @@ async function captureStoreChange(store,value,{deleted=false,key}={}){
 }
 async function ensureSchema(){const t=tenant(),d=window.OscarActivation?.tursoDirect,c=cfg();if(!t||!d||!c?.databaseURL||!c?.authToken)throw Error('بيانات مزامنة الشركة غير متاحة.');const table=d.table(c),metaTable=table+'_syncmeta';if(schemaTenant===t)return{d,c,table,metaTable};await d.ensure(c);const[info]=await d.pipeline(c,[{sql:`PRAGMA table_info(${table})`,args:[]}]);const cols=d.rows(info).map(x=>String(x.name));if(!cols.includes('sync_batch')){try{await d.pipeline(c,[{sql:`ALTER TABLE ${table} ADD COLUMN sync_batch INTEGER NOT NULL DEFAULT 0`,args:[]}])}catch(e){if(!/duplicate column|already exists/i.test(String(e?.message||e)))throw e}}await d.pipeline(c,[{sql:`CREATE TABLE IF NOT EXISTS ${metaTable} (id INTEGER PRIMARY KEY CHECK(id=1),batch INTEGER NOT NULL DEFAULT 0)`,args:[]},{sql:`INSERT OR IGNORE INTO ${metaTable}(id,batch) VALUES(1,0)`,args:[]},{sql:`CREATE INDEX IF NOT EXISTS idx_${table}_sync_batch ON ${table}(sync_batch,path)`,args:[]}]);schemaTenant=t;return{d,c,table,metaTable}}
 async function remoteBatch(s){const[r]=await s.d.pipeline(s.c,[{sql:`SELECT batch FROM ${s.metaTable} WHERE id=1`,args:[]}]);return Number(s.d.rows(r)[0]?.batch||0)}
-function buildStatements(s,batch){const st=[{sql:`UPDATE ${s.metaTable} SET batch=batch+1 WHERE id=1`,args:[]}];for(const[id,o]of batch){const env={v:o.deleted?null:o.value,deleted:!!o.deleted,rev:Number(o.rev||nextRev()),deviceId:o.deviceId||deviceId()};st.push({sql:`INSERT INTO ${s.table}(path,payload,deleted,updated_at,sync_batch) VALUES(?,?,?,?,(SELECT batch FROM ${s.metaTable} WHERE id=1)) ON CONFLICT(path) DO UPDATE SET payload=excluded.payload,deleted=excluded.deleted,updated_at=excluded.updated_at,sync_batch=excluded.sync_batch WHERE excluded.updated_at>=${s.table}.updated_at`,args:[pathFor(o.store,o.key),JSON.stringify(env),o.deleted?1:0,Number(o.rev||nextRev())]})}return st}
+function buildStatements(s,batch){const st=[{sql:`UPDATE ${s.metaTable} SET batch=batch+1 WHERE id=1`,args:[]}];for(const[id,o]of batch){const env={v:o.deleted?null:o.value,deleted:!!o.deleted,rev:Number(o.rev||nextRev()),deviceId:o.deviceId||deviceId(),tenantId:tenant()};st.push({sql:`INSERT INTO ${s.table}(path,payload,deleted,updated_at,sync_batch) VALUES(?,?,?,?,(SELECT batch FROM ${s.metaTable} WHERE id=1)) ON CONFLICT(path) DO UPDATE SET payload=excluded.payload,deleted=excluded.deleted,updated_at=excluded.updated_at,sync_batch=excluded.sync_batch WHERE excluded.updated_at>=${s.table}.updated_at`,args:[pathFor(o.store,o.key),JSON.stringify(env),o.deleted?1:0,Number(o.rev||nextRev())]})}return st}
 async function flushRealtimeOp(id,op){
   if(!op||navigator.onLine===false||!tenant())return false;
   const s=await ensureSchema();
@@ -160,6 +160,7 @@ async function pullRealtimeSnapshot({force=false}={}){
         const parsed=parsePath(row.path);if(!parsed)continue;
         const isRelevant=REALTIME_STORES.has(parsed.store)||(parsed.store==='settings'&&parsed.key==='store_config');if(!isRelevant)continue;
         let env=null;try{env=typeof row.payload==='string'?JSON.parse(row.payload):row.payload}catch(_){env=null}
+        if(env?.tenantId&&safe(env.tenantId)!==tenant())continue;
         const remoteRev=Number(row.updated_at||env?.rev||0),id=pk(parsed.store,parsed.key),local=pending[id];
         if(local&&Number(local.rev||0)>remoteRev)continue;
         if(!force&&Number(seen[row.path]||0)>=remoteRev)continue;
@@ -209,6 +210,7 @@ async function applyRows(rows,batch){
     for(const row of ordered){
       const parsed=parsePath(row.path);if(!parsed||!STORES.has(parsed.store))continue;
       let env=null;try{env=typeof row.payload==='string'?JSON.parse(row.payload):row.payload}catch(_){env=null}
+      if(env?.tenantId&&safe(env.tenantId)!==tenant())continue;
       const remoteRev=Number(row.updated_at||env?.rev||0),id=pk(parsed.store,parsed.key),localPending=pending[id];
       if(localPending&&Number(localPending.rev||0)>remoteRev)continue;
       const deleted=Number(row.deleted)===1||env?.deleted===true;

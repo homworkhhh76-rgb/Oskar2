@@ -1,10 +1,10 @@
 import React, { useRef, useState, useMemo } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.36-stock-stable-1';
-import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.36-stock-stable-1';
-import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-stock-stable-1';
+import { useApp } from './context__AppContext.js?v=7.9.4.36-customer-portal-stable-2';
+import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.36-customer-portal-stable-2';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-customer-portal-stable-2';
 import { Wifi, WifiOff, RefreshCw, Maximize2, Minimize2, Clock, Store, Camera, Menu, LogOut, Building2, Bell } from 'lucide-react';
-import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.36-stock-stable-1';
-import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.36-stock-stable-1';
+import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.36-customer-portal-stable-2';
+import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.36-customer-portal-stable-2';
 
 const h = React.createElement;
 
@@ -37,7 +37,7 @@ export const Header = () => {
     if (!file.type.startsWith('image/')) { showToast('يرجى اختيار ملف صورة صالح', 'error'); return; }
     const reader = new FileReader();
     reader.onload = () => {
-      saveSettings({ ...settings, logoUrl: reader.result });
+      saveSettings({ ...settings, logoUrl: reader.result, logoSourceUrl: '' });
       showToast('تم تحديث شعار المحل', 'success');
     };
     reader.readAsDataURL(file);
@@ -49,7 +49,7 @@ export const Header = () => {
       h('button', { type: 'button', onClick: () => setMobileSidebarOpen(!mobileSidebarOpen), className: 'lg:hidden p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800', title: 'القائمة الجانبية' }, h(Menu, { className: 'w-5 h-5' })),
       h('input', { ref: logoInputRef, type: 'file', accept: 'image/*', className: 'hidden', onChange: handleLogoUpload }),
       h('button', { type: 'button', onClick: () => canSettings ? logoInputRef.current?.click() : setActiveTab(homeTab), className: 'relative w-9 h-9 shrink-0 rounded-xl overflow-hidden bg-white border border-emerald-500/30 shadow-xs group', title: canSettings ? 'تغيير شعار المحل' : 'الصفحة الرئيسية المسموحة' },
-        h('img', { src: getBrandLogoDataUrl(settings), alt: settings.storeName, className: 'w-full h-full object-contain bg-white p-0.5', onError: (e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_LOGO_DATA_URL; } }),
+        h('img', { src: getBrandLogoDisplayUrl(settings), alt: settings.storeName, className: 'w-full h-full object-contain bg-white p-0.5', onError: (e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_LOGO_DATA_URL; } }),
         h('span', { className: 'absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity' }, h(Camera, { className: 'w-4 h-4' }))
       ),
       h('button', { type: 'button', onClick: () => setActiveTab(homeTab), className: 'flex flex-col text-right min-w-0 group focus:outline-none' },

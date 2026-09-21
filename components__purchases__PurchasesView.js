@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.36-stock-stable-1';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.36-stock-stable-1';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.36-stock-stable-1';
-import { getBrandLogoDataUrl } from './brand__logo.js?v=7.9.4.36-stock-stable-1';
-import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.36-stock-stable-1';
-import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.36-stock-stable-1';
-import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.36-stock-stable-1';
+import { useApp } from './context__AppContext.js?v=7.9.4.36-customer-portal-stable-2';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.36-customer-portal-stable-2';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.36-customer-portal-stable-2';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl } from './brand__logo.js?v=7.9.4.36-customer-portal-stable-2';
+import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.36-customer-portal-stable-2';
+import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.36-customer-portal-stable-2';
+import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.36-customer-portal-stable-2';
 import { Plus, Trash2, Building2, Eye, X, Image as ImageIcon, FileDown, FileSpreadsheet, Printer, AlertTriangle, ReceiptText, Sparkles, ScanLine } from 'lucide-react';
 
 const h = React.createElement;
@@ -321,7 +321,7 @@ export const PurchasesView = () => {
         h('div',{className:'flex-1 overflow-y-auto p-3 sm:p-5 custom-scrollbar'},
           h('article',{ref:singleRef,id:'purchase-invoice-export',dir:'rtl',className:'mx-auto w-full max-w-[720px] bg-white text-slate-900 rounded-xl border border-slate-200 shadow-sm overflow-hidden',style:{fontFamily:"'Cairo',Arial,sans-serif",colorScheme:'light'}},
             h('header',{className:'p-5 sm:p-6 text-center border-b border-slate-200'},
-              h('img',{src:getBrandLogoDataUrl(settings),alt:'الشعار',className:'w-16 h-16 object-contain mx-auto mb-2'}),
+              h('img',{src:getBrandLogoDisplayUrl(settings),alt:'الشعار',className:'w-16 h-16 object-contain mx-auto mb-2'}),
               h('h2',{className:'text-xl font-black leading-tight'},settings.storeName || 'أوسكار المحاسبي'),
               h('div',{className:'text-[11px] text-emerald-700 font-bold mt-1'},'فاتورة مشتريات وتوريد'),
               h('div',{className:'mt-2 text-[10px] text-slate-500 leading-5'},

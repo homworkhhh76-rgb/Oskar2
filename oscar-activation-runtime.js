@@ -111,8 +111,43 @@
 
   const scopedDbKey=id=>`${LOCAL_DB_ACCESS_KEY}::${encodeURIComponent(safe(id)||'current')}`;
   function saveDatabaseAccess(db,meta={}){const identity=safe(meta.companyId||meta.tenantId||readRuntime()?.companyId),cfg={databaseURL:safe(db?.databaseURL),authToken:safe(db?.authToken),table:safe(db?.table||'oscar_rtdb'),companyId:identity,tenantId:identity,savedAt:Date.now()};if(!cfg.databaseURL||!cfg.authToken)throw new Error('بيانات قاعدة الشركة غير مكتملة.');const wrapped=wrapText(JSON.stringify(cfg));localStorage.setItem(LOCAL_DB_ACCESS_KEY,wrapped);if(identity)localStorage.setItem(scopedDbKey(identity),wrapped);return cfg}
-  function readDatabaseAccess(identity=''){const wanted=safe(identity||readRuntime()?.companyId);for(const key of [wanted?scopedDbKey(wanted):'',LOCAL_DB_ACCESS_KEY].filter(Boolean)){try{const raw=localStorage.getItem(key),cfg=raw?JSON.parse(unwrapText(raw)):null;if(cfg?.databaseURL&&cfg?.authToken&&(!wanted||!cfg.companyId||cfg.companyId===wanted))return cfg}catch(_){}}return null}
-  function activatePayload(payload){if(!payload||payload.app!==APP_TAG)throw new Error('ملف التفعيل غير صالح.');const cfg=payload.database||{},aiCfg=payload.ai||{},runtime={activationKey:payload.activationKey,fileId:payload.fileId,type:payload.type,companyId:payload.companyId||payload.tenantId,tenantId:payload.tenantId||payload.companyId,companyKey:payload.companyKey||payload.activationKey,companyName:payload.companyName,account:payload.account||null,permissions:payload.permissions||payload.account?.permissions||[],status:payload.status||'active',plan:payload.plan||'lifetime',expiresAt:payload.expiresAt||'',database:{databaseURL:safe(cfg.databaseURL),authToken:safe(cfg.authToken),table:safe(cfg.table||'oscar_rtdb')},ai:{provider:safe(aiCfg.provider||'openrouter')||'openrouter',apiKey:safe(aiCfg.apiKey),model:safe(aiCfg.model||'google/gemini-2.5-flash:free')||'google/gemini-2.5-flash:free'},rootPath:payload.rootPath||'oscar/companies',activatedAt:Date.now()};localStorage.setItem(RUNTIME_KEY,wrapText(JSON.stringify(runtime)));if(runtime.database.databaseURL&&runtime.database.authToken)saveDatabaseAccess(runtime.database,{companyId:runtime.companyId});window.dispatchEvent(new CustomEvent('oscar:activation-loaded',{detail:{...runtime,database:{...runtime.database,authToken:''},ai:{...runtime.ai,apiKey:runtime.ai.apiKey?'***':''}}}));return runtime}
+  function readDatabaseAccess(identity=''){
+    const wanted=safe(identity||readRuntime()?.companyId);
+    // Company database credentials are STRICTLY tenant scoped. Never borrow the
+    // last opened company's generic credentials for a different/new company.
+    if(wanted){
+      try{
+        const raw=localStorage.getItem(scopedDbKey(wanted));
+        const cfg=raw?JSON.parse(unwrapText(raw)):null;
+        if(cfg?.databaseURL&&cfg?.authToken&&safe(cfg.companyId)===wanted)return cfg;
+      }catch(_){ }
+      // Compatibility: an old generic record may be used only when it explicitly
+      // belongs to the exact same company. Blank/unscoped records are rejected.
+      try{
+        const raw=localStorage.getItem(LOCAL_DB_ACCESS_KEY);
+        const cfg=raw?JSON.parse(unwrapText(raw)):null;
+        if(cfg?.databaseURL&&cfg?.authToken&&safe(cfg.companyId)===wanted){
+          try{localStorage.setItem(scopedDbKey(wanted),raw)}catch(_){ }
+          return cfg;
+        }
+      }catch(_){ }
+      return null;
+    }
+    try{
+      const raw=localStorage.getItem(LOCAL_DB_ACCESS_KEY),cfg=raw?JSON.parse(unwrapText(raw)):null;
+      return cfg?.databaseURL&&cfg?.authToken?cfg:null;
+    }catch(_){return null}
+  }
+  function activatePayload(payload){
+    if(!payload||payload.app!==APP_TAG)throw new Error('ملف التفعيل غير صالح.');
+    const companyId=safe(payload.companyId||payload.tenantId),companyKey=safe(payload.companyKey||payload.activationKey);
+    if(!companyId||!companyKey)throw new Error('ملف الشركة غير مكتمل.');
+    const cfg=payload.database||{},customerCfg=payload.customerDatabase||{},aiCfg=payload.ai||{},runtime={activationKey:payload.activationKey,fileId:payload.fileId,type:payload.type,companyId,tenantId:companyId,companyKey,companyName:payload.companyName,account:payload.account||null,permissions:payload.permissions||payload.account?.permissions||[],status:payload.status||'active',plan:payload.plan||'lifetime',expiresAt:payload.expiresAt||'',database:{databaseURL:safe(cfg.databaseURL),authToken:safe(cfg.authToken),table:safe(cfg.table||'oscar_rtdb')},customerDatabase:{databaseURL:safe(customerCfg.databaseURL||cfg.databaseURL),authToken:safe(customerCfg.authToken),table:safe(customerCfg.table||cfg.table||'oscar_rtdb')},ai:{provider:safe(aiCfg.provider||'openrouter')||'openrouter',apiKey:safe(aiCfg.apiKey),model:safe(aiCfg.model||'google/gemini-2.5-flash:free')||'google/gemini-2.5-flash:free'},rootPath:payload.rootPath||'oscar/companies',activatedAt:Date.now()};
+    localStorage.setItem(RUNTIME_KEY,wrapText(JSON.stringify(runtime)));
+    if(runtime.database.databaseURL&&runtime.database.authToken)saveDatabaseAccess(runtime.database,{companyId});
+    window.dispatchEvent(new CustomEvent('oscar:activation-loaded',{detail:{...runtime,database:{...runtime.database,authToken:''},customerDatabase:{...runtime.customerDatabase,authToken:runtime.customerDatabase?.authToken?'***':''},ai:{...runtime.ai,apiKey:runtime.ai.apiKey?'***':''}}}));
+    return runtime
+  }
   function readRuntime(){try{const raw=localStorage.getItem(RUNTIME_KEY);return raw?JSON.parse(unwrapText(raw)):null}catch(_){return null}}
   function clearRuntime(){localStorage.removeItem(RUNTIME_KEY)}
   function saveMasterConfig(cfg){const aiInput=cfg.ai||{},master={database:{databaseURL:safe(cfg.databaseURL),authToken:safe(cfg.authToken),table:safe(cfg.table||'oscar_rtdb')},ai:{provider:safe(cfg.aiProvider||aiInput.provider||'openrouter')||'openrouter',apiKey:safe(cfg.aiApiKey||aiInput.apiKey),model:safe(cfg.aiModel||aiInput.model||'google/gemini-2.5-flash:free')||'google/gemini-2.5-flash:free'},adminRootPath:cfg.adminRootPath||'oscar/admin',rootPath:cfg.rootPath||'oscar/companies',savedAt:Date.now()};if(!master.database.databaseURL||!master.database.authToken)throw new Error('بيانات قاعدة الأم غير مكتملة.');localStorage.setItem(MASTER_KEY,wrapText(JSON.stringify(master)));return master}
@@ -191,7 +226,7 @@
     if(allowOffline){const access=validatePayloadLocally(payload);try{markVerified(payload,access)}catch(_){}return{access,online:false,deferred:true,provisional:true}}
     throw new Error('تعذر التحقق من ملف الدخول.');
   }
-  function buildRolePayload(type,account,extra={}){const rt=readRuntime()||{};return{type,activationKey:rt.companyKey||rt.activationKey,fileId:`${type}_${account?.id||Date.now()}_${account?.authVersion||''}`,companyId:rt.companyId,tenantId:rt.companyId,companyKey:rt.companyKey||rt.activationKey,companyName:rt.companyName||'الشركة',status:rt.status||'active',plan:rt.plan||'lifetime',expiresAt:rt.expiresAt||'',rootPath:rt.rootPath||'oscar/companies',database:readDatabaseAccess(rt.companyId)||rt.database||{},ai:clone(rt.ai||{}),permissions:account?.permissions||[],account:clone(account),...extra}}
+  function buildRolePayload(type,account,extra={}){const rt=readRuntime()||{};return{type,activationKey:rt.companyKey||rt.activationKey,fileId:`${type}_${account?.id||Date.now()}_${account?.authVersion||''}`,companyId:rt.companyId,tenantId:rt.companyId,companyKey:rt.companyKey||rt.activationKey,companyName:rt.companyName||'الشركة',status:rt.status||'active',plan:rt.plan||'lifetime',expiresAt:rt.expiresAt||'',rootPath:rt.rootPath||'oscar/companies',database:readDatabaseAccess(rt.companyId)||rt.database||{},customerDatabase:clone(rt.customerDatabase||{}),ai:clone(rt.ai||{}),permissions:account?.permissions||[],account:clone(account),...extra}}
   async function prepareVerifiedRoleFile(type,account,fileName){const payload=buildRolePayload(type,account);if(window.OscarCloudSync){const result=await window.OscarCloudSync.syncNow({manual:false,force:true});if(result?.remaining>0||result?.error)throw new Error('الحساب محفوظ محلياً لكن لم يصل إلى قاعدة الشركة بعد. شغّل المزامنة ثم أعد المحاولة.')}await verifyPayloadRemote(payload);return downloadActivationFile(payload,fileName)}
 
   async function prepareCompanyManagerFileRotation(fileName=''){
@@ -203,7 +238,7 @@
     if(policyVersion>=2&&currentVersion!==remoteVersion&&currentVersion!==previousVersion)throw new Error('هذا الملف لم يعد مخولاً بتغيير ملف المدير. ادخل بأحدث ملف مدير أولاً.');
     const authVersion='AUTH-'+(crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`),issuedAt=new Date().toISOString();
     const manager={...remote,...current,id:remote.id||current.id,active:true,authVersion,previousAuthVersion:currentVersion,pendingAuthVersion:authVersion,pendingIssuedAt:issuedAt,authPolicyVersion:2,updatedAt:issuedAt},updatedAt=Date.now(),nextAccess={...access,manager,updatedAt};
-    const account={...manager,branchId:current.branchId||'BR-MAIN',permissions:Array.isArray(current.permissions)?current.permissions:[]},payload={type:'company-manager',activationKey:rt.companyKey||rt.activationKey,fileId:`manager_${account.id}_${authVersion}`,companyId,tenantId:companyId,companyKey:rt.companyKey||rt.activationKey,companyName:rt.companyName||access.companyName||'الشركة',status:access.status||rt.status||'active',plan:access.plan||rt.plan||'lifetime',expiresAt:access.endAt||rt.expiresAt||'',rootPath:rt.rootPath||'oscar/companies',database:db,ai:clone(rt.ai||{}),account,permissions:account.permissions,app:APP_TAG};
+    const account={...manager,branchId:current.branchId||'BR-MAIN',permissions:Array.isArray(current.permissions)?current.permissions:[]},payload={type:'company-manager',activationKey:rt.companyKey||rt.activationKey,fileId:`manager_${account.id}_${authVersion}`,companyId,tenantId:companyId,companyKey:rt.companyKey||rt.activationKey,companyName:rt.companyName||access.companyName||'الشركة',status:access.status||rt.status||'active',plan:access.plan||rt.plan||'lifetime',expiresAt:access.endAt||rt.expiresAt||'',rootPath:rt.rootPath||'oscar/companies',database:db,customerDatabase:clone(rt.customerDatabase||{}),ai:clone(rt.ai||{}),account,permissions:account.permissions,app:APP_TAG};
     const prepared=await prepareActivationDownload(payload,fileName||`${rt.companyName||access.companyName||'الشركة'}-مدير-جديد.mzauth`);
     await writeExact(db,path,nextAccess,updatedAt,false);
     return{...prepared,authVersion,previousAuthVersion:currentVersion,companyId};
