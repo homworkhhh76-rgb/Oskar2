@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { useApp } from './context__AppContext.js?v=7.9.4.41-recipe-accounting';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.41-recipe-accounting';
 import { ArrowLeftRight, Plus, Trash2 } from 'lucide-react';
-import { formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.41-recipe-accounting';
 
 const h = React.createElement;
 const makeRow = (products = []) => {

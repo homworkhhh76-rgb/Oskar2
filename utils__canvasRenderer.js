@@ -1,11 +1,11 @@
-import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { code128Geometry } from './utils__code128.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.41-recipe-accounting';
+import { code128Geometry } from './utils__code128.js?v=7.9.4.41-recipe-accounting';
 
 const imageCache = new Map();
 const num = v => { const n=Number(v); return Number.isFinite(n)?n:0; };
 const money = v => num(v).toFixed(2);
 const normalize = v => String(v ?? '').replace(/\s+/g,' ').trim();
-const dateText = v => { const d=new Date(v); return Number.isFinite(d.getTime())?d.toLocaleString('ar-EG'):'-'; };
+const dateText = v => { const d=new Date(v); return Number.isFinite(d.getTime())?d.toLocaleString('ar-EG-u-nu-latn'):'-'; };
 
 export function resolveExportElement(target){
   if(!target) return null;
@@ -75,7 +75,7 @@ export async function renderTableCanvas({title='تقرير',subtitle='',headers=
   try{await document.fonts?.ready;}catch(_){}
   settings=documentBrandSettings(settings);
   const w=orientation==='landscape'?1600:1120;const ctxProbe=document.createElement('canvas').getContext('2d');const cols=tableColumnGeometry(headers,48,w-96);const fs=headers.length>9?16:headers.length>7?17:19;let bodyH=0;(rows||[]).forEach(r=>bodyH+=rowHeight(ctxProbe,r,cols,fs,56));const h=Math.max(900,320+bodyH+100);const {canvas,ctx}=createCanvas(w,h);let y=await drawBrand(ctx,w,settings,title,subtitle,30);
-  roundedRect(ctx,48,y,w-96,52,10,'#f8fafc','#e2e8f0');txt(ctx,`تاريخ التقرير: ${new Date().toLocaleString('ar-EG')}`,w-68,y+26,16,600,'right','#64748b');txt(ctx,pageNote||`عدد السجلات: ${(rows||[]).length}`,68,y+26,16,700,'left','#334155');y+=70;
+  roundedRect(ctx,48,y,w-96,52,10,'#f8fafc','#e2e8f0');txt(ctx,`تاريخ التقرير: ${new Date().toLocaleString('ar-EG-u-nu-latn')}`,w-68,y+26,16,600,'right','#64748b');txt(ctx,pageNote||`عدد السجلات: ${(rows||[]).length}`,68,y+26,16,700,'left','#334155');y+=70;
   y=drawTable(ctx,{x:48,y,w:w-96,headers,rows,fontSize:fs});y+=38;txt(ctx,`تم إنشاء هذا التقرير من نظام ${settings.storeName||'أوسكار المحاسبي'}`,w/2,y,14,600,'center','#94a3b8');return canvas;
 }
 

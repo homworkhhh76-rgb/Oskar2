@@ -1,11 +1,11 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, X } from 'lucide-react';
-import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { printElementOnly } from './utils__export.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.41-recipe-accounting';
+import { printElementOnly } from './utils__export.js?v=7.9.4.41-recipe-accounting';
 
 const h = React.createElement;
-const money = (value) => Number(value || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money = (value) => Number(value || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const addonUnitTotal = (item) => (item?.addons || []).reduce((sum, addon) => sum + Number(addon?.price || 0), 0);
 const unitTotal = (item) => Number(item?.unitPrice || 0) + addonUnitTotal(item);
 const lineTotal = (item) => unitTotal(item) * Number(item?.quantity || 0);
@@ -121,7 +121,7 @@ export const KitchenTicketModal = ({ order, isAdditionOnly = false, onClose }) =
             infoRow('الجرسون:', order.waiterName || 'الكاشير'),
             order.customerName ? infoRow('العميل:', order.customerName) : null,
             order.guestCount ? infoRow('عدد الأفراد:', order.guestCount) : null,
-            infoRow('وقت الإرسال:', new Date(order.lastKitchenSendAt || order.sentToKitchenAt || order.createdAt || Date.now()).toLocaleString('ar-EG'))
+            infoRow('وقت الإرسال:', new Date(order.lastKitchenSendAt || order.sentToKitchenAt || order.createdAt || Date.now()).toLocaleString('ar-EG-u-nu-latn'))
           ),
           h('div', {
             style: {

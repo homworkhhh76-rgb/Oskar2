@@ -1,9 +1,10 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.41-recipe-accounting';
+import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.41-recipe-accounting';
+import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.41-recipe-accounting';
+import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.41-recipe-accounting';
+import { notifyTelegramInvoice } from './services__telegram.js?v=7.9.4.41-recipe-accounting';
 const AppContext = createContext(null);
 const recordTime = (item = {}) => {
     const fields = ['createdAt', 'date', 'timestamp', 'startTime', 'updatedAt'];
@@ -36,6 +37,66 @@ const normalizeActiveWarehouseSettings = (value, warehouseRows = []) => {
 const finiteNumber = (value, fallback = 0) => {
     const n = Number(value);
     return Number.isFinite(n) ? n : fallback;
+};
+const recipeIngredientBaseCost = (ingredient, productRows = []) => {
+    const product = (productRows || []).find((p) => p?.id === (ingredient?.ingredientProductId || ingredient?.productId));
+    if (!product) return 0;
+    const units = Array.isArray(product.units) ? product.units : [];
+    const unit = units.find((u) => u.id === (ingredient?.ingredientUnitId || ingredient?.unitId))
+        || units.find((u) => u.name === ingredient?.unit)
+        || units.find((u) => u.id === product.baseUnitId)
+        || units.find((u) => (Number(u.conversionToBase) || 1) === 1)
+        || units[0];
+    const unitFactor = Math.max(0.00000001, Number(unit?.conversionToBase) || 1);
+    const productBaseCost = Math.max(0, Number(product.costPrice) || 0);
+    const unitCostAsBase = Math.max(0, Number(unit?.costPrice) || 0) / unitFactor;
+    return productBaseCost > 0 ? productBaseCost : unitCostAsBase;
+};
+const calculateRecipeBaseCost = (recipe, productRows = []) => {
+    const ingredients = Array.isArray(recipe?.ingredients || recipe?.items) ? (recipe.ingredients || recipe.items) : [];
+    const materialsCost = ingredients.reduce((sum, ing) => {
+        const product = (productRows || []).find((p) => p?.id === (ing?.ingredientProductId || ing?.productId));
+        if (!product) return sum;
+        const units = Array.isArray(product.units) ? product.units : [];
+        const unit = units.find((u) => u.id === (ing?.ingredientUnitId || ing?.unitId))
+            || units.find((u) => u.name === ing?.unit)
+            || units.find((u) => u.id === product.baseUnitId)
+            || units.find((u) => (Number(u.conversionToBase) || 1) === 1)
+            || units[0];
+        const factor = Number(ing?.conversionFactor ?? unit?.conversionToBase ?? 1) || 1;
+        const baseQty = Math.max(0, Number(ing?.baseQuantity) || ((Number(ing?.quantity) || 0) * factor));
+        return sum + baseQty * recipeIngredientBaseCost(ing, productRows);
+    }, 0);
+    const extraCost = Math.max(0, Number(recipe?.extraCost ?? recipe?.productionOverhead ?? 0) || 0);
+    return Math.max(0, materialsCost + extraCost);
+};
+const applyRecipeCostsToProducts = (productRows = [], recipes = []) => {
+    const rows = (productRows || []).map((p) => ({ ...p, units:Array.isArray(p?.units) ? p.units.map((u) => ({...u})) : [] }));
+    for (const recipe of recipes || []) {
+        const productId = recipe?.productId || recipe?.mealProductId;
+        if (!productId) continue;
+        const idx = rows.findIndex((p) => p.id === productId);
+        if (idx < 0) continue;
+        const baseCost = Number(calculateRecipeBaseCost(recipe, rows).toFixed(4));
+        const current = rows[idx];
+        const units = (current.units || []).map((u) => {
+            const wanted = Number((baseCost * Math.max(1, Number(u.conversionToBase) || 1)).toFixed(4));
+            return Math.abs((Number(u.costPrice) || 0) - wanted) > 0.00005 ? { ...u, costPrice:wanted } : u;
+        });
+        const changed = Math.abs((Number(current.costPrice) || 0) - baseCost) > 0.00005
+            || Math.abs((Number(current.recipeCost) || 0) - baseCost) > 0.00005
+            || units.some((u, i) => u !== current.units?.[i]);
+        if (changed) {
+            rows[idx] = {
+                ...current,
+                costPrice: baseCost,
+                recipeCost: baseCost,
+                units,
+                updatedAt: new Date().toISOString(),
+            };
+        }
+    }
+    return rows;
 };
 const normalizeAccountRecord = (account) => {
     if (!account || typeof account !== 'object') return account;
@@ -206,7 +267,7 @@ export const AppProvider = ({ children }) => {
     // Reload all stores from IndexedDB
     const reloadData = useCallback(async () => {
         try {
-            const [prods, cats, whs, stk, stkMovs, invs, purchs, custs, supps, accs, trans, exps, shfts, audits, helds, syncs, sett, stmts, vouchs, emps,] = await Promise.all([
+            const [prods, cats, whs, stk, stkMovs, invs, purchs, custs, supps, accs, trans, exps, shfts, audits, helds, syncs, sett, stmts, vouchs, emps, recs,] = await Promise.all([
                 getAllFromStore('products'),
                 getAllFromStore('categories'),
                 getAllFromStore('warehouses'),
@@ -227,8 +288,11 @@ export const AppProvider = ({ children }) => {
                 getAllFromStore('partner_statements'),
                 getAllFromStore('vouchers'),
                 getAllFromStore('employees'),
+                getAllFromStore('recipes'),
             ]);
-            setProducts(newestFirst(prods));
+            const recipeCostedProducts = (recs || []).length ? applyRecipeCostsToProducts(prods || [], recs || []) : (prods || []);
+            if ((recs || []).length) await bulkPut('products', recipeCostedProducts);
+            setProducts(newestFirst(recipeCostedProducts));
             setCategories((cats || []).sort((a, b) => a.displayOrder - b.displayOrder));
             setWarehouses(whs || []);
             setStock(stk || []);
@@ -677,7 +741,7 @@ export const AppProvider = ({ children }) => {
                     const factor = Number(ing.conversionFactor ?? ingUnit?.conversionToBase ?? 1) || 1;
                     const qtyPerMeal = Number(ing.quantity) || 0;
                     const basePerMeal = Number(ing.baseQuantity) > 0 ? Number(ing.baseQuantity) : qtyPerMeal * factor;
-                    const requiredBaseQty = basePerMeal * item.quantity;
+                    const requiredBaseQty = basePerMeal * baseQuantity;
                     if (requiredBaseQty <= 0) continue;
                     const ingredientBaseCost = Number(ingProduct.costPrice) || (Number(ingUnit?.costPrice) / Math.max(1, Number(ingUnit?.conversionToBase) || 1)) || 0;
                     const cost = consumeFifo(ingProduct.id, requiredBaseQty, ingredientBaseCost);
@@ -691,7 +755,7 @@ export const AppProvider = ({ children }) => {
                         quantityPerMeal: qtyPerMeal,
                         conversionFactor: factor,
                         baseQuantityPerMeal: basePerMeal,
-                        soldMealQuantity: item.quantity,
+                        soldMealQuantity: baseQuantity,
                         baseQuantity: requiredBaseQty,
                         fifoCostTotal: cost,
                     });
@@ -726,7 +790,7 @@ export const AppProvider = ({ children }) => {
             const currentQty=stockIndex>=0?Number(updatedStockList[stockIndex].baseQuantity)||0:0;
             const newQty=currentQty-baseQty;
             if(stockIndex>=0) updatedStockList[stockIndex]={...updatedStockList[stockIndex],baseQuantity:newQty}; else updatedStockList.push({productId,warehouseId,baseQuantity:newQty});
-            newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:now,productId,productName,warehouseId,warehouseName:warehouse?.name||'صالة العرض',type:movementMeta.type||'sale',unitName:movementMeta.unitName||'وحدة أساسية',quantityInUnit:movementMeta.quantityInUnit??baseQty,conversionFactor:movementMeta.conversionFactor||1,baseQuantityChange:-baseQty,newBaseBalance:newQty,referenceId:invoice.id,referenceType:'INVOICE',userId:currentUser.id,userName:currentUser.name,recipeId:movementMeta.recipeId,manufacturedProductId:movementMeta.manufacturedProductId,manufacturedProductName:movementMeta.manufacturedProductName});
+            newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:now,productId,productName,warehouseId,warehouseName:warehouse?.name||'صالة العرض',type:movementMeta.type||'sale',unitName:movementMeta.unitName||'وحدة أساسية',quantityInUnit:movementMeta.quantityInUnit??baseQty,conversionFactor:movementMeta.conversionFactor||1,baseQuantityChange:-baseQty,newBaseBalance:newQty,referenceId:invoice.id,referenceType:'INVOICE',userId:currentUser.id,userName:currentUser.name,recipeId:movementMeta.recipeId,manufacturedProductId:movementMeta.manufacturedProductId,manufacturedProductName:movementMeta.manufacturedProductName,unitCost:Number(movementMeta.unitCost)||0,costAmount:Number(movementMeta.costAmount)||0,fifoCostTotal:Number(movementMeta.costAmount)||0});
         };
         for (const item of invoiceItems) {
             if (item.isManufacturedMeal && Array.isArray(item.recipeConsumption) && item.recipeConsumption.length > 0) {
@@ -739,10 +803,12 @@ export const AppProvider = ({ children }) => {
                         recipeId:item.recipeId,
                         manufacturedProductId:item.productId,
                         manufacturedProductName:item.productName,
+                        unitCost: ing.baseQuantity > 0 ? (Number(ing.fifoCostTotal) || 0) / Number(ing.baseQuantity) : 0,
+                        costAmount: Number(ing.fifoCostTotal) || 0,
                     });
                 }
             } else {
-                deductStock(item.productId, item.productName, item.baseQuantity, {type:'sale',unitName:item.unitName,quantityInUnit:item.quantity,conversionFactor:item.conversionFactor});
+                deductStock(item.productId, item.productName, item.baseQuantity, {type:'sale',unitName:item.unitName,quantityInUnit:item.quantity,conversionFactor:item.conversionFactor,unitCost:item.baseQuantity>0?(Number(item.fifoCostTotal)||0)/item.baseQuantity:0,costAmount:Number(item.fifoCostTotal)||0});
             }
         }
         await bulkPut('stock',updatedStockList); await bulkPut('stock_movements',newMovements); await bulkPut('products',productCopies);
@@ -762,7 +828,7 @@ export const AppProvider = ({ children }) => {
         if(customerStatement)setPartnerStatements(prev => [customerStatement, ...prev]);
         if(updatedShift)setShifts(prev => prev.map(x => x.id===updatedShift.id?updatedShift:x));
         setSyncQueue(window.OscarCloudSync?.pendingItems?.() || []);
-        playSuccessSound(settings.scannerBeepEnabled); if(!isDirectSale) clearCart(); showToast(`تم حفظ الفاتورة بنجاح [${invoiceNumber}]`,'success'); return invoice;
+        playSuccessSound(settings.scannerBeepEnabled); if(!isDirectSale) clearCart(); notifyTelegramInvoice(invoice,'sale').catch(()=>{}); showToast(`تم حفظ الفاتورة بنجاح [${invoiceNumber}]`,'success'); return invoice;
     }, [cart, invoiceDiscountType, invoiceDiscountValue, settings, warehouses, products, customers, selectedCustomer, currentUser, activeShift, stock, accounts, clearCart, showToast]);
     // Create Return Invoice
     const createReturnInvoice = useCallback(async (payload) => {
@@ -800,6 +866,10 @@ export const AppProvider = ({ children }) => {
                 total,
                 fifoCostTotal: returnFifoCost,
                 costPriceAtSale: costPerSoldUnit,
+                isManufacturedMeal: !!originalItem?.isManufacturedMeal,
+                recipeId: originalItem?.recipeId,
+                recipeConsumption: Array.isArray(originalItem?.recipeConsumption) ? originalItem.recipeConsumption.map((r) => ({...r})) : [],
+                originalSoldQuantity: Number(originalItem?.quantity) || 0,
             });
         }
         const refundMode = payload.refundMode === 'customer_balance' && original.customerId && original.customerId !== CASH_CUSTOMER.id ? 'customer_balance' : 'account';
@@ -832,7 +902,7 @@ export const AppProvider = ({ children }) => {
             refundMode,
             payments: refundMode === 'account' ? [
                 {
-                    method: refundAccount?.type === 'cash' ? 'cash' : 'account',
+                    method: refundAccount?.type || 'cash',
                     amount: refundTotal,
                     accountId: refundAccount?.id,
                     accountName: refundAccount?.name || 'الصندوق',
@@ -846,37 +916,46 @@ export const AppProvider = ({ children }) => {
             createdAt: now,
         };
         await putInStore('invoices', returnInvoice);
-        // Re-credit stock
+        // Re-credit stock. For manufactured items, restore the raw ingredients that were originally consumed.
         const updatedStockList = [...stock];
         const newMovements = [];
-        for (const item of returnItems) {
-            const stockIndex = updatedStockList.findIndex((s) => s.productId === item.productId && s.warehouseId === original.warehouseId);
-            const currentQty = stockIndex >= 0 ? updatedStockList[stockIndex].baseQuantity : 0;
-            const newQty = currentQty + item.baseQuantity;
-            if (stockIndex >= 0) {
-                updatedStockList[stockIndex] = {
-                    ...updatedStockList[stockIndex],
-                    baseQuantity: newQty,
-                };
-            }
+        const addBackStock = (productId, productName, baseQty, meta = {}) => {
+            const stockIndex = updatedStockList.findIndex((s) => s.productId === productId && s.warehouseId === original.warehouseId);
+            const currentQty = stockIndex >= 0 ? Number(updatedStockList[stockIndex].baseQuantity) || 0 : 0;
+            const newQty = currentQty + baseQty;
+            if (stockIndex >= 0) updatedStockList[stockIndex] = { ...updatedStockList[stockIndex], baseQuantity:newQty };
+            else updatedStockList.push({ productId, warehouseId:original.warehouseId, baseQuantity:newQty });
             newMovements.push({
-                id: 'mov-' + Math.random().toString(36).substring(2, 9),
-                date: now,
-                productId: item.productId,
-                productName: item.productName,
-                warehouseId: original.warehouseId,
-                warehouseName: warehouses.find((w) => w.id === original.warehouseId)?.name || 'المخزن',
-                type: 'return',
-                unitName: item.unitName,
-                quantityInUnit: item.quantity,
-                conversionFactor: item.conversionFactor,
-                baseQuantityChange: item.baseQuantity,
-                newBaseBalance: newQty,
-                referenceId: returnInvoice.id,
-                referenceType: 'RETURN',
-                userId: currentUser.id,
-                userName: currentUser.name,
+                id:'mov-' + Math.random().toString(36).substring(2, 9), date:now, productId, productName,
+                warehouseId:original.warehouseId, warehouseName:warehouses.find((w) => w.id === original.warehouseId)?.name || 'المخزن',
+                type:meta.type || 'return', unitName:meta.unitName || 'وحدة أساسية', quantityInUnit:meta.quantityInUnit ?? baseQty,
+                conversionFactor:meta.conversionFactor || 1, baseQuantityChange:baseQty, newBaseBalance:newQty,
+                referenceId:returnInvoice.id, referenceType:'RETURN', userId:currentUser.id, userName:currentUser.name,
+                recipeId:meta.recipeId, manufacturedProductId:meta.manufacturedProductId, manufacturedProductName:meta.manufacturedProductName,
+                unitCost:Number(meta.unitCost)||0, costAmount:Number(meta.costAmount)||0, fifoCostTotal:Number(meta.costAmount)||0,
             });
+        };
+        for (const item of returnItems) {
+            if (item.isManufacturedMeal && Array.isArray(item.recipeConsumption) && item.recipeConsumption.length && item.originalSoldQuantity > 0) {
+                const returnRatio = Math.max(0, Math.min(1, Number(item.quantity) / Number(item.originalSoldQuantity)));
+                for (const ing of item.recipeConsumption) {
+                    const restoredBase = Math.max(0, (Number(ing.baseQuantity) || 0) * returnRatio);
+                    if (restoredBase <= 0) continue;
+                    const restoredCost = Math.max(0, (Number(ing.fifoCostTotal) || 0) * returnRatio);
+                    addBackStock(ing.productId, ing.productName, restoredBase, {
+                        type:'recipe_return', unitName:ing.unitName,
+                        quantityInUnit:(Number(ing.quantityPerMeal)||0) * (Number(ing.soldMealQuantity)||0) * returnRatio,
+                        conversionFactor:ing.conversionFactor, recipeId:item.recipeId,
+                        manufacturedProductId:item.productId, manufacturedProductName:item.productName,
+                        unitCost:restoredBase>0?restoredCost/restoredBase:0, costAmount:restoredCost,
+                    });
+                }
+            } else {
+                addBackStock(item.productId, item.productName, item.baseQuantity, {
+                    type:'return', unitName:item.unitName, quantityInUnit:item.quantity, conversionFactor:item.conversionFactor,
+                    unitCost:item.baseQuantity>0?(Number(item.fifoCostTotal)||0)/item.baseQuantity:0, costAmount:Number(item.fifoCostTotal)||0,
+                });
+            }
         }
         await bulkPut('stock', updatedStockList);
         await bulkPut('stock_movements', newMovements);
@@ -903,6 +982,7 @@ export const AppProvider = ({ children }) => {
             }
         }
         await reloadData();
+        notifyTelegramInvoice(returnInvoice,'return').catch(()=>{});
         showToast(`تم تسجيل المرتجع بنجاح [${returnNumber}]`, 'info');
         return returnInvoice;
     }, [invoices, products, customers, currentUser, activeShift, accounts, stock, warehouses, reloadData, showToast]);
@@ -924,16 +1004,17 @@ export const AppProvider = ({ children }) => {
         for(const item of items){const pi=updatedProducts.findIndex(p=>p.id===item.productId);const si=updatedStockList.findIndex(x=>x.productId===item.productId&&x.warehouseId===warehouseId);const currentBaseStock=si>=0?Number(updatedStockList[si].baseQuantity)||0:0;const currentTotalBaseStock=updatedStockList.filter(x=>x.productId===item.productId).reduce((sum,row)=>sum+Math.max(0,Number(row.baseQuantity)||0),0);const baseQty=Math.max(0,Number(item.baseQuantity)||0);const newBaseStock=currentBaseStock+baseQty;
           if(pi>=0){const currentCost=Number(updatedProducts[pi].costPrice)||0;const unitCost=((Number(item.unitPrice)||0)*ratio)/Math.max(0.00000001,(Number(item.conversionFactor)||1));let batches=updatedProducts[pi].fifoBatches||[];if(currentBaseStock>0&&!batches.some(b=>(b.warehouseId===warehouseId||!b.warehouseId)&&Number(b.remainingBaseQty)>0)){batches.push({id:`legacy-${item.productId}-${warehouseId}`,purchaseId:'legacy',warehouseId,receivedAt:'2000-01-01T00:00:00.000Z',expiryDate:updatedProducts[pi].expiryDate||'',unitCost:currentCost,remainingBaseQty:currentBaseStock});}batches.push({id:`batch-${purchaseInvoice.id}-${item.productId}-${Math.random().toString(36).slice(2,6)}`,purchaseId:purchaseInvoice.id,warehouseId,receivedAt:purchaseDate,expiryDate:item.expiryDate||updatedProducts[pi].expiryDate||'',unitCost,remainingBaseQty:baseQty});const oldVal=Math.max(0,currentTotalBaseStock)*currentCost,newVal=baseQty*unitCost,totalUnits=Math.max(0,currentTotalBaseStock)+baseQty,newWAC=totalUnits>0?(oldVal+newVal)/totalUnits:unitCost;updatedProducts[pi]={...updatedProducts[pi],costPrice:parseFloat(newWAC.toFixed(4)),fifoBatches:batches,updatedAt:now};}
           if(si>=0)updatedStockList[si]={...updatedStockList[si],baseQuantity:newBaseStock};else updatedStockList.push({productId:item.productId,warehouseId,baseQuantity:newBaseStock});
-          newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:purchaseDate,productId:item.productId,productName:item.productName,warehouseId,warehouseName:targetWarehouse.name||'صالة العرض',type:'purchase',unitName:item.unitName,quantityInUnit:item.quantity,conversionFactor:item.conversionFactor,baseQuantityChange:baseQty,newBaseBalance:newBaseStock,referenceId:purchaseInvoice.id,referenceType:'PURCHASE',userId:currentUser.id,userName:currentUser.name});}
-        await bulkPut('products',updatedProducts);await bulkPut('stock',updatedStockList);await bulkPut('stock_movements',newMovements);
+          newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:purchaseDate,productId:item.productId,productName:item.productName,warehouseId,warehouseName:targetWarehouse.name||'صالة العرض',type:'purchase',unitName:item.unitName,quantityInUnit:item.quantity,conversionFactor:item.conversionFactor,baseQuantityChange:baseQty,newBaseBalance:newBaseStock,referenceId:purchaseInvoice.id,referenceType:'PURCHASE',userId:currentUser.id,userName:currentUser.name,unitCost:pi>=0?Number(updatedProducts[pi].costPrice)||0:0,costAmount:baseQty*(pi>=0?Number(updatedProducts[pi].costPrice)||0:0)});}
+        const currentRecipes=await getAllFromStore('recipes').catch(()=>[]);const costedProducts=applyRecipeCostsToProducts(updatedProducts,currentRecipes);
+        await bulkPut('products',costedProducts);await bulkPut('stock',updatedStockList);await bulkPut('stock_movements',newMovements);
         const updatedAccounts=[...accounts];for(const pay of payments){const ai=updatedAccounts.findIndex(a=>a.id===pay.accountId);if(ai>=0)updatedAccounts[ai]={...updatedAccounts[ai],balance:(Number(updatedAccounts[ai].balance)||0)-(Number(pay.amount)||0)};}await bulkPut('accounts',updatedAccounts);
         let updatedSupplier=null,supplierStatement=null;
         if(remaining>0){const supp=suppliers.find(s=>s.id===payload.supplierId) || (payload.supplierObject?.id===payload.supplierId ? payload.supplierObject : null);if(supp){const nb=(Number(supp.balance)||0)+remaining;updatedSupplier={...supp,balance:nb};supplierStatement={id:'stmt-'+Date.now(),date:purchaseDate,type:'purchase',partyType:'supplier',partyId:supp.id,referenceNumber:invoiceNumber,description:`فاتورة مشتريات رقم ${invoiceNumber}`,debit:0,credit:remaining,runningBalance:nb};await putInStore('suppliers',updatedSupplier);await putInStore('partner_statements',supplierStatement);}}
         setPurchases(prev => [purchaseInvoice, ...prev.filter(x=>x.id!==purchaseInvoice.id)]);
-        setProducts(updatedProducts);setStock(updatedStockList);setStockMovements(prev=>[...newMovements,...prev]);setAccounts(updatedAccounts);
+        setProducts(costedProducts);setStock(updatedStockList);setStockMovements(prev=>[...newMovements,...prev]);setAccounts(updatedAccounts);
         if(updatedSupplier)setSuppliers(prev=>prev.some(x=>x.id===updatedSupplier.id)?prev.map(x=>x.id===updatedSupplier.id?updatedSupplier:x):[updatedSupplier,...prev]);if(supplierStatement)setPartnerStatements(prev=>[supplierStatement,...prev]);
         setSyncQueue(window.OscarCloudSync?.pendingItems?.() || []);
-        playSuccessSound(settings.scannerBeepEnabled);showToast(`تم تسجيل فاتورة الشراء بنجاح [${invoiceNumber}]`,'success');return purchaseInvoice;
+        playSuccessSound(settings.scannerBeepEnabled);notifyTelegramInvoice(purchaseInvoice,'purchase').catch(()=>{});showToast(`تم تسجيل فاتورة الشراء بنجاح [${invoiceNumber}]`,'success');return purchaseInvoice;
     }, [warehouses,products,stock,accounts,suppliers,currentUser,showToast,settings.activeWarehouseId,settings.scannerBeepEnabled]);
 
     // Damaged/expired stock: deduct quantity and exact FIFO cost as a loss expense.
@@ -1223,6 +1304,12 @@ export const AppProvider = ({ children }) => {
             }
         }
         await putInStore('products', cleanProduct);
+        const allRecipes = await getAllFromStore('recipes').catch(() => []);
+        if (allRecipes.length) {
+            const allProducts = await getAllFromStore('products').catch(() => []);
+            const costedProducts = applyRecipeCostsToProducts(allProducts, allRecipes);
+            await bulkPut('products', costedProducts);
+        }
         await reloadData();
         showToast(`تم حفظ الصنف: ${cleanProduct.name}`, 'success');
     }, [products, settings.activeWarehouseId, warehouses, currentUser, reloadData, showToast]);

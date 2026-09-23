@@ -1,8 +1,8 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { getAllFromStore, getFromStore, deleteFromStore, putInStore, syncChannel, } from './restaurant__services__db.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { initRestaurantDefaults, generateOrderNumber, generateTakeawayQueueNumber, generateKitchenTicketId, playChimeSound, } from './restaurant__services__restaurantService.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { getAllFromStore, getFromStore, deleteFromStore, putInStore, syncChannel, } from './restaurant__services__db.js?v=7.9.4.41-recipe-accounting';
+import { initRestaurantDefaults, generateOrderNumber, generateTakeawayQueueNumber, generateKitchenTicketId, playChimeSound, } from './restaurant__services__restaurantService.js?v=7.9.4.41-recipe-accounting';
+import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.41-recipe-accounting';
 const RestaurantContext = createContext(null);
 const RESTAURANT_STORES = new Set([
     'restaurant_sections',
@@ -16,7 +16,7 @@ const RESTAURANT_STORES = new Set([
 const isRestaurantTab = (tab) => String(tab || '').startsWith('restaurant_');
 const makeRestaurantId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 export const RestaurantProvider = ({ children }) => {
-    const { products, customers, setSelectedCustomer, setCart, setActiveTab, showToast, settings, isLoaded, isCloudReady, activeTab, } = useApp();
+    const { products, customers, setSelectedCustomer, setCart, setActiveTab, showToast, settings, isLoaded, isCloudReady, activeTab, refreshData, } = useApp();
     const [sections, setSections] = useState([]);
     const [tables, setTables] = useState([]);
     const [orders, setOrders] = useState([]);
@@ -834,22 +834,70 @@ export const RestaurantProvider = ({ children }) => {
         const id = recipeData.id || makeRestaurantId('rcp');
         const productId = recipeData.mealProductId || recipeData.productId || '';
         const productName = recipeData.mealProductName || recipeData.productName || 'وجبة';
-        const items = recipeData.items || recipeData.ingredients || [];
-        const ingredients = recipeData.ingredients || recipeData.items || [];
+        const sourceItems = recipeData.ingredients || recipeData.items || [];
+        const ingredients = (sourceItems || []).map((ing) => {
+            const raw = (products || []).find((p) => p.id === (ing.ingredientProductId || ing.productId));
+            const units = Array.isArray(raw?.units) ? raw.units : [];
+            const unit = units.find((u) => u.id === (ing.ingredientUnitId || ing.unitId))
+                || units.find((u) => u.name === ing.unit)
+                || units.find((u) => u.id === raw?.baseUnitId)
+                || units.find((u) => (Number(u.conversionToBase) || 1) === 1)
+                || units[0];
+            const factor = Number(ing.conversionFactor ?? unit?.conversionToBase ?? 1) || 1;
+            const quantity = Math.max(0, Number(ing.quantity) || 0);
+            const baseQuantity = Math.max(0, Number(ing.baseQuantity) || quantity * factor);
+            const unitFactor = Math.max(0.00000001, Number(unit?.conversionToBase) || 1);
+            const baseCost = Math.max(0, Number(raw?.costPrice) || 0) || (Math.max(0, Number(unit?.costPrice) || 0) / unitFactor);
+            const ingredientCost = baseQuantity * baseCost;
+            return {
+                ...ing,
+                ingredientProductId: raw?.id || ing.ingredientProductId || ing.productId || '',
+                ingredientName: raw?.name || ing.ingredientName || '',
+                ingredientUnitId: unit?.id || ing.ingredientUnitId || ing.unitId || '',
+                unit: unit?.name || ing.unit || raw?.baseUnitName || 'حبة',
+                quantity,
+                conversionFactor: factor,
+                baseQuantity,
+                baseUnitCost: Number(baseCost.toFixed(4)),
+                ingredientCost: Number(ingredientCost.toFixed(4)),
+            };
+        }).filter((ing) => ing.ingredientProductId && ing.quantity > 0);
+        const materialsCost = ingredients.reduce((sum, ing) => sum + (Number(ing.ingredientCost) || 0), 0);
+        const extraCost = Math.max(0, Number(recipeData.extraCost ?? recipeData.productionOverhead ?? 0) || 0);
+        const totalCost = Math.max(0, materialsCost + extraCost);
+        const now = new Date().toISOString();
         const recipe = {
             id,
             productId,
             productName,
             mealProductId: productId,
             mealProductName: productName,
-            items,
+            items: ingredients,
             ingredients,
+            materialsCost: Number(materialsCost.toFixed(4)),
+            extraCost: Number(extraCost.toFixed(4)),
+            totalCost: Number(totalCost.toFixed(4)),
+            costPerBaseUnit: Number(totalCost.toFixed(4)),
             notes: recipeData.notes,
-            updatedAt: new Date().toISOString(),
+            updatedAt: now,
         };
         await putInStore('recipes', recipe);
+        const manufacturedProduct = (products || []).find((p) => p.id === productId);
+        if (manufacturedProduct) {
+            const updatedUnits = (manufacturedProduct.units || []).map((u) => ({
+                ...u,
+                costPrice: Number((totalCost * Math.max(1, Number(u.conversionToBase) || 1)).toFixed(4)),
+            }));
+            await putInStore('products', {
+                ...manufacturedProduct,
+                costPrice: Number(totalCost.toFixed(4)),
+                recipeCost: Number(totalCost.toFixed(4)),
+                units: updatedUnits,
+                updatedAt: now,
+            });
+        }
         setRecipes((prev) => {
-            const idx = prev.findIndex((r) => r.id === id || (productId && r.productId === productId));
+            const idx = prev.findIndex((r) => r.id === id || (productId && (r.productId === productId || r.mealProductId === productId)));
             if (idx >= 0) {
                 const copy = [...prev];
                 copy[idx] = recipe;
@@ -857,7 +905,9 @@ export const RestaurantProvider = ({ children }) => {
             }
             return [...prev, recipe];
         });
+        try { await refreshData?.(); } catch {}
         syncChannel?.postMessage({ type: 'restaurant_recipe_change' });
+        return recipe;
     };
     const deleteRecipe = async (id) => {
         await deleteFromStore('recipes', id);

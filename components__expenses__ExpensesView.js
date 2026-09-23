@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { downloadProfessionalTablePDF, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { useApp } from './context__AppContext.js?v=7.9.4.41-recipe-accounting';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.41-recipe-accounting';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.41-recipe-accounting';
+import { downloadProfessionalTablePDF, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.41-recipe-accounting';
 import { Plus, Search, Trash2, Edit2, FileSpreadsheet, FileText, Settings2, UsersRound, Receipt, WalletCards, X } from 'lucide-react';
 
 const h = React.createElement;
@@ -167,7 +167,7 @@ export const ExpensesView = () => {
         title: `كشف الدفعات المدخلة - ${cls}`,
         filename: `كشف_الدفعات_المدخلة_${safePart(cls)}_${safePart(dateFrom || 'الكل')}_${safePart(dateTo || 'الكل')}`,
         headers: ['المرجع','التاريخ','التصنيف','الجهة','المبلغ','طريقة الدفع','الحساب المودع فيه','البيان'],
-        rows: filteredReceipts.map(v => [v.reference || '-', new Date(v.date).toLocaleString('ar-EG'), paymentClassLabel(v.classId), v.partyName || '-', Number(v.amount)||0, v.method || '-', v.accountName || 'حساب مالي', v.notes || '']),
+        rows: filteredReceipts.map(v => [v.reference || '-', new Date(v.date).toLocaleString('ar-EG-u-nu-latn'), paymentClassLabel(v.classId), v.partyName || '-', Number(v.amount)||0, v.method || '-', v.accountName || 'حساب مالي', v.notes || '']),
       };
     }
     const selectedText = selectedCategory === 'all' ? (mode === 'labor' ? 'كل بنود العمال والأجور' : 'كل أنواع المصروفات') : selectedCategory;
@@ -175,7 +175,7 @@ export const ExpensesView = () => {
       title: mode === 'labor' ? `كشف العمال والأجور - ${selectedText}` : `كشف المصروفات - ${selectedText}`,
       filename: `${mode === 'labor' ? 'كشف_العمال' : 'كشف_المصروفات'}_${safePart(selectedText)}_${safePart(dateFrom || 'الكل')}_${safePart(dateTo || 'الكل')}`,
       headers: ['التاريخ','نوع المصروف','المبلغ','الحساب المسدد منه','البيان'],
-      rows: filteredExpenses.map(e => [new Date(e.date).toLocaleString('ar-EG'), e.category || '-', Number(e.amount)||0, e.accountName || '-', e.notes || '']),
+      rows: filteredExpenses.map(e => [new Date(e.date).toLocaleString('ar-EG-u-nu-latn'), e.category || '-', Number(e.amount)||0, e.accountName || '-', e.notes || '']),
     };
   };
   const exportPDF = async () => {
@@ -256,7 +256,7 @@ export const ExpensesView = () => {
   }, h(Icon,{className:'w-4 h-4'}), label);
 
   const expenseRows = expensePager.pageItems.map(exp => h('tr',{key:exp.id,className:'border-b border-slate-100 hover:bg-slate-50/70'},
-    h('td',{className:'p-3 text-slate-500'},new Date(exp.date).toLocaleString('ar-EG')),
+    h('td',{className:'p-3 text-slate-500'},new Date(exp.date).toLocaleString('ar-EG-u-nu-latn')),
     h('td',{className:'p-3 font-bold'},exp.category || '-'),
     h('td',{className:'p-3 font-mono font-black text-rose-600'},`${money(exp.amount)} ${settings.currencySymbol}`),
     h('td',{className:'p-3'},exp.accountName || '-'),
@@ -268,7 +268,7 @@ export const ExpensesView = () => {
   ));
   const receiptRows = receiptPager.pageItems.map(v => h('tr',{key:v.id,className:'border-b border-slate-100 hover:bg-slate-50/70'},
     h('td',{className:'p-3 font-mono font-bold'},v.reference || '-'),
-    h('td',{className:'p-3 text-slate-500'},new Date(v.date).toLocaleString('ar-EG')),
+    h('td',{className:'p-3 text-slate-500'},new Date(v.date).toLocaleString('ar-EG-u-nu-latn')),
     h('td',{className:'p-3'},h('span',{className:'px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-bold'},paymentClassLabel(v.classId))),
     h('td',{className:'p-3 font-bold'},v.partyName || '-'),
     h('td',{className:'p-3 font-mono font-black text-emerald-700'},`${money(v.amount)} ${settings.currencySymbol}`),

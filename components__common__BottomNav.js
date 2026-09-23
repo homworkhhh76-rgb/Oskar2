@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { canAccessTab, canAccessPermission } from './utils__permissions.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { useApp } from './context__AppContext.js?v=7.9.4.41-recipe-accounting';
+import { canAccessTab, canAccessPermission } from './utils__permissions.js?v=7.9.4.41-recipe-accounting';
 import {
   ShoppingCart, ReceiptText, Package, Warehouse, Menu, X, LayoutDashboard, Truck,
   Boxes, Users, Building2, Wallet, Receipt, Barcode, BarChart3, Trash2, Settings,

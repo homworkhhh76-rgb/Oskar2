@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { useApp } from './context__AppContext.js?v=7.9.4.41-recipe-accounting';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.41-recipe-accounting';
 import { RotateCcw } from 'lucide-react';
 
 const h = React.createElement;
@@ -29,7 +29,7 @@ export const TrashView = () => {
   const restoreText = { products:'استرجاع الصنف', customers:'استرجاع العميل', suppliers:'استرجاع المورد', expenses:'استرجاع المصروف' }[activeTab];
   const itemTitle = item => activeTab === 'expenses' ? `${item.category || 'مصروف'} - ${Number(item.amount || 0).toFixed(2)}` : item.name;
   const itemSub = item => {
-    if (activeTab === 'products') return `حُذف بتاريخ: ${new Date(item.deletedAt).toLocaleString('ar-EG')}`;
+    if (activeTab === 'products') return `حُذف بتاريخ: ${new Date(item.deletedAt).toLocaleString('ar-EG-u-nu-latn')}`;
     if (activeTab === 'customers') return `الهاتف: ${item.phone || '-'}`;
     if (activeTab === 'suppliers') return `الشركة: ${item.company || '-'}`;
     return item.notes || '-';

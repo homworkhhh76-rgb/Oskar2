@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { GENERAL_PAGE_PERMISSIONS, RESTAURANT_PAGE_PERMISSIONS, normalizeEmployeePermissions } from './utils__permissions.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { useApp } from './context__AppContext.js?v=7.9.4.41-recipe-accounting';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.41-recipe-accounting';
+import { GENERAL_PAGE_PERMISSIONS, RESTAURANT_PAGE_PERMISSIONS, normalizeEmployeePermissions } from './utils__permissions.js?v=7.9.4.41-recipe-accounting';
 import {
   Users, UserPlus, ShieldCheck, Trash2, Edit2, UserCheck, Download,
   UtensilsCrossed, ChefHat, LayoutGrid, Scale, X

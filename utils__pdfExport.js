@@ -1,4 +1,4 @@
-import { renderElementTablePages, resolveExportElement } from './utils__canvasRenderer.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { renderElementTablePages, resolveExportElement } from './utils__canvasRenderer.js?v=7.9.4.41-recipe-accounting';
 
 const safe=v=>String(v||'export').replace(/[\\/:*?"<>|]+/g,'-').trim()||'export';
 const withExt=(name,ext)=>safe(name).toLowerCase().endsWith(ext)?safe(name):safe(name)+ext;

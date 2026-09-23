@@ -1,4 +1,4 @@
-import { printElementOnly } from './utils__export.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { printElementOnly } from './utils__export.js?v=7.9.4.41-recipe-accounting';
 
 const esc = (value) => String(value ?? '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -8,7 +8,7 @@ const noteText = (notes) => typeof notes === 'string'
   ? notes
   : String(notes?.kitchenNotes || notes?.general || '');
 
-const money = (value) => Number(value || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money = (value) => Number(value || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const addonUnitTotal = (item) => (item?.addons || []).reduce((sum, addon) => sum + Number(addon?.price || 0), 0);
 const unitTotal = (item) => Number(item?.unitPrice || 0) + addonUnitTotal(item);
 const lineTotal = (item) => unitTotal(item) * Number(item?.quantity || 0);
@@ -77,7 +77,7 @@ export async function printKitchenTicketDirect(order, settings = {}, options = {
       <div><b>الجرسون:</b> ${esc(order.waiterName || '-')}</div>
       ${order.customerName ? `<div><b>العميل:</b> ${esc(order.customerName)}</div>` : ''}
       ${order.guestCount ? `<div><b>الأفراد:</b> ${esc(order.guestCount)}</div>` : ''}
-      <div><b>وقت الإرسال:</b> ${esc(new Date(sentAt).toLocaleString('ar-EG'))}</div>
+      <div><b>وقت الإرسال:</b> ${esc(new Date(sentAt).toLocaleString('ar-EG-u-nu-latn'))}</div>
     </div>
     <div style="display:grid;grid-template-columns:minmax(0,1fr) 30px 52px 58px;gap:3px;padding:3px 0;border-top:2px solid #000;border-bottom:2px solid #000;font-size:${small ? '7px' : '8px'};font-weight:900;text-align:center">
       <div style="text-align:right">الصنف</div><div>كمية</div><div>السعر ${esc(currency)}</div><div>الإجمالي ${esc(currency)}</div>

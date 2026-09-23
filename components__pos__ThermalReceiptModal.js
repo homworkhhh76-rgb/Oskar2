@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel, warmProfessionalExportLibraries } from './utils__professionalExport.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { renderInvoiceCanvas } from './utils__canvasRenderer.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { smartPrinter } from './services__printer.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { useApp } from './context__AppContext.js?v=7.9.4.41-recipe-accounting';
+import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.41-recipe-accounting';
+import { downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel, warmProfessionalExportLibraries } from './utils__professionalExport.js?v=7.9.4.41-recipe-accounting';
+import { renderInvoiceCanvas } from './utils__canvasRenderer.js?v=7.9.4.41-recipe-accounting';
+import { smartPrinter } from './services__printer.js?v=7.9.4.41-recipe-accounting';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.41-recipe-accounting';
 import { Printer, X, Download, Image as ImageIcon, FileSpreadsheet, Bluetooth } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 
@@ -176,7 +176,7 @@ export const ThermalReceiptModal = () => {
                 ),
                 h('div', { className: 'receipt-meta' },
                     h('div', { className: 'receipt-meta-row receipt-meta-strong' }, h('span', null, isReturn ? 'فاتورة مرتجع مبيعات' : 'فاتورة مبيعات'), h('span', { className: 'font-mono' }, `#${invoice.invoiceNumber}`)),
-                    h('div', { className: 'receipt-meta-row' }, h('span', null, 'التاريخ:'), h('span', null, `${new Date(invoice.date).toLocaleDateString('ar-EG')} - ${new Date(invoice.date).toLocaleTimeString('ar-EG')}`)),
+                    h('div', { className: 'receipt-meta-row' }, h('span', null, 'التاريخ:'), h('span', null, `${new Date(invoice.date).toLocaleDateString('ar-EG-u-nu-latn')} - ${new Date(invoice.date).toLocaleTimeString('ar-EG-u-nu-latn')}`)),
                     h('div', { className: 'receipt-meta-row' }, h('span', null, 'الكاشير:'), h('span', null, invoice.cashierName || '-')),
                     invoice.customerName && invoice.customerId !== 'cust-walkin' ? h('div', { className: 'receipt-meta-row receipt-meta-strong' }, h('span', null, 'العميل:'), h('span', null, invoice.customerName)) : null
                 ),

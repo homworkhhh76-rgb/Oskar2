@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl } from './brand__logo.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { useApp } from './context__AppContext.js?v=7.9.4.41-recipe-accounting';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.41-recipe-accounting';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.41-recipe-accounting';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl } from './brand__logo.js?v=7.9.4.41-recipe-accounting';
+import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.41-recipe-accounting';
+import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.41-recipe-accounting';
+import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.41-recipe-accounting';
 import { Plus, Trash2, Building2, Eye, X, Image as ImageIcon, FileDown, FileSpreadsheet, Printer, AlertTriangle, ReceiptText, Sparkles, ScanLine } from 'lucide-react';
 
 const h = React.createElement;
@@ -134,7 +134,8 @@ export const PurchasesView = () => {
         expiryDate: r.expiryDate || p?.expiryDate || '',
       };
     });
-    const payments = paidSafe > 0 ? [{ method: 'cash', amount: paidSafe, accountId, accountName: accounts.find((a) => a.id === accountId)?.name || 'الصندوق' }] : [];
+    const selectedPaymentAccount = accounts.find((a) => a.id === accountId);
+    const payments = paidSafe > 0 ? [{ method: selectedPaymentAccount?.type || 'cash', amount: paidSafe, accountId, accountName: selectedPaymentAccount?.name || 'الصندوق' }] : [];
     const paymentType = paidSafe <= 0 ? 'debt' : paidSafe >= total ? 'cash' : 'partial';
     const res = await createPurchaseInvoice?.({
       supplierId: supplier.id, supplierName: supplier.name, warehouseId, items,
@@ -273,7 +274,7 @@ export const PurchasesView = () => {
         rows.push(['', '', '', '', 'الباقي دين', num(viewing.remainingAmount)]);
         ok = await downloadProfessionalTableExcel({
           title: 'فاتورة مشتريات',
-          subtitle: `رقم النظام: ${viewing.invoiceNumber || '-'}${viewing.supplierInvoiceNumber ? ` • فاتورة المورد: ${viewing.supplierInvoiceNumber}` : ''} • المورد: ${viewing.supplierName || 'مورد'} • التاريخ: ${safeDate(viewing.date).toLocaleString('ar-EG')}`,
+          subtitle: `رقم النظام: ${viewing.invoiceNumber || '-'}${viewing.supplierInvoiceNumber ? ` • فاتورة المورد: ${viewing.supplierInvoiceNumber}` : ''} • المورد: ${viewing.supplierName || 'مورد'} • التاريخ: ${safeDate(viewing.date).toLocaleString('ar-EG-u-nu-latn')}`,
           headers: ['#', 'الصنف', 'الوحدة', 'الكمية', 'السعر', 'الإجمالي'],
           rows,
           settings,
@@ -296,7 +297,7 @@ export const PurchasesView = () => {
           h('thead', null, h('tr', { className: 'bg-slate-50 dark:bg-slate-800 border-b text-slate-500 dark:border-slate-700' }, ...['الرقم', 'التاريخ', 'المورد', 'الإجمالي', 'المدفوع', 'الدين', ''].map((x, i) => h('th', { key: i, className: 'p-3' }, x)))),
           h('tbody', null, ...purchasesPager.pageItems.map((p, index) => h('tr', { key: p.id || index, className: 'border-b last:border-0 dark:border-slate-800' },
             h('td', { className: 'p-3 font-mono font-bold' }, p.invoiceNumber || `PUR-${index + 1}`),
-            h('td', { className: 'p-3' }, safeDate(p.date).toLocaleDateString('ar-EG')),
+            h('td', { className: 'p-3' }, safeDate(p.date).toLocaleDateString('ar-EG-u-nu-latn')),
             h('td', { className: 'p-3 font-bold' }, p.supplierName || 'مورد'),
             h('td', { className: 'p-3 font-mono' }, `${money(p.grandTotal)} ${settings.currencySymbol || ''}`),
             h('td', { className: 'p-3 font-mono text-emerald-700' }, money(p.paidAmount)),
@@ -331,7 +332,7 @@ export const PurchasesView = () => {
             ),
             h('section',{className:'grid grid-cols-2 gap-x-5 gap-y-2 p-4 sm:p-5 text-[11px] border-b border-slate-200 bg-slate-50/70'},
               h('div',null,h('span',{className:'text-slate-400'},'رقم الفاتورة: '),h('b',{className:'font-mono'},viewing.invoiceNumber || '-')),
-              h('div',null,h('span',{className:'text-slate-400'},'التاريخ: '),h('b',null,safeDate(viewing.date).toLocaleString('ar-EG'))),
+              h('div',null,h('span',{className:'text-slate-400'},'التاريخ: '),h('b',null,safeDate(viewing.date).toLocaleString('ar-EG-u-nu-latn'))),
               viewing.supplierInvoiceNumber ? h('div',null,h('span',{className:'text-slate-400'},'فاتورة المورد: '),h('b',{className:'font-mono'},viewing.supplierInvoiceNumber)) : null,
               h('div',null,h('span',{className:'text-slate-400'},'المورد: '),h('b',null,viewing.supplierName || 'مورد')),
               h('div',null,h('span',{className:'text-slate-400'},'المخزن: '),h('b',null,warehouses.find((w)=>w.id===viewing.warehouseId)?.name || '-'))

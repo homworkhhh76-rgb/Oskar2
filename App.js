@@ -1,38 +1,39 @@
 import React, { useEffect, useState } from 'react';
-import { AppProvider, useApp } from './context__AppContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { Header } from './components__common__Header.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { Sidebar } from './components__common__Sidebar.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { BottomNav } from './components__common__BottomNav.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { Toast } from './components__common__Toast.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { SyncModal } from './components__sync__SyncModal.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { POSView } from './components__pos__POSView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { DashboardView } from './components__dashboard__DashboardView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { SalesView } from './components__sales__SalesView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { PurchasesView } from './components__purchases__PurchasesView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { ProductsView } from './components__products__ProductsView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { CategoriesView } from './components__categories__CategoriesView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { InventoryView } from './components__inventory__InventoryView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { CustomersView } from './components__customers__CustomersView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { SuppliersView } from './components__suppliers__SuppliersView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { AccountsView } from './components__accounts__AccountsView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { ExpensesView } from './components__expenses__ExpensesView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { VouchersView } from './components__vouchers__VouchersView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { EmployeesView } from './components__employees__EmployeesView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { BarcodesView } from './components__barcodes__BarcodesView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { ReportsView } from './components__reports__ReportsView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { TrashView } from './components__trash__TrashView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { SettingsView } from './components__settings__SettingsView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { ThermalReceiptModal } from './components__pos__ThermalReceiptModal.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { LoginGate } from './components__auth__LoginGate.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { RestaurantProvider } from './restaurant__context__RestaurantContext.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { RestaurantTablesView } from './restaurant__components__RestaurantTablesView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { RestaurantWaiterView } from './restaurant__components__RestaurantWaiterView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { RestaurantKDSView } from './restaurant__components__RestaurantKDSView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { RestaurantWasteView } from './restaurant__components__RestaurantWasteView.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { RestaurantSettingsPanel } from './restaurant__components__RestaurantSettingsPanel.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { OscarAI } from './components__ai__OscarAI.js?v=7.9.4.36-github-shift-fix-2-qr-green';
-import { canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.36-github-shift-fix-2-qr-green';
+import { AppProvider, useApp } from './context__AppContext.js?v=7.9.4.41-recipe-accounting';
+import { Header } from './components__common__Header.js?v=7.9.4.41-recipe-accounting';
+import { Sidebar } from './components__common__Sidebar.js?v=7.9.4.41-recipe-accounting';
+import { BottomNav } from './components__common__BottomNav.js?v=7.9.4.41-recipe-accounting';
+import { Toast } from './components__common__Toast.js?v=7.9.4.41-recipe-accounting';
+import { SyncModal } from './components__sync__SyncModal.js?v=7.9.4.41-recipe-accounting';
+import { POSView } from './components__pos__POSView.js?v=7.9.4.41-recipe-accounting';
+import { DashboardView } from './components__dashboard__DashboardView.js?v=7.9.4.41-recipe-accounting';
+import { SalesView } from './components__sales__SalesView.js?v=7.9.4.41-recipe-accounting';
+import { PurchasesView } from './components__purchases__PurchasesView.js?v=7.9.4.41-recipe-accounting';
+import { ProductsView } from './components__products__ProductsView.js?v=7.9.4.41-recipe-accounting';
+import { CategoriesView } from './components__categories__CategoriesView.js?v=7.9.4.41-recipe-accounting';
+import { InventoryView } from './components__inventory__InventoryView.js?v=7.9.4.41-recipe-accounting';
+import { CustomersView } from './components__customers__CustomersView.js?v=7.9.4.41-recipe-accounting';
+import { SuppliersView } from './components__suppliers__SuppliersView.js?v=7.9.4.41-recipe-accounting';
+import { AccountsView } from './components__accounts__AccountsView.js?v=7.9.4.41-recipe-accounting';
+import { ExpensesView } from './components__expenses__ExpensesView.js?v=7.9.4.41-recipe-accounting';
+import { VouchersView } from './components__vouchers__VouchersView.js?v=7.9.4.41-recipe-accounting';
+import { EmployeesView } from './components__employees__EmployeesView.js?v=7.9.4.41-recipe-accounting';
+import { BarcodesView } from './components__barcodes__BarcodesView.js?v=7.9.4.41-recipe-accounting';
+import { ReportsView } from './components__reports__ReportsView.js?v=7.9.4.41-recipe-accounting';
+import { TrashView } from './components__trash__TrashView.js?v=7.9.4.41-recipe-accounting';
+import { SettingsView } from './components__settings__SettingsView.js?v=7.9.4.41-recipe-accounting';
+import { ThermalReceiptModal } from './components__pos__ThermalReceiptModal.js?v=7.9.4.41-recipe-accounting';
+import { DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.41-recipe-accounting';
+import { LoginGate } from './components__auth__LoginGate.js?v=7.9.4.41-recipe-accounting';
+import { RestaurantProvider } from './restaurant__context__RestaurantContext.js?v=7.9.4.41-recipe-accounting';
+import { RestaurantTablesView } from './restaurant__components__RestaurantTablesView.js?v=7.9.4.41-recipe-accounting';
+import { RestaurantWaiterView } from './restaurant__components__RestaurantWaiterView.js?v=7.9.4.41-recipe-accounting';
+import { RestaurantKDSView } from './restaurant__components__RestaurantKDSView.js?v=7.9.4.41-recipe-accounting';
+import { RestaurantWasteView } from './restaurant__components__RestaurantWasteView.js?v=7.9.4.41-recipe-accounting';
+import { RestaurantSettingsPanel } from './restaurant__components__RestaurantSettingsPanel.js?v=7.9.4.41-recipe-accounting';
+import { OscarAI } from './components__ai__OscarAI.js?v=7.9.4.41-recipe-accounting';
+import { canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.41-recipe-accounting';
+import { startTelegramAutomation } from './services__telegram.js?v=7.9.4.41-recipe-accounting';
 
 const h = React.createElement;
 const ScrollScreen = ({ children }) => h('div', { className:'scroll-chain-page h-full min-h-0 overflow-y-auto custom-scrollbar mobile-safe-bottom lg:pb-0' }, children);
@@ -53,6 +54,11 @@ const MainLayout = () => {
     const timer = setTimeout(() => setShowSkipButton(true), 1500);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    return startTelegramAutomation();
+  }, [isLoaded]);
 
   useEffect(() => {
     const isVisible = (el) => {
