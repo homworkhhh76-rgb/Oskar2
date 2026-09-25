@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl } from './brand__logo.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { useApp } from './context__AppContext.js?v=7.9.4.46-profit-report';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.46-profit-report';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.46-profit-report';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl } from './brand__logo.js?v=7.9.4.46-profit-report';
+import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.46-profit-report';
+import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.46-profit-report';
+import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.46-profit-report';
 import { Plus, Trash2, Building2, Eye, X, Pencil, Image as ImageIcon, FileDown, FileSpreadsheet, Printer, AlertTriangle, ReceiptText, Sparkles, ScanLine } from 'lucide-react';
 
 const h = React.createElement;

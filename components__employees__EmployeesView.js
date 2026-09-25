@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { GENERAL_PAGE_PERMISSIONS, RESTAURANT_PAGE_PERMISSIONS, normalizeEmployeePermissions } from './utils__permissions.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { useApp } from './context__AppContext.js?v=7.9.4.46-profit-report';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.46-profit-report';
+import { GENERAL_PAGE_PERMISSIONS, RESTAURANT_PAGE_PERMISSIONS, normalizeEmployeePermissions } from './utils__permissions.js?v=7.9.4.46-profit-report';
 import {
   Users, UserPlus, ShieldCheck, Trash2, Edit2, UserCheck, Download,
   UtensilsCrossed, ChefHat, LayoutGrid, Scale, X

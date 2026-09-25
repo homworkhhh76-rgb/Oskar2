@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { useApp } from './context__AppContext.js?v=7.9.4.46-profit-report';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.46-profit-report';
 import { ArrowLeftRight, Plus, Trash2 } from 'lucide-react';
-import { formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.46-profit-report';
 
 const h = React.createElement;
 const makeRow = (products = []) => {

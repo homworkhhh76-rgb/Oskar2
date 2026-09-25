@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { useApp } from './context__AppContext.js?v=7.9.4.46-profit-report';
+import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.46-profit-report';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.46-profit-report';
 import { Wifi, WifiOff, RefreshCw, Maximize2, Minimize2, Clock, Store, Camera, Menu, LogOut, Building2, Bell } from 'lucide-react';
-import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { saveTelegramConfig, uploadTelegramSnapshot } from './services__telegramReports.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.46-profit-report';
+import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.46-profit-report';
+import { saveTelegramConfig, uploadTelegramSnapshot } from './services__telegramReports.js?v=7.9.4.46-profit-report';
 
 const h = React.createElement;
 

@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { exportToCSV, downloadBlob } from './utils__export.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { generateAllReportsArtifacts } from './services__telegramReports.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { Download, ReceiptText, Package, Users, Truck, WalletCards, CalendarDays, CircleDollarSign, FileText, Image as ImageIcon } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useApp } from './context__AppContext.js?v=7.9.4.46-profit-report';
+import { exportToCSV, downloadBlob } from './utils__export.js?v=7.9.4.46-profit-report';
+import { generateAllReportsArtifacts } from './services__telegramReports.js?v=7.9.4.46-profit-report';
+import { getAllFromStore } from './services__db.js?v=7.9.4.46-profit-report';
+import { Download, ReceiptText, Package, Users, Truck, WalletCards, CalendarDays, CircleDollarSign, FileText, Image as ImageIcon, TrendingUp } from 'lucide-react';
 
 const h = React.createElement;
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
@@ -11,10 +12,13 @@ const EPS = 0.000001;
 const startOfDay = (d) => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
 const endOfDay = (d) => { const x = new Date(d); x.setHours(23,59,59,999); return x; };
 
-const Metric = ({ label, value, sub, tone = 'slate' }) => h('div', {
+const Metric = ({ label, value, sub, tone = 'slate', icon: Icon }) => h('div', {
   className: `rounded-2xl border p-4 bg-white dark:bg-slate-900 shadow-xs ${tone === 'emerald' ? 'border-emerald-200 dark:border-emerald-900' : tone === 'rose' ? 'border-rose-200 dark:border-rose-900' : tone === 'blue' ? 'border-blue-200 dark:border-blue-900' : 'border-slate-200 dark:border-slate-800'}`
 },
-  h('div', { className: 'text-[11px] font-bold text-slate-500' }, label),
+  h('div', { className: 'flex items-center justify-between gap-2' },
+    h('div', { className: 'text-[11px] font-bold text-slate-500' }, label),
+    Icon ? h('div', { className:`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center ${tone === 'emerald' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600' : tone === 'rose' ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600' : tone === 'blue' ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}` }, h(Icon,{className:'w-4 h-4'})) : null
+  ),
   h('div', { className: `mt-1 text-xl font-black font-mono ${tone === 'emerald' ? 'text-emerald-700 dark:text-emerald-400' : tone === 'rose' ? 'text-rose-600' : tone === 'blue' ? 'text-blue-700 dark:text-blue-400' : 'text-slate-900 dark:text-white'}` }, value),
   sub ? h('div', { className: 'mt-1 text-[10px] text-slate-400' }, sub) : null
 );
@@ -46,6 +50,15 @@ export const ReportsView = () => {
   const [period, setPeriod] = useState('month');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [wasteRecords, setWasteRecords] = useState([]);
+
+  useEffect(() => {
+    let alive = true;
+    getAllFromStore('waste_records').then((rows) => {
+      if (alive) setWasteRecords(Array.isArray(rows) ? rows : []);
+    }).catch(() => { if (alive) setWasteRecords([]); });
+    return () => { alive = false; };
+  }, []);
 
   const periodBounds = useMemo(() => {
     const now = new Date();
@@ -86,6 +99,32 @@ export const ReportsView = () => {
   const purchasesTotal = periodPurchases.reduce((s, x) => s + num(x.grandTotal), 0);
   const purchasesPaid = periodPurchases.reduce((s, x) => s + num(x.paidAmount), 0);
   const purchasesDebt = periodPurchases.reduce((s, x) => s + num(x.remainingAmount), 0);
+
+  // Profit engine: FIFO cost saved on invoice lines is preferred, then cost at sale,
+  // then the current product cost as a legacy fallback.
+  const productById = new Map(products.map((p) => [String(p?.id || ''), p]));
+  const lineCost = (item) => {
+    if (item?.fifoCostTotal !== undefined && item?.fifoCostTotal !== null && Number.isFinite(Number(item.fifoCostTotal))) return num(item.fifoCostTotal);
+    if (item?.costPriceAtSale !== undefined && item?.costPriceAtSale !== null && Number.isFinite(Number(item.costPriceAtSale))) return num(item.quantity) * num(item.costPriceAtSale);
+    const p = productById.get(String(item?.productId || ''));
+    const baseQty = num(item?.baseQuantity ?? (num(item?.quantity) * Math.max(1, num(item?.conversionFactor) || 1)));
+    return baseQty * num(p?.costPrice);
+  };
+  const soldCost = sales.reduce((sum, inv) => sum + (Array.isArray(inv?.items) ? inv.items : []).reduce((s, it) => s + lineCost(it), 0), 0);
+  const returnedCost = returns.reduce((sum, inv) => sum + (Array.isArray(inv?.items) ? inv.items : []).reduce((s, it) => s + lineCost(it), 0), 0);
+  const cogs = soldCost - returnedCost;
+  const netSales = salesTotal - returnsTotal;
+  const salesProfit = netSales - cogs;
+
+  const isWasteExpense = (e) => !!e?.inventoryLoss || /(?:هالك|تالف|تالفة|منتهي|منتهية)/i.test(`${e?.category || ''} ${e?.notes || ''}`);
+  const wasteExpenses = periodExpenses.filter(isWasteExpense);
+  const operatingExpenses = periodExpenses.filter((e) => !isWasteExpense(e));
+  const wasteExpenseTotal = wasteExpenses.reduce((s, e) => s + num(e.amount), 0);
+  const restaurantWaste = wasteRecords.filter((w) => !w?.deletedAt && inPeriod(w?.date || w?.createdAt));
+  const restaurantWasteTotal = restaurantWaste.reduce((s, w) => s + num(w?.cost ?? w?.estimatedCost), 0);
+  const wasteTotal = wasteExpenseTotal + restaurantWasteTotal;
+  const operatingExpenseTotal = operatingExpenses.reduce((s, e) => s + num(e.amount), 0);
+  const netProfit = salesProfit - operatingExpenseTotal - wasteTotal;
 
   const activeProducts = products.filter((p) => !p?.deletedAt && p?.status !== 'archived');
   const activeWarehouseId = settings.activeWarehouseId || warehouses.find((w) => w?.isDefault)?.id || warehouses[0]?.id || '';
@@ -136,6 +175,11 @@ export const ReportsView = () => {
       ['الفواتير','فواتير مبيعات مسددة',paidSales.length],
       ['الفواتير','فواتير مبيعات آجلة/جزئية',debtSales.length],
       ['الفواتير','إجمالي المبيعات',money(salesTotal)],
+      ['الفواتير','تكلفة البضاعة المباعة',money(cogs)],
+      ['الفواتير','أرباح المبيعات',money(salesProfit)],
+      ['الفواتير','المصروفات التشغيلية',money(operatingExpenseTotal)],
+      ['الفواتير','الهالك والتالف',money(wasteTotal)],
+      ['الفواتير','صافي الأرباح',money(netProfit)],
       ['الفواتير','إجمالي ديون الفواتير',money(salesDebt)],
       ['المشتريات','عدد فواتير المشتريات',periodPurchases.length],
       ['المشتريات','إجمالي المشتريات',money(purchasesTotal)],
@@ -188,6 +232,10 @@ export const ReportsView = () => {
         h(Metric,{label:'إجمالي فواتير المبيعات',value:`${money(salesTotal)} ${currency}`,sub:`مدفوع ${money(salesPaid)} • متبقي ${money(salesDebt)}`,tone:'emerald'}),
         h(Metric,{label:'عدد المرتجعات',value:String(returns.length),sub:`قيمة المرتجع ${money(returnsTotal)} ${currency}`,tone:'rose'}),
         h(Metric,{label:'صافي المبيعات بعد المرتجعات',value:`${money(salesTotal-returnsTotal)} ${currency}`,sub:'إجمالي البيع مطروحاً منه المرتجعات',tone:'emerald'})
+      ),
+      h('div', { className:'grid grid-cols-1 sm:grid-cols-2 gap-3' },
+        h(Metric,{label:'أرباح المبيعات',value:`${money(salesProfit)} ${currency}`,sub:`صافي المبيعات ${money(netSales)} − تكلفة البضاعة ${money(cogs)}`,tone:salesProfit>=0?'emerald':'rose',icon:TrendingUp}),
+        h(Metric,{label:'صافي الأرباح',value:`${money(netProfit)} ${currency}`,sub:`بعد خصم المصروفات ${money(operatingExpenseTotal)} + الهالك ${money(wasteTotal)}`,tone:netProfit>=0?'emerald':'rose',icon:CircleDollarSign})
       ),
       h('div', { className:'grid grid-cols-2 lg:grid-cols-4 gap-3' },
         h(Metric,{label:'عدد فواتير المشتريات',value:String(periodPurchases.length),sub:`${paidPurchases.length} مسددة • ${debtPurchases.length} آجلة/جزئية`}),

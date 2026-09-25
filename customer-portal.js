@@ -1,4 +1,4 @@
-import { decodeCustomerPortalAccess } from './customer-portal-codec.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { decodeCustomerPortalAccess } from './customer-portal-codec.js?v=7.9.4.46-profit-report';
 
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

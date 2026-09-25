@@ -1,14 +1,14 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { BarcodeCameraModal } from './components__pos__CameraScannerModal.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { calculateUnitConversions, formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { exportToCSV } from './utils__export.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { useApp } from './context__AppContext.js?v=7.9.4.46-profit-report';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.46-profit-report';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.46-profit-report';
+import { BarcodeCameraModal } from './components__pos__CameraScannerModal.js?v=7.9.4.46-profit-report';
+import { calculateUnitConversions, formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.46-profit-report';
+import { exportToCSV } from './utils__export.js?v=7.9.4.46-profit-report';
+import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.46-profit-report';
+import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.46-profit-report';
+import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.46-profit-report';
 import { Plus, Search, Trash2, Edit, Layers, FolderTree, X, Download, Image as ImageIcon, FileSpreadsheet, Camera, } from 'lucide-react';
 const h = React.createElement;
 const normalizeArabicDigits = (value) => String(value ?? '')

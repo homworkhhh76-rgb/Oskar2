@@ -1,13 +1,13 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { downloadProfessionalTablePDF, downloadProfessionalTableExcel, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.45-auto-backup-24h-report-fix';
-import { TransferForm } from './components__inventory__TransferForm.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { useApp } from './context__AppContext.js?v=7.9.4.46-profit-report';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.46-profit-report';
+import { formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.46-profit-report';
+import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.46-profit-report';
+import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.46-profit-report';
+import { downloadProfessionalTablePDF, downloadProfessionalTableExcel, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.46-profit-report';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.46-profit-report';
+import { TransferForm } from './components__inventory__TransferForm.js?v=7.9.4.46-profit-report';
 import { ArrowLeftRight, Building2, Download, Search, Image as ImageIcon, FileSpreadsheet, Trash2, } from 'lucide-react';
 export const InventoryView = () => {
     const { products, warehouses, settings, getProductStock, adjustStockCount, transferStock, recordDamagedStock, showToast, } = useApp();
