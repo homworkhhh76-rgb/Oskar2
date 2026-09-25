@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Search, X, UtensilsCrossed, Clock3, UserRound, Trash2, ShoppingCart, RefreshCw } from 'lucide-react';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.41-recipe-accounting';
-import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.41-recipe-accounting';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.38-data-visible-reports-ledger';
+import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.38-data-visible-reports-ledger';
 
 const h = React.createElement;
 const STATUS_LABELS = {
@@ -77,9 +77,9 @@ export const RestaurantPendingOrdersModal = ({ isOpen, onClose }) => {
               ),
               h('div',{className:'flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[10px] text-slate-500'},
                 h('span',{className:'inline-flex items-center gap-1'},h(UserRound,{className:'w-3 h-3'}),order.waiterName || 'الجرسون'),
-                h('span',{className:'inline-flex items-center gap-1'},h(Clock3,{className:'w-3 h-3'}),new Date(order.createdAt || Date.now()).toLocaleTimeString('ar-EG-u-nu-latn',{hour:'2-digit',minute:'2-digit'})),
+                h('span',{className:'inline-flex items-center gap-1'},h(Clock3,{className:'w-3 h-3'}),new Date(order.createdAt || Date.now()).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'})),
                 order.customerName ? h('span',{className:'font-bold text-slate-700 dark:text-slate-200'},'العميل: '+order.customerName) : null,
-                h('span',{className:'font-black text-emerald-600'},`${Number(order.total||0).toLocaleString('ar-EG-u-nu-latn')} ${settings.currencySymbol||'₪'}`)
+                h('span',{className:'font-black text-emerald-600'},`${Number(order.total||0).toLocaleString('ar-EG')} ${settings.currencySymbol||'₪'}`)
               ),
               h('div',{className:'mt-2 text-[10px] text-slate-500 truncate'},(order.items||[]).filter(i=>i.status!=='cancelled').map(i=>`${i.quantity}× ${i.productName}`).join('، '))
             ),

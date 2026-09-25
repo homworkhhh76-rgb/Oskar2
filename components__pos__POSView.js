@@ -1,14 +1,14 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.41-recipe-accounting';
-import { ProductGrid } from './components__pos__ProductGrid.js?v=7.9.4.41-recipe-accounting';
-import { CartPanel } from './components__pos__CartPanel.js?v=7.9.4.41-recipe-accounting';
-import { FullCartView } from './components__pos__FullCartView.js?v=7.9.4.41-recipe-accounting';
-import { PaymentModal } from './components__pos__PaymentModal.js?v=7.9.4.41-recipe-accounting';
-import { CameraScannerModal } from './components__pos__CameraScannerModal.js?v=7.9.4.41-recipe-accounting';
-import { HoldInvoicesModal } from './components__pos__HoldInvoicesModal.js?v=7.9.4.41-recipe-accounting';
-import { RestaurantPendingOrdersModal } from './restaurant__components__RestaurantPendingOrdersModal.js?v=7.9.4.41-recipe-accounting';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.41-recipe-accounting';
+import { useApp } from './context__AppContext.js?v=7.9.4.38-data-visible-reports-ledger';
+import { ProductGrid } from './components__pos__ProductGrid.js?v=7.9.4.38-data-visible-reports-ledger';
+import { CartPanel } from './components__pos__CartPanel.js?v=7.9.4.38-data-visible-reports-ledger';
+import { FullCartView } from './components__pos__FullCartView.js?v=7.9.4.38-data-visible-reports-ledger';
+import { PaymentModal } from './components__pos__PaymentModal.js?v=7.9.4.38-data-visible-reports-ledger';
+import { CameraScannerModal } from './components__pos__CameraScannerModal.js?v=7.9.4.38-data-visible-reports-ledger';
+import { HoldInvoicesModal } from './components__pos__HoldInvoicesModal.js?v=7.9.4.38-data-visible-reports-ledger';
+import { RestaurantPendingOrdersModal } from './restaurant__components__RestaurantPendingOrdersModal.js?v=7.9.4.38-data-visible-reports-ledger';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.38-data-visible-reports-ledger';
 import { Barcode, Camera, Maximize2, UtensilsCrossed } from 'lucide-react';
 export const POSView = () => {
     const { cart, handleScannedBarcode, setShowCameraModal, holdCurrentInvoice, posCartLayout, setPosCartLayout, settings } = useApp();

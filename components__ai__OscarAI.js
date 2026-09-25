@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, X, Send, Sparkles, TrendingUp, PackageSearch, WalletCards, Receipt, ChefHat, Settings2, CheckCircle2, LoaderCircle, ShoppingCart, RotateCcw, BarChart3, FileDown, Paperclip, PackagePlus } from 'lucide-react';
-import { useApp } from './context__AppContext.js?v=7.9.4.41-recipe-accounting';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.41-recipe-accounting';
-import { askOscar, getAIConfig, aiHealthCheck, fileToDataUrl } from './services__ai.js?v=7.9.4.41-recipe-accounting';
-import { executeAIActions, isMutationAction } from './services__aiActions.js?v=7.9.4.41-recipe-accounting';
-import { canAccessPermission } from './utils__permissions.js?v=7.9.4.41-recipe-accounting';
+import { useApp } from './context__AppContext.js?v=7.9.4.38-data-visible-reports-ledger';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.38-data-visible-reports-ledger';
+import { askOscar, getAIConfig, aiHealthCheck, fileToDataUrl } from './services__ai.js?v=7.9.4.38-data-visible-reports-ledger';
+import { executeAIActions, isMutationAction } from './services__aiActions.js?v=7.9.4.38-data-visible-reports-ledger';
+import { canAccessPermission } from './utils__permissions.js?v=7.9.4.38-data-visible-reports-ledger';
 
 const h = React.createElement;
 const DAY = 86400000;

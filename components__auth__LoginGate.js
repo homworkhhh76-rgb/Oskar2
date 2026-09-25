@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Upload, ShieldCheck, Building2, Wifi, WifiOff, Database, LogIn } from 'lucide-react';
-import { DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.41-recipe-accounting';
+import { DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.38-data-visible-reports-ledger';
 const h=React.createElement;
 export const LoginGate=({children})=>{
  const A=()=>window.OscarActivation;

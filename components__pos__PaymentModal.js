@@ -1,11 +1,11 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useEffect } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.41-recipe-accounting';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.41-recipe-accounting';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.41-recipe-accounting';
+import { useApp } from './context__AppContext.js?v=7.9.4.38-data-visible-reports-ledger';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.38-data-visible-reports-ledger';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.38-data-visible-reports-ledger';
 import { Banknote, Clock, Split, CheckCircle2, X, AlertCircle, Coins, } from 'lucide-react';
 export const PaymentModal = ({ isOpen, onClose, onSuccess }) => {
-    const { cart, customers, selectedCustomer, setSelectedCustomer, accounts, settings, createSaleInvoice, setShowThermalModal, saveCustomer, showToast, invoiceDiscountType, setInvoiceDiscountType, invoiceDiscountValue, setInvoiceDiscountValue, } = useApp();
+    const { cart, customers, invoices, selectedCustomer, setSelectedCustomer, accounts, settings, createSaleInvoice, updateSaleInvoice, editingSaleInvoiceId, setShowThermalModal, saveCustomer, showToast, invoiceDiscountType, setInvoiceDiscountType, invoiceDiscountValue, setInvoiceDiscountValue, } = useApp();
     const { activeRestaurantOrder, closeOrderAfterPayment } = useRestaurant();
     // Grand total calculation
     const subtotal = cart.reduce((s, i) => s + (i.quantity * i.unitPrice), 0);
@@ -38,13 +38,23 @@ export const PaymentModal = ({ isOpen, onClose, onSuccess }) => {
                 document.activeElement?.blur?.();
                 requestAnimationFrame(() => document.activeElement?.blur?.());
             }
-            setPaymentType('cash');
-            setCashGiven(grandTotal.toString());
-            setNotes('');
-            setSelectedAccountId(defaultAccountId);
-            setMultiRows([{ accountId: defaultAccountId, method: 'cash', amount: grandTotal }]);
+            const edited = editingSaleInvoiceId ? invoices.find((x) => x.id === editingSaleInvoiceId) : null;
+            if (edited) {
+                const oldType = ['cash','debt','partial','multi'].includes(edited.paymentType) ? edited.paymentType : (Number(edited.remainingAmount || 0) > 0 ? (Number(edited.paidAmount || 0) > 0 ? 'partial' : 'debt') : 'cash');
+                setPaymentType(oldType);
+                setCashGiven(String(oldType === 'cash' ? grandTotal : Number(edited.paidAmount || 0)));
+                setNotes(edited.notes || '');
+                setSelectedAccountId(edited.payments?.[0]?.accountId || defaultAccountId);
+                setMultiRows(Array.isArray(edited.payments) && edited.payments.length ? edited.payments.map((p) => ({ accountId:p.accountId, method:p.method || 'cash', amount:Number(p.amount || 0) })) : [{ accountId: defaultAccountId, method: 'cash', amount: grandTotal }]);
+            } else {
+                setPaymentType('cash');
+                setCashGiven(grandTotal.toString());
+                setNotes('');
+                setSelectedAccountId(defaultAccountId);
+                setMultiRows([{ accountId: defaultAccountId, method: 'cash', amount: grandTotal }]);
+            }
         }
-    }, [isOpen, grandTotal, accounts]);
+    }, [isOpen, grandTotal, accounts, editingSaleInvoiceId, invoices]);
     if (!isOpen)
         return null;
     const numCashGiven = parseFloat(cashGiven) || 0;
@@ -126,12 +136,10 @@ export const PaymentModal = ({ isOpen, onClose, onSuccess }) => {
                     accountName: accounts.find((a) => a.id === r.accountId)?.name || '',
                 }));
             }
-            const inv = await createSaleInvoice({
-                paymentType,
-                paidAmount,
-                payments,
-                notes,
-            });
+            const savePayload = { paymentType, paidAmount, payments, notes };
+            const inv = editingSaleInvoiceId
+                ? await updateSaleInvoice(editingSaleInvoiceId, savePayload)
+                : await createSaleInvoice(savePayload);
             if (inv) {
                 if (activeRestaurantOrder?.id) {
                     try { await closeOrderAfterPayment(activeRestaurantOrder.id, inv.id); } catch (e) { console.warn('Restaurant close after payment warning', e); }

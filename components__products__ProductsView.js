@@ -1,14 +1,14 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.41-recipe-accounting';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.41-recipe-accounting';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.41-recipe-accounting';
-import { BarcodeCameraModal } from './components__pos__CameraScannerModal.js?v=7.9.4.41-recipe-accounting';
-import { calculateUnitConversions, formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.41-recipe-accounting';
-import { exportToCSV } from './utils__export.js?v=7.9.4.41-recipe-accounting';
-import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.41-recipe-accounting';
-import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.41-recipe-accounting';
-import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.41-recipe-accounting';
+import { useApp } from './context__AppContext.js?v=7.9.4.38-data-visible-reports-ledger';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.38-data-visible-reports-ledger';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.38-data-visible-reports-ledger';
+import { BarcodeCameraModal } from './components__pos__CameraScannerModal.js?v=7.9.4.38-data-visible-reports-ledger';
+import { calculateUnitConversions, formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.38-data-visible-reports-ledger';
+import { exportToCSV } from './utils__export.js?v=7.9.4.38-data-visible-reports-ledger';
+import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.38-data-visible-reports-ledger';
+import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.38-data-visible-reports-ledger';
+import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.38-data-visible-reports-ledger';
 import { Plus, Search, Trash2, Edit, Layers, FolderTree, X, Download, Image as ImageIcon, FileSpreadsheet, Camera, } from 'lucide-react';
 const h = React.createElement;
 const normalizeArabicDigits = (value) => String(value ?? '')

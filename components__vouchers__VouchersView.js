@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useApp } from './context__AppContext.js?v=7.9.4.41-recipe-accounting';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.41-recipe-accounting';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.41-recipe-accounting';
-import { exportToCSV, printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.41-recipe-accounting';
-import { downloadProfessionalTablePDF, downloadProfessionalTableImage, downloadProfessionalVoucherPDF, downloadProfessionalVoucherImage } from './utils__professionalExport.js?v=7.9.4.41-recipe-accounting';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl } from './brand__logo.js?v=7.9.4.41-recipe-accounting';
+import { useApp } from './context__AppContext.js?v=7.9.4.38-data-visible-reports-ledger';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.38-data-visible-reports-ledger';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.38-data-visible-reports-ledger';
+import { exportToCSV, printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.38-data-visible-reports-ledger';
+import { downloadProfessionalTablePDF, downloadProfessionalTableImage, downloadProfessionalVoucherPDF, downloadProfessionalVoucherImage } from './utils__professionalExport.js?v=7.9.4.38-data-visible-reports-ledger';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl } from './brand__logo.js?v=7.9.4.38-data-visible-reports-ledger';
 import { FileSpreadsheet, ArrowDownLeft, ArrowUpRight, Search, Trash2, Printer, Download, Image as ImageIcon, FileText, CreditCard, User, Building2, AlertCircle, Eye, X } from 'lucide-react';
 
 const h = React.createElement;
@@ -81,7 +81,7 @@ export const VouchersView = () => {
 
   const voucherExportData = () => ({
     headers: ['رقم السند','النوع','التاريخ','الجهة','المبلغ','الحساب/المصدر','البيان','المستخدم'],
-    rows: filteredVouchers.map(v => [v.voucherNumber, v.type === 'receipt' ? 'سند قبض' : 'سند صرف', new Date(v.date).toLocaleString('ar-EG-u-nu-latn'), v.partyName, Number(v.amount)||0, v.sourceType === 'account' ? (v.accountName || 'حساب مالي') : 'بدون حساب', v.notes || '', v.userName || ''])
+    rows: filteredVouchers.map(v => [v.voucherNumber, v.type === 'receipt' ? 'سند قبض' : 'سند صرف', new Date(v.date).toLocaleString('ar-EG'), v.partyName, Number(v.amount)||0, v.sourceType === 'account' ? (v.accountName || 'حساب مالي') : 'بدون حساب', v.notes || '', v.userName || ''])
   });
   const exportTablePDF = async () => {
     const {headers,rows}=voucherExportData();
@@ -120,7 +120,7 @@ export const VouchersView = () => {
     h('div',{className:'py-3 text-center border-b border-dashed border-gray-300'},
       h('div',{className:`inline-block px-3 py-1 rounded-md text-xs font-black ${viewingVoucher.type==='receipt'?'bg-emerald-100 text-emerald-800':'bg-amber-100 text-amber-800'}`},viewingVoucher.type==='receipt'?'سند قبض مالي':'سند صرف مالي'),
       h('div',{className:'text-xs font-black text-gray-800 mt-1'},`رقم السند: #${viewingVoucher.voucherNumber}`),
-      h('div',{className:'text-[9px] text-gray-500'},new Date(viewingVoucher.date).toLocaleString('ar-EG-u-nu-latn'))
+      h('div',{className:'text-[9px] text-gray-500'},new Date(viewingVoucher.date).toLocaleString('ar-EG'))
     ),
     h('div',{className:'py-3 space-y-2 border-b border-dashed border-gray-300 text-[11px]'},
       h('div',{className:'flex justify-between gap-3'},h('span',{className:'text-gray-500'},viewingVoucher.type==='receipt'?'استلمنا من:':'صرفنا إلى:'),h('span',{className:'font-black text-gray-900 text-left'},viewingVoucher.partyName || '-')),
@@ -161,7 +161,7 @@ export const VouchersView = () => {
         h('tbody',{className:'divide-y'},...(filteredVouchers.length?vouchersPager.pageItems.map(v=>h('tr',{key:v.id,className:'hover:bg-slate-50'},
           h('td',{className:'p-3 font-mono font-bold'},v.voucherNumber),
           h('td',{className:'p-3'},h('span',{className:`px-2 py-1 rounded-lg font-bold ${v.type==='receipt'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}`},v.type==='receipt'?'قبض':'صرف')),
-          h('td',{className:'p-3 text-slate-500'},new Date(v.date).toLocaleDateString('ar-EG-u-nu-latn')),
+          h('td',{className:'p-3 text-slate-500'},new Date(v.date).toLocaleDateString('ar-EG')),
           h('td',{className:'p-3 font-bold'},v.partyName || '-'),
           h('td',{className:'p-3 font-mono font-black'},`${money(v.amount)} ${settings.currencySymbol}`),
           h('td',{className:'p-3'},v.sourceType==='account'?(v.accountName||'حساب مالي'):'بدون حساب'),

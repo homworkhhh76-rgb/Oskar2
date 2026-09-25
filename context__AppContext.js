@@ -1,10 +1,9 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.41-recipe-accounting';
-import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.41-recipe-accounting';
-import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.41-recipe-accounting';
-import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.41-recipe-accounting';
-import { notifyTelegramInvoice } from './services__telegram.js?v=7.9.4.41-recipe-accounting';
+import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.38-data-visible-reports-ledger';
+import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.38-data-visible-reports-ledger';
+import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.38-data-visible-reports-ledger';
+import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.38-data-visible-reports-ledger';
 const AppContext = createContext(null);
 const recordTime = (item = {}) => {
     const fields = ['createdAt', 'date', 'timestamp', 'startTime', 'updatedAt'];
@@ -37,66 +36,6 @@ const normalizeActiveWarehouseSettings = (value, warehouseRows = []) => {
 const finiteNumber = (value, fallback = 0) => {
     const n = Number(value);
     return Number.isFinite(n) ? n : fallback;
-};
-const recipeIngredientBaseCost = (ingredient, productRows = []) => {
-    const product = (productRows || []).find((p) => p?.id === (ingredient?.ingredientProductId || ingredient?.productId));
-    if (!product) return 0;
-    const units = Array.isArray(product.units) ? product.units : [];
-    const unit = units.find((u) => u.id === (ingredient?.ingredientUnitId || ingredient?.unitId))
-        || units.find((u) => u.name === ingredient?.unit)
-        || units.find((u) => u.id === product.baseUnitId)
-        || units.find((u) => (Number(u.conversionToBase) || 1) === 1)
-        || units[0];
-    const unitFactor = Math.max(0.00000001, Number(unit?.conversionToBase) || 1);
-    const productBaseCost = Math.max(0, Number(product.costPrice) || 0);
-    const unitCostAsBase = Math.max(0, Number(unit?.costPrice) || 0) / unitFactor;
-    return productBaseCost > 0 ? productBaseCost : unitCostAsBase;
-};
-const calculateRecipeBaseCost = (recipe, productRows = []) => {
-    const ingredients = Array.isArray(recipe?.ingredients || recipe?.items) ? (recipe.ingredients || recipe.items) : [];
-    const materialsCost = ingredients.reduce((sum, ing) => {
-        const product = (productRows || []).find((p) => p?.id === (ing?.ingredientProductId || ing?.productId));
-        if (!product) return sum;
-        const units = Array.isArray(product.units) ? product.units : [];
-        const unit = units.find((u) => u.id === (ing?.ingredientUnitId || ing?.unitId))
-            || units.find((u) => u.name === ing?.unit)
-            || units.find((u) => u.id === product.baseUnitId)
-            || units.find((u) => (Number(u.conversionToBase) || 1) === 1)
-            || units[0];
-        const factor = Number(ing?.conversionFactor ?? unit?.conversionToBase ?? 1) || 1;
-        const baseQty = Math.max(0, Number(ing?.baseQuantity) || ((Number(ing?.quantity) || 0) * factor));
-        return sum + baseQty * recipeIngredientBaseCost(ing, productRows);
-    }, 0);
-    const extraCost = Math.max(0, Number(recipe?.extraCost ?? recipe?.productionOverhead ?? 0) || 0);
-    return Math.max(0, materialsCost + extraCost);
-};
-const applyRecipeCostsToProducts = (productRows = [], recipes = []) => {
-    const rows = (productRows || []).map((p) => ({ ...p, units:Array.isArray(p?.units) ? p.units.map((u) => ({...u})) : [] }));
-    for (const recipe of recipes || []) {
-        const productId = recipe?.productId || recipe?.mealProductId;
-        if (!productId) continue;
-        const idx = rows.findIndex((p) => p.id === productId);
-        if (idx < 0) continue;
-        const baseCost = Number(calculateRecipeBaseCost(recipe, rows).toFixed(4));
-        const current = rows[idx];
-        const units = (current.units || []).map((u) => {
-            const wanted = Number((baseCost * Math.max(1, Number(u.conversionToBase) || 1)).toFixed(4));
-            return Math.abs((Number(u.costPrice) || 0) - wanted) > 0.00005 ? { ...u, costPrice:wanted } : u;
-        });
-        const changed = Math.abs((Number(current.costPrice) || 0) - baseCost) > 0.00005
-            || Math.abs((Number(current.recipeCost) || 0) - baseCost) > 0.00005
-            || units.some((u, i) => u !== current.units?.[i]);
-        if (changed) {
-            rows[idx] = {
-                ...current,
-                costPrice: baseCost,
-                recipeCost: baseCost,
-                units,
-                updatedAt: new Date().toISOString(),
-            };
-        }
-    }
-    return rows;
 };
 const normalizeAccountRecord = (account) => {
     if (!account || typeof account !== 'object') return account;
@@ -253,6 +192,7 @@ export const AppProvider = ({ children }) => {
     const [invoiceDiscountType, setInvoiceDiscountType] = useState('fixed');
     const [invoiceDiscountValue, setInvoiceDiscountValue] = useState(0);
     const [selectedCustomer, setSelectedCustomer] = useState(CASH_CUSTOMER);
+    const [editingSaleInvoiceId, setEditingSaleInvoiceId] = useState(null);
     // Toast helper
     const showToast = useCallback((message, type = 'info') => {
         const id = Math.random().toString(36).substring(2, 9);
@@ -267,7 +207,7 @@ export const AppProvider = ({ children }) => {
     // Reload all stores from IndexedDB
     const reloadData = useCallback(async () => {
         try {
-            const [prods, cats, whs, stk, stkMovs, invs, purchs, custs, supps, accs, trans, exps, shfts, audits, helds, syncs, sett, stmts, vouchs, emps, recs,] = await Promise.all([
+            const [prods, cats, whs, stk, stkMovs, invs, purchs, custs, supps, accs, trans, exps, shfts, audits, helds, syncs, sett, stmts, vouchs, emps,] = await Promise.all([
                 getAllFromStore('products'),
                 getAllFromStore('categories'),
                 getAllFromStore('warehouses'),
@@ -288,11 +228,8 @@ export const AppProvider = ({ children }) => {
                 getAllFromStore('partner_statements'),
                 getAllFromStore('vouchers'),
                 getAllFromStore('employees'),
-                getAllFromStore('recipes'),
             ]);
-            const recipeCostedProducts = (recs || []).length ? applyRecipeCostsToProducts(prods || [], recs || []) : (prods || []);
-            if ((recs || []).length) await bulkPut('products', recipeCostedProducts);
-            setProducts(newestFirst(recipeCostedProducts));
+            setProducts(newestFirst(prods));
             setCategories((cats || []).sort((a, b) => a.displayOrder - b.displayOrder));
             setWarehouses(whs || []);
             setStock(stk || []);
@@ -629,6 +566,7 @@ export const AppProvider = ({ children }) => {
         setInvoiceDiscountValue(0);
         // Every new sale starts as a direct cash sale.
         setSelectedCustomer(CASH_CUSTOMER);
+        setEditingSaleInvoiceId(null);
     }, []);
     // Hold current invoice
     const holdCurrentInvoice = useCallback(async (notes) => {
@@ -695,15 +633,25 @@ export const AppProvider = ({ children }) => {
         const isDirectSale = Array.isArray(payload.items) && payload.items.length > 0;
         const saleCart = isDirectSale ? payload.items : cart;
         if (saleCart.length === 0) { showToast('السلة فارغة!', 'error'); return null; }
-        const warehouseId = settings.activeWarehouseId;
+        const [liveProductsRaw, liveStockRaw, liveAccountsRaw, liveCustomersRaw, liveShiftsRaw] = await Promise.all([
+            getAllFromStore('products'), getAllFromStore('stock'), getAllFromStore('accounts'), getAllFromStore('customers'), getAllFromStore('shifts')
+        ]);
+        const sourceProducts = Array.isArray(liveProductsRaw) && liveProductsRaw.length ? liveProductsRaw : products;
+        const sourceStock = Array.isArray(liveStockRaw) ? liveStockRaw : stock;
+        const sourceAccounts = Array.isArray(liveAccountsRaw) && liveAccountsRaw.length ? liveAccountsRaw : accounts;
+        const sourceCustomers = Array.isArray(liveCustomersRaw) ? liveCustomersRaw : customers;
+        const liveActiveShift = activeShift?.id ? ((liveShiftsRaw || []).find((x) => x.id === activeShift.id) || activeShift) : null;
+        const warehouseId = payload.warehouseIdOverride || settings.activeWarehouseId;
         const warehouse = warehouses.find((w) => w.id === warehouseId) || warehouses[0];
         const now = new Date().toISOString();
-        const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
+        const invoiceDate = payload.dateOverride || now;
+        const invoiceNumber = payload.invoiceNumberOverride || `INV-${Date.now().toString().slice(-6)}`;
+        const invoiceId = payload.invoiceIdOverride || `inv-${Date.now()}`;
         const syncId = `sale-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
         const recipes = await getAllFromStore('recipes').catch(() => []);
         const recipeByProductId = new Map((recipes || []).map((r) => [r.productId || r.mealProductId, r]).filter((x) => x[0]));
         let subtotal = 0, lineDiscountTotal = 0, taxTotal = 0;
-        const productCopies = products.map(p => ({...p, fifoBatches: Array.isArray(p.fifoBatches) ? p.fifoBatches.map(b=>({...b})) : []}));
+        const productCopies = sourceProducts.map(p => ({...p, fifoBatches: Array.isArray(p.fifoBatches) ? p.fifoBatches.map(b=>({...b})) : []}));
         const consumeFifo = (productId, baseQty, fallbackBaseCost) => {
             const p = productCopies.find(x=>x.id===productId);
             if (!p) return baseQty * fallbackBaseCost;
@@ -741,7 +689,7 @@ export const AppProvider = ({ children }) => {
                     const factor = Number(ing.conversionFactor ?? ingUnit?.conversionToBase ?? 1) || 1;
                     const qtyPerMeal = Number(ing.quantity) || 0;
                     const basePerMeal = Number(ing.baseQuantity) > 0 ? Number(ing.baseQuantity) : qtyPerMeal * factor;
-                    const requiredBaseQty = basePerMeal * baseQuantity;
+                    const requiredBaseQty = basePerMeal * item.quantity;
                     if (requiredBaseQty <= 0) continue;
                     const ingredientBaseCost = Number(ingProduct.costPrice) || (Number(ingUnit?.costPrice) / Math.max(1, Number(ingUnit?.conversionToBase) || 1)) || 0;
                     const cost = consumeFifo(ingProduct.id, requiredBaseQty, ingredientBaseCost);
@@ -755,7 +703,7 @@ export const AppProvider = ({ children }) => {
                         quantityPerMeal: qtyPerMeal,
                         conversionFactor: factor,
                         baseQuantityPerMeal: basePerMeal,
-                        soldMealQuantity: baseQuantity,
+                        soldMealQuantity: item.quantity,
                         baseQuantity: requiredBaseQty,
                         fifoCostTotal: cost,
                     });
@@ -780,17 +728,18 @@ export const AppProvider = ({ children }) => {
         let paid = Number(payload.paidAmount)||0;
         const remaining = Math.max(0, grandTotal - paid);
         const change = Math.max(0, paid - grandTotal);
-        const saleCustomer = payload.forceCashCustomer ? CASH_CUSTOMER : (payload.customerObject || (payload.customerId ? (customers.find((c) => c.id === payload.customerId) || selectedCustomer || CASH_CUSTOMER) : (selectedCustomer || CASH_CUSTOMER)));
+        const selectedLiveCustomer = selectedCustomer?.id ? (sourceCustomers.find((c) => c.id === selectedCustomer.id) || selectedCustomer) : CASH_CUSTOMER;
+        const saleCustomer = payload.forceCashCustomer ? CASH_CUSTOMER : (payload.customerObject || (payload.customerId ? (sourceCustomers.find((c) => c.id === payload.customerId) || selectedLiveCustomer || CASH_CUSTOMER) : (selectedLiveCustomer || CASH_CUSTOMER)));
         if ((payload.paymentType === 'debt' || payload.paymentType === 'partial') && saleCustomer.id === CASH_CUSTOMER.id) { showToast('يجب اختيار عميل مسجل للبيع الآجل أو الدفع الجزئي!', 'error'); return null; }
-        const invoice = { id:'inv-'+Date.now(), invoiceNumber, type:'sale', date:now, customerId:saleCustomer.id, customerName:saleCustomer.name, cashierId:currentUser.id, cashierName:currentUser.name, shiftId:activeShift?.id, branchId:settings.activeBranchName, warehouseId, items:invoiceItems, subtotal, lineDiscountTotal, invoiceDiscountType:effectiveDiscountType, invoiceDiscountValue:rawDiscount, invoiceDiscountAmount, discountTotal, taxTotal, roundingAdjustment, grandTotal, paidAmount:Math.min(paid,grandTotal), remainingAmount:remaining, changeAmount:change, paymentType:payload.paymentType, payments, status:'completed', notes:payload.notes, syncId, isSynced:false, createdAt:now };
+        const invoice = { id:invoiceId, invoiceNumber, type:'sale', date:invoiceDate, customerId:saleCustomer.id, customerName:saleCustomer.name, cashierId:currentUser.id, cashierName:currentUser.name, shiftId:liveActiveShift?.id, branchId:settings.activeBranchName, warehouseId, items:invoiceItems, subtotal, lineDiscountTotal, invoiceDiscountType:effectiveDiscountType, invoiceDiscountValue:rawDiscount, invoiceDiscountAmount, discountTotal, taxTotal, roundingAdjustment, grandTotal, paidAmount:Math.min(paid,grandTotal), remainingAmount:remaining, changeAmount:change, paymentType:payload.paymentType, payments, status:'completed', notes:payload.notes, syncId, isSynced:false, createdAt:payload.createdAtOverride || now, updatedAt:now, editedAt:payload.isEdit ? now : undefined };
         await putInStore('invoices', invoice);
-        const updatedStockList=[...stock], newMovements=[];
+        const updatedStockList=[...sourceStock], newMovements=[];
         const deductStock = (productId, productName, baseQty, movementMeta = {}) => {
             const stockIndex=updatedStockList.findIndex(s=>s.productId===productId&&s.warehouseId===warehouseId);
             const currentQty=stockIndex>=0?Number(updatedStockList[stockIndex].baseQuantity)||0:0;
             const newQty=currentQty-baseQty;
             if(stockIndex>=0) updatedStockList[stockIndex]={...updatedStockList[stockIndex],baseQuantity:newQty}; else updatedStockList.push({productId,warehouseId,baseQuantity:newQty});
-            newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:now,productId,productName,warehouseId,warehouseName:warehouse?.name||'صالة العرض',type:movementMeta.type||'sale',unitName:movementMeta.unitName||'وحدة أساسية',quantityInUnit:movementMeta.quantityInUnit??baseQty,conversionFactor:movementMeta.conversionFactor||1,baseQuantityChange:-baseQty,newBaseBalance:newQty,referenceId:invoice.id,referenceType:'INVOICE',userId:currentUser.id,userName:currentUser.name,recipeId:movementMeta.recipeId,manufacturedProductId:movementMeta.manufacturedProductId,manufacturedProductName:movementMeta.manufacturedProductName,unitCost:Number(movementMeta.unitCost)||0,costAmount:Number(movementMeta.costAmount)||0,fifoCostTotal:Number(movementMeta.costAmount)||0});
+            newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:now,productId,productName,warehouseId,warehouseName:warehouse?.name||'صالة العرض',type:movementMeta.type||'sale',unitName:movementMeta.unitName||'وحدة أساسية',quantityInUnit:movementMeta.quantityInUnit??baseQty,conversionFactor:movementMeta.conversionFactor||1,baseQuantityChange:-baseQty,newBaseBalance:newQty,referenceId:invoice.id,referenceType:'INVOICE',userId:currentUser.id,userName:currentUser.name,recipeId:movementMeta.recipeId,manufacturedProductId:movementMeta.manufacturedProductId,manufacturedProductName:movementMeta.manufacturedProductName});
         };
         for (const item of invoiceItems) {
             if (item.isManufacturedMeal && Array.isArray(item.recipeConsumption) && item.recipeConsumption.length > 0) {
@@ -803,21 +752,19 @@ export const AppProvider = ({ children }) => {
                         recipeId:item.recipeId,
                         manufacturedProductId:item.productId,
                         manufacturedProductName:item.productName,
-                        unitCost: ing.baseQuantity > 0 ? (Number(ing.fifoCostTotal) || 0) / Number(ing.baseQuantity) : 0,
-                        costAmount: Number(ing.fifoCostTotal) || 0,
                     });
                 }
             } else {
-                deductStock(item.productId, item.productName, item.baseQuantity, {type:'sale',unitName:item.unitName,quantityInUnit:item.quantity,conversionFactor:item.conversionFactor,unitCost:item.baseQuantity>0?(Number(item.fifoCostTotal)||0)/item.baseQuantity:0,costAmount:Number(item.fifoCostTotal)||0});
+                deductStock(item.productId, item.productName, item.baseQuantity, {type:'sale',unitName:item.unitName,quantityInUnit:item.quantity,conversionFactor:item.conversionFactor});
             }
         }
         await bulkPut('stock',updatedStockList); await bulkPut('stock_movements',newMovements); await bulkPut('products',productCopies);
-        const updatedAccounts=[...accounts];
+        const updatedAccounts=[...sourceAccounts];
         for(const p of payments){const i=updatedAccounts.findIndex(a=>a.id===p.accountId);if(i>=0)updatedAccounts[i]={...updatedAccounts[i],balance:(Number(updatedAccounts[i].balance)||0)+(Number(p.amount)||0)};}
         await bulkPut('accounts',updatedAccounts);
         let updatedCustomer = null, customerStatement = null, updatedShift = null;
-        if(remaining>0&&saleCustomer.id!==CASH_CUSTOMER.id){const newBalance=(Number(saleCustomer.balance)||0)+remaining;updatedCustomer={...saleCustomer,balance:newBalance};customerStatement={id:'stmt-'+Date.now(),date:now,type:'sale',referenceNumber:invoiceNumber,description:`فاتورة مبيعات آجل رقم ${invoiceNumber}`,debit:remaining,credit:0,runningBalance:newBalance};await putInStore('customers',updatedCustomer);await putInStore('partner_statements',customerStatement);}
-        if(activeShift){const cashPaid=payments.filter(p=>p.method==='cash').reduce((x,p)=>x+(Number(p.amount)||0),0)-change;const otherPaid=payments.filter(p=>p.method!=='cash').reduce((x,p)=>x+(Number(p.amount)||0),0);updatedShift={...activeShift,totalCashSales:(Number(activeShift.totalCashSales)||0)+Math.max(0,cashPaid),totalOtherSales:(Number(activeShift.totalOtherSales)||0)+otherPaid,expectedCash:(Number(activeShift.expectedCash)||0)+Math.max(0,cashPaid)};await putInStore('shifts',updatedShift);}
+        if(remaining>0&&saleCustomer.id!==CASH_CUSTOMER.id){const newBalance=(Number(saleCustomer.balance)||0)+remaining;updatedCustomer={...saleCustomer,balance:newBalance};customerStatement={id:'stmt-'+Date.now(),date:now,type:'sale',partnerType:'customer',partnerId:saleCustomer.id,partnerName:saleCustomer.name,referenceType:'SALE',referenceId:invoice.id,referenceNumber:invoiceNumber,description:`فاتورة مبيعات آجل رقم ${invoiceNumber}`,debit:remaining,credit:0,runningBalance:newBalance};await putInStore('customers',updatedCustomer);await putInStore('partner_statements',customerStatement);}
+        if(liveActiveShift){const cashPaid=payments.filter(p=>p.method==='cash').reduce((x,p)=>x+(Number(p.amount)||0),0)-change;const otherPaid=payments.filter(p=>p.method!=='cash').reduce((x,p)=>x+(Number(p.amount)||0),0);updatedShift={...liveActiveShift,totalCashSales:(Number(liveActiveShift.totalCashSales)||0)+Math.max(0,cashPaid),totalOtherSales:(Number(liveActiveShift.totalOtherSales)||0)+otherPaid,expectedCash:(Number(liveActiveShift.expectedCash)||0)+Math.max(0,cashPaid)};await putInStore('shifts',updatedShift);}
         // Update the open screen from the already-saved local data; no full database reload and no cloud wait.
         setInvoices(prev => [invoice, ...prev.filter(x => x.id !== invoice.id)]);
         setStock(updatedStockList);
@@ -828,58 +775,189 @@ export const AppProvider = ({ children }) => {
         if(customerStatement)setPartnerStatements(prev => [customerStatement, ...prev]);
         if(updatedShift)setShifts(prev => prev.map(x => x.id===updatedShift.id?updatedShift:x));
         setSyncQueue(window.OscarCloudSync?.pendingItems?.() || []);
-        playSuccessSound(settings.scannerBeepEnabled); if(!isDirectSale) clearCart(); notifyTelegramInvoice(invoice,'sale').catch(()=>{}); showToast(`تم حفظ الفاتورة بنجاح [${invoiceNumber}]`,'success'); return invoice;
+        playSuccessSound(settings.scannerBeepEnabled); if(!isDirectSale) clearCart(); setEditingSaleInvoiceId(null); showToast(payload.isEdit ? `تم تعديل الفاتورة [${invoiceNumber}] مع عكس القيد القديم وإعادة احتساب الجديد` : `تم حفظ الفاتورة بنجاح [${invoiceNumber}]`,'success'); return invoice;
     }, [cart, invoiceDiscountType, invoiceDiscountValue, settings, warehouses, products, customers, selectedCustomer, currentUser, activeShift, stock, accounts, clearCart, showToast]);
-    // Create Return Invoice
-    const createReturnInvoice = useCallback(async (payload) => {
-        const original = invoices.find((inv) => inv.id === payload.originalInvoiceId);
-        if (!original) {
-            showToast('لم يتم العثور على الفاتورة الأصلية', 'error');
-            return null;
-        }
-        const now = new Date().toISOString();
-        const returnNumber = `RET-${Date.now().toString().slice(-6)}`;
-        const syncId = `ret-${Date.now()}`;
-        let refundTotal = 0;
-        const returnItems = [];
-        for (const reqItem of payload.items) {
-            const prod = products.find((p) => p.id === reqItem.productId);
-            const unit = prod?.units.find((u) => u.id === reqItem.unitId);
-            const factor = unit?.conversionToBase || 1;
-            const originalItem = original.items?.find((x) => x.productId === reqItem.productId && x.unitId === reqItem.unitId);
-            const costPerSoldUnit = originalItem?.costPriceAtSale ?? ((prod?.costPrice || 0) * factor);
-            const returnFifoCost = reqItem.quantity * costPerSoldUnit;
-            const total = reqItem.quantity * reqItem.unitPrice;
-            refundTotal += total;
-            returnItems.push({
-                id: 'ret-item-' + Math.random().toString(36).substring(2, 9),
-                productId: reqItem.productId,
-                productName: prod?.name || 'صنف مرتجع',
-                unitId: reqItem.unitId,
-                unitName: unit?.name || 'حبة',
-                quantity: reqItem.quantity,
-                conversionFactor: factor,
-                baseQuantity: reqItem.quantity * factor,
-                unitPrice: reqItem.unitPrice,
-                discount: 0,
-                taxRate: 0,
-                total,
-                fifoCostTotal: returnFifoCost,
-                costPriceAtSale: costPerSoldUnit,
-                isManufacturedMeal: !!originalItem?.isManufacturedMeal,
-                recipeId: originalItem?.recipeId,
-                recipeConsumption: Array.isArray(originalItem?.recipeConsumption) ? originalItem.recipeConsumption.map((r) => ({...r})) : [],
-                originalSoldQuantity: Number(originalItem?.quantity) || 0,
+    // Transaction reversal helpers: all invoice changes pass through the same accounting/stock logic.
+    const addStockDelta = useCallback(async ({ rows, productId, warehouseId, delta, movement }) => {
+        const qty = finiteNumber(delta, 0);
+        if (!productId || !warehouseId || Math.abs(qty) < 0.0000001) return rows;
+        const nextRows = [...rows];
+        const index = nextRows.findIndex((row) => row.productId === productId && String(row.warehouseId) === String(warehouseId));
+        const current = index >= 0 ? finiteNumber(nextRows[index].baseQuantity, 0) : 0;
+        const next = current + qty;
+        const stamped = { productId, warehouseId, baseQuantity: next, updatedAt: new Date().toISOString() };
+        if (index >= 0) nextRows[index] = { ...nextRows[index], ...stamped };
+        else nextRows.push(stamped);
+        if (movement) {
+            await putInStore('stock_movements', {
+                id: movement.id || `mov-reverse-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                date: movement.date || new Date().toISOString(),
+                productId,
+                warehouseId,
+                baseQuantityChange: qty,
+                newBaseBalance: next,
+                userId: currentUser.id,
+                userName: currentUser.name,
+                ...movement,
             });
         }
-        const refundMode = payload.refundMode === 'customer_balance' && original.customerId && original.customerId !== CASH_CUSTOMER.id ? 'customer_balance' : 'account';
-        const refundAccount = refundMode === 'account' ? accounts.find((a) => a.id === payload.refundAccountId) : null;
-        if (refundMode === 'account' && !refundAccount) {
-            showToast('اختر حساباً مالياً صالحاً لإرجاع المبلغ', 'error');
+        return nextRows;
+    }, [currentUser]);
+
+    const appendReversalStatement = useCallback(async ({ partnerType, partner, amount, referenceType, referenceId, referenceNumber, description, direction }) => {
+        const value = Math.max(0, finiteNumber(amount, 0));
+        if (!partner?.id || value <= 0) return;
+        const nextBalance = finiteNumber(partner.balance, 0) + (direction === 'increase' ? value : -value);
+        const store = partnerType === 'supplier' ? 'suppliers' : 'customers';
+        await putInStore(store, { ...partner, balance: nextBalance });
+        await putInStore('partner_statements', {
+            id: `stmt-rev-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            date: new Date().toISOString(),
+            type: 'reversal',
+            partnerType,
+            partnerId: partner.id,
+            partnerName: partner.name,
+            referenceType,
+            referenceId,
+            referenceNumber,
+            description,
+            debit: direction === 'increase' ? value : 0,
+            credit: direction === 'increase' ? 0 : value,
+            runningBalance: nextBalance,
+            isReversal: true,
+        });
+    }, []);
+
+    const restoreFifoQuantity = useCallback((productRows, productId, warehouseId, baseQty, costTotal, sourceMeta = {}) => {
+        const qty = Math.max(0, finiteNumber(baseQty, 0));
+        if (!productId || qty <= 0) return productRows;
+        const next = productRows.map((p) => p.id === productId ? { ...p, fifoBatches: Array.isArray(p.fifoBatches) ? p.fifoBatches.map((b) => ({ ...b })) : [] } : p);
+        const index = next.findIndex((p) => p.id === productId);
+        if (index < 0) return next;
+        const unitCost = qty > 0 ? Math.max(0, finiteNumber(costTotal, 0)) / qty : 0;
+        next[index].fifoBatches.push({
+            id: `batch-reversal-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            purchaseId: sourceMeta.purchaseId || sourceMeta.referenceId || 'reversal',
+            warehouseId,
+            receivedAt: new Date().toISOString(),
+            expiryDate: '',
+            unitCost,
+            remainingBaseQty: qty,
+            reversalBatch: true,
+            sourceReferenceId: sourceMeta.referenceId,
+            sourceReturnId: sourceMeta.returnId,
+        });
+        next[index].updatedAt = new Date().toISOString();
+        return next;
+    }, []);
+
+    const removeReturnFifoBatches = useCallback((productRows, returnId) => productRows.map((p) => ({
+        ...p,
+        fifoBatches: Array.isArray(p.fifoBatches) ? p.fifoBatches.filter((b) => b.sourceReturnId !== returnId) : p.fifoBatches,
+    })), []);
+
+    // Create Return Invoice. Debt is reversed first; only the paid portion is refunded from the original payment accounts.
+    const createReturnInvoice = useCallback(async (payload) => {
+        const liveInvoices = await getAllFromStore('invoices');
+        const original = (liveInvoices || []).find((inv) => inv.id === payload.originalInvoiceId && inv.type === 'sale');
+        if (!original) {
+            showToast('لم يتم العثور على فاتورة المبيعات الأصلية', 'error');
             return null;
         }
+        const linkedReturns = (liveInvoices || []).filter((inv) => inv.type === 'return' && inv.originalInvoiceId === original.id);
+        const now = new Date().toISOString();
+        const returnNumber = `RET-${Date.now().toString().slice(-6)}`;
+        const syncId = `ret-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const alreadyReturnedByKey = new Map();
+        for (const ret of linkedReturns) {
+            for (const item of (ret.items || [])) {
+                const key = `${item.productId}\u0001${item.unitId || ''}`;
+                alreadyReturnedByKey.set(key, finiteNumber(alreadyReturnedByKey.get(key), 0) + finiteNumber(item.quantity, 0));
+            }
+        }
+        const originalGross = (original.items || []).reduce((sum, item) => sum + Math.max(0, finiteNumber(item.total, finiteNumber(item.quantity, 0) * finiteNumber(item.unitPrice, 0))), 0) || Math.max(0, finiteNumber(original.grandTotal, 0));
+        const priorReturnTotal = linkedReturns.reduce((sum, ret) => sum + Math.max(0, finiteNumber(ret.grandTotal, 0)), 0);
+        const remainingReturnableValue = Math.max(0, finiteNumber(original.grandTotal, 0) - priorReturnTotal);
+        if (remainingReturnableValue <= 0.000001) {
+            showToast('تم إرجاع كامل قيمة هذه الفاتورة سابقاً', 'warning');
+            return null;
+        }
+        const returnItems = [];
+        let selectedGross = 0;
+        for (const reqItem of (payload.items || [])) {
+            const originalItem = (original.items || []).find((x) => x.productId === reqItem.productId && x.unitId === reqItem.unitId);
+            if (!originalItem) continue;
+            const key = `${originalItem.productId}\u0001${originalItem.unitId || ''}`;
+            const availableQty = Math.max(0, finiteNumber(originalItem.quantity, 0) - finiteNumber(alreadyReturnedByKey.get(key), 0));
+            const qty = Math.min(availableQty, Math.max(0, finiteNumber(reqItem.quantity, 0)));
+            if (qty <= 0) continue;
+            const proportion = finiteNumber(originalItem.quantity, 0) > 0 ? qty / finiteNumber(originalItem.quantity, 0) : 0;
+            const grossLine = Math.max(0, finiteNumber(originalItem.total, finiteNumber(originalItem.quantity, 0) * finiteNumber(originalItem.unitPrice, 0))) * proportion;
+            selectedGross += grossLine;
+            const recipeConsumption = Array.isArray(originalItem.recipeConsumption) ? originalItem.recipeConsumption.map((ing) => ({
+                ...ing,
+                soldMealQuantity: qty,
+                baseQuantity: finiteNumber(ing.baseQuantity, 0) * proportion,
+                fifoCostTotal: finiteNumber(ing.fifoCostTotal, 0) * proportion,
+            })) : [];
+            returnItems.push({
+                id: `ret-item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                productId: originalItem.productId,
+                productName: originalItem.productName,
+                unitId: originalItem.unitId,
+                unitName: originalItem.unitName,
+                quantity: qty,
+                conversionFactor: finiteNumber(originalItem.conversionFactor, 1) || 1,
+                baseQuantity: finiteNumber(originalItem.baseQuantity, finiteNumber(originalItem.quantity, 0) * finiteNumber(originalItem.conversionFactor, 1)) * proportion,
+                unitPrice: finiteNumber(originalItem.unitPrice, 0),
+                discount: finiteNumber(originalItem.discount, 0) * proportion,
+                taxRate: finiteNumber(originalItem.taxRate, 0),
+                total: grossLine,
+                fifoCostTotal: finiteNumber(originalItem.fifoCostTotal, 0) * proportion,
+                costPriceAtSale: finiteNumber(originalItem.costPriceAtSale, 0),
+                isManufacturedMeal: !!originalItem.isManufacturedMeal,
+                recipeId: originalItem.recipeId,
+                recipeConsumption,
+            });
+        }
+        if (!returnItems.length || selectedGross <= 0) {
+            showToast('حدد كمية صحيحة للإرجاع', 'warning');
+            return null;
+        }
+        const proportionalNet = originalGross > 0 ? finiteNumber(original.grandTotal, 0) * (selectedGross / originalGross) : selectedGross;
+        const refundTotal = Math.min(remainingReturnableValue, Math.max(0, proportionalNet));
+        const priorDebtReversed = linkedReturns.reduce((sum, ret) => sum + Math.max(0, finiteNumber(ret.returnAllocation?.debtReversed, 0)), 0);
+        const originalDebt = Math.max(0, finiteNumber(original.remainingAmount, 0));
+        const debtStillOpenFromInvoice = Math.max(0, originalDebt - priorDebtReversed);
+        const debtReversed = Math.min(refundTotal, debtStillOpenFromInvoice);
+        let paidRefundLeft = Math.max(0, refundTotal - debtReversed);
+        const priorRefundByAccount = new Map();
+        for (const ret of linkedReturns) {
+            for (const row of (ret.returnAllocation?.accountRefunds || [])) {
+                priorRefundByAccount.set(row.accountId, finiteNumber(priorRefundByAccount.get(row.accountId), 0) + finiteNumber(row.amount, 0));
+            }
+        }
+        const originalPayments = Array.isArray(original.payments) ? original.payments.filter((p) => p?.accountId && finiteNumber(p.amount, 0) > 0) : [];
+        const availablePayments = originalPayments.map((p) => ({ ...p, available: Math.max(0, finiteNumber(p.amount, 0) - finiteNumber(priorRefundByAccount.get(p.accountId), 0)) })).filter((p) => p.available > 0.000001);
+        const liveReturnAccounts = await getAllFromStore('accounts');
+        const accountRefunds = [];
+        for (const p of availablePayments) {
+            if (paidRefundLeft <= 0.000001) break;
+            const amount = Math.min(p.available, paidRefundLeft);
+            accountRefunds.push({ accountId: p.accountId, accountName: p.accountName, method: p.method || 'account', amount });
+            paidRefundLeft -= amount;
+        }
+        if (paidRefundLeft > 0.000001) {
+            const fallback = (liveReturnAccounts || []).find((a) => a.id === payload.refundAccountId) || (liveReturnAccounts || []).find((a) => a.isDefault) || (liveReturnAccounts || [])[0];
+            if (!fallback) {
+                showToast('لا يوجد حساب مالي لإرجاع الجزء المدفوع من الفاتورة', 'error');
+                return null;
+            }
+            accountRefunds.push({ accountId: fallback.id, accountName: fallback.name, method: fallback.type === 'cash' ? 'cash' : 'account', amount: paidRefundLeft });
+            paidRefundLeft = 0;
+        }
         const returnInvoice = {
-            id: 'ret-' + Date.now(),
+            id: `ret-${Date.now()}`,
             invoiceNumber: returnNumber,
             type: 'return',
             date: now,
@@ -895,100 +973,68 @@ export const AppProvider = ({ children }) => {
             discountTotal: 0,
             taxTotal: 0,
             grandTotal: refundTotal,
-            paidAmount: refundTotal,
+            paidAmount: accountRefunds.reduce((s, p) => s + finiteNumber(p.amount, 0), 0),
             remainingAmount: 0,
             changeAmount: 0,
-            paymentType: refundMode === 'customer_balance' ? 'customer_balance' : 'cash',
-            refundMode,
-            payments: refundMode === 'account' ? [
-                {
-                    method: refundAccount?.type || 'cash',
-                    amount: refundTotal,
-                    accountId: refundAccount?.id,
-                    accountName: refundAccount?.name || 'الصندوق',
-                },
-            ] : [],
+            paymentType: debtReversed > 0 && accountRefunds.length ? 'partial_reverse' : (debtReversed > 0 ? 'debt_reverse' : 'refund'),
+            payments: accountRefunds,
             status: 'completed',
             originalInvoiceId: original.id,
             notes: payload.notes,
+            returnAllocation: { debtReversed, accountRefunds },
             syncId,
             isSynced: false,
             createdAt: now,
         };
         await putInStore('invoices', returnInvoice);
-        // Re-credit stock. For manufactured items, restore the raw ingredients that were originally consumed.
-        const updatedStockList = [...stock];
-        const newMovements = [];
-        const addBackStock = (productId, productName, baseQty, meta = {}) => {
-            const stockIndex = updatedStockList.findIndex((s) => s.productId === productId && s.warehouseId === original.warehouseId);
-            const currentQty = stockIndex >= 0 ? Number(updatedStockList[stockIndex].baseQuantity) || 0 : 0;
-            const newQty = currentQty + baseQty;
-            if (stockIndex >= 0) updatedStockList[stockIndex] = { ...updatedStockList[stockIndex], baseQuantity:newQty };
-            else updatedStockList.push({ productId, warehouseId:original.warehouseId, baseQuantity:newQty });
-            newMovements.push({
-                id:'mov-' + Math.random().toString(36).substring(2, 9), date:now, productId, productName,
-                warehouseId:original.warehouseId, warehouseName:warehouses.find((w) => w.id === original.warehouseId)?.name || 'المخزن',
-                type:meta.type || 'return', unitName:meta.unitName || 'وحدة أساسية', quantityInUnit:meta.quantityInUnit ?? baseQty,
-                conversionFactor:meta.conversionFactor || 1, baseQuantityChange:baseQty, newBaseBalance:newQty,
-                referenceId:returnInvoice.id, referenceType:'RETURN', userId:currentUser.id, userName:currentUser.name,
-                recipeId:meta.recipeId, manufacturedProductId:meta.manufacturedProductId, manufacturedProductName:meta.manufacturedProductName,
-                unitCost:Number(meta.unitCost)||0, costAmount:Number(meta.costAmount)||0, fifoCostTotal:Number(meta.costAmount)||0,
-            });
+        const [liveReturnStock, liveReturnProducts] = await Promise.all([getAllFromStore('stock'), getAllFromStore('products')]);
+        let updatedStockList = [...(Array.isArray(liveReturnStock) ? liveReturnStock : stock)];
+        let updatedProducts = (Array.isArray(liveReturnProducts) && liveReturnProducts.length ? liveReturnProducts : products).map((p) => ({ ...p, fifoBatches: Array.isArray(p.fifoBatches) ? p.fifoBatches.map((b) => ({ ...b })) : [] }));
+        const restoreOne = async (productId, productName, baseQty, costTotal, meta = {}) => {
+            const qty = Math.max(0, finiteNumber(baseQty, 0));
+            if (!productId || qty <= 0) return;
+            updatedStockList = await addStockDelta({ rows: updatedStockList, productId, warehouseId: original.warehouseId, delta: qty, movement: {
+                productName, warehouseName: warehouses.find((w) => String(w.id) === String(original.warehouseId))?.name || 'المخزن', type: meta.type || 'sales_return', unitName: meta.unitName || 'وحدة أساسية', quantityInUnit: meta.quantityInUnit ?? qty, conversionFactor: meta.conversionFactor || 1, referenceId: returnInvoice.id, referenceType: 'SALES_RETURN', originalReferenceId: original.id, recipeId: meta.recipeId, manufacturedProductId: meta.manufacturedProductId, manufacturedProductName: meta.manufacturedProductName,
+            }});
+            updatedProducts = restoreFifoQuantity(updatedProducts, productId, original.warehouseId, qty, costTotal, { referenceId: original.id, returnId: returnInvoice.id });
         };
         for (const item of returnItems) {
-            if (item.isManufacturedMeal && Array.isArray(item.recipeConsumption) && item.recipeConsumption.length && item.originalSoldQuantity > 0) {
-                const returnRatio = Math.max(0, Math.min(1, Number(item.quantity) / Number(item.originalSoldQuantity)));
-                for (const ing of item.recipeConsumption) {
-                    const restoredBase = Math.max(0, (Number(ing.baseQuantity) || 0) * returnRatio);
-                    if (restoredBase <= 0) continue;
-                    const restoredCost = Math.max(0, (Number(ing.fifoCostTotal) || 0) * returnRatio);
-                    addBackStock(ing.productId, ing.productName, restoredBase, {
-                        type:'recipe_return', unitName:ing.unitName,
-                        quantityInUnit:(Number(ing.quantityPerMeal)||0) * (Number(ing.soldMealQuantity)||0) * returnRatio,
-                        conversionFactor:ing.conversionFactor, recipeId:item.recipeId,
-                        manufacturedProductId:item.productId, manufacturedProductName:item.productName,
-                        unitCost:restoredBase>0?restoredCost/restoredBase:0, costAmount:restoredCost,
-                    });
-                }
+            if (item.isManufacturedMeal && item.recipeConsumption.length) {
+                for (const ing of item.recipeConsumption) await restoreOne(ing.productId, ing.productName, ing.baseQuantity, ing.fifoCostTotal, { type: 'recipe_sales_return', unitName: ing.unitName, quantityInUnit: finiteNumber(ing.quantityPerMeal, 0) * finiteNumber(item.quantity, 0), conversionFactor: ing.conversionFactor, recipeId: item.recipeId, manufacturedProductId: item.productId, manufacturedProductName: item.productName });
             } else {
-                addBackStock(item.productId, item.productName, item.baseQuantity, {
-                    type:'return', unitName:item.unitName, quantityInUnit:item.quantity, conversionFactor:item.conversionFactor,
-                    unitCost:item.baseQuantity>0?(Number(item.fifoCostTotal)||0)/item.baseQuantity:0, costAmount:Number(item.fifoCostTotal)||0,
-                });
+                await restoreOne(item.productId, item.productName, item.baseQuantity, item.fifoCostTotal, { unitName: item.unitName, quantityInUnit: item.quantity, conversionFactor: item.conversionFactor });
             }
         }
         await bulkPut('stock', updatedStockList);
-        await bulkPut('stock_movements', newMovements);
-        // Financial refund: either credit the registered customer's balance or pay from a selected account.
-        if (refundMode === 'customer_balance') {
-            const cust = customers.find((c) => c.id === original.customerId);
-            if (cust) {
-                const newBalance = (Number(cust.balance) || 0) - refundTotal;
-                await putInStore('customers', { ...cust, balance: newBalance });
-                await putInStore('partner_statements', {
-                    id: 'stmt-ret-' + Date.now(), partnerType: 'customer', partnerId: cust.id, partnerName: cust.name,
-                    date: now, referenceType: 'SALES_RETURN', referenceId: returnInvoice.id, referenceNumber: returnNumber,
-                    description: `مرتجع مبيعات ${returnNumber}`, debit: 0, credit: refundTotal, runningBalance: newBalance,
-                });
-            }
-        } else if (refundAccount) {
-            await putInStore('accounts', { ...refundAccount, balance: (Number(refundAccount.balance) || 0) - refundTotal });
-            if (activeShift && refundAccount.type === 'cash') {
-                await putInStore('shifts', {
-                    ...activeShift,
-                    totalCashReturns: (Number(activeShift.totalCashReturns) || 0) + refundTotal,
-                    expectedCash: (Number(activeShift.expectedCash) || 0) - refundTotal,
-                });
-            }
+        await bulkPut('products', updatedProducts);
+        if (debtReversed > 0 && original.customerId && original.customerId !== CASH_CUSTOMER.id) {
+            const liveCustomersForReturn = await getAllFromStore('customers');
+            const cust = (liveCustomersForReturn || []).find((c) => c.id === original.customerId);
+            if (cust) await appendReversalStatement({ partnerType: 'customer', partner: cust, amount: debtReversed, referenceType: 'SALES_RETURN', referenceId: returnInvoice.id, referenceNumber: returnNumber, description: `قيد عكسي لمرتجع مبيعات ${returnNumber}`, direction: 'decrease' });
         }
+        const updatedAccounts = (liveReturnAccounts || []).map((a) => ({ ...a }));
+        for (const refund of accountRefunds) {
+            const ai = updatedAccounts.findIndex((a) => a.id === refund.accountId);
+            if (ai >= 0) updatedAccounts[ai].balance = finiteNumber(updatedAccounts[ai].balance, 0) - finiteNumber(refund.amount, 0);
+        }
+        if (updatedAccounts.length) await bulkPut('accounts', updatedAccounts);
+        if (activeShift) {
+            const cashRefund = accountRefunds.filter((r) => r.method === 'cash' || (liveReturnAccounts || []).find((a) => a.id === r.accountId)?.type === 'cash').reduce((s, r) => s + finiteNumber(r.amount, 0), 0);
+            if (cashRefund > 0) await putInStore('shifts', { ...activeShift, totalCashReturns: finiteNumber(activeShift.totalCashReturns, 0) + cashRefund, expectedCash: finiteNumber(activeShift.expectedCash, 0) - cashRefund });
+        }
+        await putInStore('audit_logs', { id: `audit-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date: now, type: 'sales_return_reverse_entry', referenceId: returnInvoice.id, originalReferenceId: original.id, amount: refundTotal, debtReversed, accountRefunds, userId: currentUser.id, userName: currentUser.name });
         await reloadData();
-        notifyTelegramInvoice(returnInvoice,'return').catch(()=>{});
-        showToast(`تم تسجيل المرتجع بنجاح [${returnNumber}]`, 'info');
+        showToast(`تم تسجيل المرتجع وعكس المخزون والدين والدفع [${returnNumber}]`, 'success');
         return returnInvoice;
-    }, [invoices, products, customers, currentUser, activeShift, accounts, stock, warehouses, reloadData, showToast]);
+    }, [invoices, products, customers, currentUser, activeShift, accounts, stock, warehouses, reloadData, showToast, addStockDelta, restoreFifoQuantity, appendReversalStatement]);
     // Create Purchase Invoice (local-first: durable local save first, cloud sync later)
     const createPurchaseInvoice = useCallback(async (payload) => {
-        const now=new Date().toISOString(); const purchaseDate=payload?.date ? new Date(`${String(payload.date).slice(0,10)}T12:00:00`).toISOString() : now; const invoiceNumber=`PUR-${Date.now().toString().slice(-6)}`; const syncId=`pur-${Date.now()}`;
+        const [liveProductsRaw, liveStockRaw, liveAccountsRaw, liveSuppliersRaw] = await Promise.all([getAllFromStore('products'), getAllFromStore('stock'), getAllFromStore('accounts'), getAllFromStore('suppliers')]);
+        const sourceProducts = Array.isArray(liveProductsRaw) && liveProductsRaw.length ? liveProductsRaw : products;
+        const sourceStock = Array.isArray(liveStockRaw) ? liveStockRaw : stock;
+        const sourceAccounts = Array.isArray(liveAccountsRaw) && liveAccountsRaw.length ? liveAccountsRaw : accounts;
+        const sourceSuppliers = Array.isArray(liveSuppliersRaw) ? liveSuppliersRaw : suppliers;
+        const now=new Date().toISOString(); const purchaseDate=payload?.date ? new Date(`${String(payload.date).slice(0,10)}T12:00:00`).toISOString() : (payload?.dateOverride || now); const invoiceNumber=payload?.invoiceNumberOverride || `PUR-${Date.now().toString().slice(-6)}`; const purchaseId=payload?.invoiceIdOverride || `pur-${Date.now()}`; const syncId=`pur-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
         const targetWarehouse = warehouses.find(w=>w.id===payload?.warehouseId) || warehouses.find(w=>w.id===settings.activeWarehouseId) || warehouses.find(w=>w.isDefault) || warehouses.find(w=>/صالة\s*العرض/.test(String(w.name||''))) || warehouses[0];
         if(!targetWarehouse) throw new Error('لا يوجد مخزن رئيسي. أضف صالة العرض من المخازن أولاً.');
         const warehouseId=targetWarehouse.id;
@@ -998,23 +1044,22 @@ export const AppProvider = ({ children }) => {
         const subtotal=items.reduce((x,i)=>x+(Number(i.total)||0),0);
         const discountTotal=Math.max(0,Math.min(subtotal,Number(payload.discountAmount)||0));
         const grandTotal=Math.max(0,subtotal-discountTotal); const paidAmount=Math.min(grandTotal,Math.max(0,Number(payload.paidAmount)||0)); const remaining=Math.max(0,grandTotal-paidAmount); const ratio=subtotal>0?grandTotal/subtotal:1;
-        const purchaseInvoice={id:'pur-'+Date.now(),invoiceNumber,supplierInvoiceNumber:payload.supplierInvoiceNumber||'',date:purchaseDate,supplierId:payload.supplierId,supplierName:payload.supplierName,warehouseId,warehouseName:targetWarehouse.name||'صالة العرض',items:items.map((it,idx)=>({id:`pur-it-${Date.now()}-${idx}`,...it})),subtotal,discountType:payload.discountType||'fixed',discountValue:Number(payload.discountValue)||0,discountTotal,taxTotal:0,grandTotal,paidAmount,remainingAmount:remaining,paymentType:payload.paymentType,payments,notes:payload.notes||'',syncId,isSynced:false,createdAt:now};
+        const purchaseInvoice={id:purchaseId,invoiceNumber,supplierInvoiceNumber:payload.supplierInvoiceNumber||'',date:purchaseDate,supplierId:payload.supplierId,supplierName:payload.supplierName,warehouseId,warehouseName:targetWarehouse.name||'صالة العرض',items:items.map((it,idx)=>({id:`pur-it-${Date.now()}-${idx}`,...it})),subtotal,discountType:payload.discountType||'fixed',discountValue:Number(payload.discountValue)||0,discountTotal,taxTotal:0,grandTotal,paidAmount,remainingAmount:remaining,paymentType:payload.paymentType,payments,notes:payload.notes||'',syncId,isSynced:false,createdAt:payload.createdAtOverride || now,updatedAt:now,editedAt:payload.isEdit?now:undefined};
         await putInStore('purchases',purchaseInvoice);
-        const updatedProducts=products.map(p=>({...p,fifoBatches:Array.isArray(p.fifoBatches)?p.fifoBatches.map(b=>({...b})):[]})); const updatedStockList=[...stock],newMovements=[];
+        const updatedProducts=sourceProducts.map(p=>({...p,fifoBatches:Array.isArray(p.fifoBatches)?p.fifoBatches.map(b=>({...b})):[]})); const updatedStockList=[...sourceStock],newMovements=[];
         for(const item of items){const pi=updatedProducts.findIndex(p=>p.id===item.productId);const si=updatedStockList.findIndex(x=>x.productId===item.productId&&x.warehouseId===warehouseId);const currentBaseStock=si>=0?Number(updatedStockList[si].baseQuantity)||0:0;const currentTotalBaseStock=updatedStockList.filter(x=>x.productId===item.productId).reduce((sum,row)=>sum+Math.max(0,Number(row.baseQuantity)||0),0);const baseQty=Math.max(0,Number(item.baseQuantity)||0);const newBaseStock=currentBaseStock+baseQty;
           if(pi>=0){const currentCost=Number(updatedProducts[pi].costPrice)||0;const unitCost=((Number(item.unitPrice)||0)*ratio)/Math.max(0.00000001,(Number(item.conversionFactor)||1));let batches=updatedProducts[pi].fifoBatches||[];if(currentBaseStock>0&&!batches.some(b=>(b.warehouseId===warehouseId||!b.warehouseId)&&Number(b.remainingBaseQty)>0)){batches.push({id:`legacy-${item.productId}-${warehouseId}`,purchaseId:'legacy',warehouseId,receivedAt:'2000-01-01T00:00:00.000Z',expiryDate:updatedProducts[pi].expiryDate||'',unitCost:currentCost,remainingBaseQty:currentBaseStock});}batches.push({id:`batch-${purchaseInvoice.id}-${item.productId}-${Math.random().toString(36).slice(2,6)}`,purchaseId:purchaseInvoice.id,warehouseId,receivedAt:purchaseDate,expiryDate:item.expiryDate||updatedProducts[pi].expiryDate||'',unitCost,remainingBaseQty:baseQty});const oldVal=Math.max(0,currentTotalBaseStock)*currentCost,newVal=baseQty*unitCost,totalUnits=Math.max(0,currentTotalBaseStock)+baseQty,newWAC=totalUnits>0?(oldVal+newVal)/totalUnits:unitCost;updatedProducts[pi]={...updatedProducts[pi],costPrice:parseFloat(newWAC.toFixed(4)),fifoBatches:batches,updatedAt:now};}
           if(si>=0)updatedStockList[si]={...updatedStockList[si],baseQuantity:newBaseStock};else updatedStockList.push({productId:item.productId,warehouseId,baseQuantity:newBaseStock});
-          newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:purchaseDate,productId:item.productId,productName:item.productName,warehouseId,warehouseName:targetWarehouse.name||'صالة العرض',type:'purchase',unitName:item.unitName,quantityInUnit:item.quantity,conversionFactor:item.conversionFactor,baseQuantityChange:baseQty,newBaseBalance:newBaseStock,referenceId:purchaseInvoice.id,referenceType:'PURCHASE',userId:currentUser.id,userName:currentUser.name,unitCost:pi>=0?Number(updatedProducts[pi].costPrice)||0:0,costAmount:baseQty*(pi>=0?Number(updatedProducts[pi].costPrice)||0:0)});}
-        const currentRecipes=await getAllFromStore('recipes').catch(()=>[]);const costedProducts=applyRecipeCostsToProducts(updatedProducts,currentRecipes);
-        await bulkPut('products',costedProducts);await bulkPut('stock',updatedStockList);await bulkPut('stock_movements',newMovements);
-        const updatedAccounts=[...accounts];for(const pay of payments){const ai=updatedAccounts.findIndex(a=>a.id===pay.accountId);if(ai>=0)updatedAccounts[ai]={...updatedAccounts[ai],balance:(Number(updatedAccounts[ai].balance)||0)-(Number(pay.amount)||0)};}await bulkPut('accounts',updatedAccounts);
+          newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:purchaseDate,productId:item.productId,productName:item.productName,warehouseId,warehouseName:targetWarehouse.name||'صالة العرض',type:'purchase',unitName:item.unitName,quantityInUnit:item.quantity,conversionFactor:item.conversionFactor,baseQuantityChange:baseQty,newBaseBalance:newBaseStock,referenceId:purchaseInvoice.id,referenceType:'PURCHASE',userId:currentUser.id,userName:currentUser.name});}
+        await bulkPut('products',updatedProducts);await bulkPut('stock',updatedStockList);await bulkPut('stock_movements',newMovements);
+        const updatedAccounts=[...sourceAccounts];for(const pay of payments){const ai=updatedAccounts.findIndex(a=>a.id===pay.accountId);if(ai>=0)updatedAccounts[ai]={...updatedAccounts[ai],balance:(Number(updatedAccounts[ai].balance)||0)-(Number(pay.amount)||0)};}await bulkPut('accounts',updatedAccounts);
         let updatedSupplier=null,supplierStatement=null;
-        if(remaining>0){const supp=suppliers.find(s=>s.id===payload.supplierId) || (payload.supplierObject?.id===payload.supplierId ? payload.supplierObject : null);if(supp){const nb=(Number(supp.balance)||0)+remaining;updatedSupplier={...supp,balance:nb};supplierStatement={id:'stmt-'+Date.now(),date:purchaseDate,type:'purchase',partyType:'supplier',partyId:supp.id,referenceNumber:invoiceNumber,description:`فاتورة مشتريات رقم ${invoiceNumber}`,debit:0,credit:remaining,runningBalance:nb};await putInStore('suppliers',updatedSupplier);await putInStore('partner_statements',supplierStatement);}}
+        if(remaining>0){const supp=sourceSuppliers.find(s=>s.id===payload.supplierId) || (payload.supplierObject?.id===payload.supplierId ? payload.supplierObject : null);if(supp){const nb=(Number(supp.balance)||0)+remaining;updatedSupplier={...supp,balance:nb};supplierStatement={id:'stmt-'+Date.now(),date:purchaseDate,type:'purchase',partnerType:'supplier',partnerId:supp.id,partnerName:supp.name,partyType:'supplier',partyId:supp.id,referenceType:'PURCHASE',referenceId:purchaseInvoice.id,referenceNumber:invoiceNumber,description:`فاتورة مشتريات رقم ${invoiceNumber}`,debit:0,credit:remaining,runningBalance:nb};await putInStore('suppliers',updatedSupplier);await putInStore('partner_statements',supplierStatement);}}
         setPurchases(prev => [purchaseInvoice, ...prev.filter(x=>x.id!==purchaseInvoice.id)]);
-        setProducts(costedProducts);setStock(updatedStockList);setStockMovements(prev=>[...newMovements,...prev]);setAccounts(updatedAccounts);
+        setProducts(updatedProducts);setStock(updatedStockList);setStockMovements(prev=>[...newMovements,...prev]);setAccounts(updatedAccounts);
         if(updatedSupplier)setSuppliers(prev=>prev.some(x=>x.id===updatedSupplier.id)?prev.map(x=>x.id===updatedSupplier.id?updatedSupplier:x):[updatedSupplier,...prev]);if(supplierStatement)setPartnerStatements(prev=>[supplierStatement,...prev]);
         setSyncQueue(window.OscarCloudSync?.pendingItems?.() || []);
-        playSuccessSound(settings.scannerBeepEnabled);notifyTelegramInvoice(purchaseInvoice,'purchase').catch(()=>{});showToast(`تم تسجيل فاتورة الشراء بنجاح [${invoiceNumber}]`,'success');return purchaseInvoice;
+        playSuccessSound(settings.scannerBeepEnabled);showToast(payload?.isEdit ? `تم تعديل فاتورة الشراء [${invoiceNumber}] مع عكس القيد القديم وإعادة احتساب الجديد` : `تم تسجيل فاتورة الشراء بنجاح [${invoiceNumber}]`,'success');return purchaseInvoice;
     }, [warehouses,products,stock,accounts,suppliers,currentUser,showToast,settings.activeWarehouseId,settings.scannerBeepEnabled]);
 
     // Damaged/expired stock: deduct quantity and exact FIFO cost as a loss expense.
@@ -1304,12 +1349,6 @@ export const AppProvider = ({ children }) => {
             }
         }
         await putInStore('products', cleanProduct);
-        const allRecipes = await getAllFromStore('recipes').catch(() => []);
-        if (allRecipes.length) {
-            const allProducts = await getAllFromStore('products').catch(() => []);
-            const costedProducts = applyRecipeCostsToProducts(allProducts, allRecipes);
-            await bulkPut('products', costedProducts);
-        }
         await reloadData();
         showToast(`تم حفظ الصنف: ${cleanProduct.name}`, 'success');
     }, [products, settings.activeWarehouseId, warehouses, currentUser, reloadData, showToast]);
@@ -1604,10 +1643,11 @@ export const AppProvider = ({ children }) => {
                 expectedCash: activeShift.expectedCash + exp.amount,
             });
         }
+        await putInStore('audit_logs', { id:`audit-exp-del-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date:new Date().toISOString(), type:'expense_deleted_reversal', referenceId:exp.id, originalDate:exp.date || exp.createdAt, accountId:exp.accountId, accountName:exp.accountName, amount:finiteNumber(exp.amount,0), category:exp.category, userId:currentUser.id, userName:currentUser.name });
         await putInStore('expenses', { ...exp, deletedAt: new Date().toISOString() });
         await reloadData();
         showToast('تم نقل المصروف إلى سلة المحذوفات وإلغاء أثره المالي', 'info');
-    }, [expenses, accounts, activeShift, reloadData, showToast]);
+    }, [expenses, accounts, activeShift, currentUser, reloadData, showToast]);
     const softDeleteExpense = deleteExpense;
     const restoreExpense = useCallback(async (id) => {
         const exp = expenses.find((e) => e.id === id);
@@ -1773,10 +1813,11 @@ export const AppProvider = ({ children }) => {
                 await putInStore('suppliers', { ...supp, balance: revBalance });
             }
         }
+        await putInStore('audit_logs', { id:`audit-voucher-del-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date:new Date().toISOString(), type:'voucher_deleted_reversal', referenceId:v.id, originalDate:v.date || v.createdAt, voucherNumber:v.voucherNumber, partyName:v.partyName, voucherType:v.type, accountId:v.accountId, accountName:v.accountName, amount:finiteNumber(v.amount,0), userId:currentUser.id, userName:currentUser.name });
         await deleteFromStore('vouchers', id);
         await reloadData();
         showToast('تم حذف السند وإلغاء أثره المالي بنجاح', 'info');
-    }, [vouchers, accounts, customers, suppliers, reloadData, showToast]);
+    }, [vouchers, accounts, customers, suppliers, currentUser, reloadData, showToast]);
     const recordCustomerPayment = useCallback(async (payload) => {
         const customer = customers.find((c) => c.id === payload.customerId);
         if (!customer) {
@@ -1824,105 +1865,257 @@ export const AppProvider = ({ children }) => {
         await reloadData();
         showToast('تم حذف الموظف بنجاح', 'info');
     }, [reloadData, showToast]);
-    // Sales invoice deletion with full stock & financial reversal
-    const deleteInvoice = useCallback(async (id) => {
-        const inv = invoices.find((i) => i.id === id);
-        if (!inv)
-            return;
-        // 1. Revert inventory for each item.
-        // Meals linked to a recipe consume raw ingredients at sale time, so deleting
-        // the invoice must restore those exact ingredients instead of adding a fake
-        // finished-meal quantity back to stock.
-        const updatedStockList = [...stock];
-        const addBackToStock = (productId, baseQty) => {
-            const qty = Math.max(0, Number(baseQty) || 0);
+    // Reverse a sales-return document itself (used when deleting a return or cascading from original sale deletion).
+    const reverseReturnInvoice = useCallback(async (ret, { deleteRecord = true } = {}) => {
+        if (!ret || ret.type !== 'return') return false;
+        const [liveReverseStock, liveReverseProducts] = await Promise.all([getAllFromStore('stock'), getAllFromStore('products')]);
+        let updatedStockList = [...(liveReverseStock || [])];
+        let updatedProducts = (Array.isArray(liveReverseProducts) && liveReverseProducts.length ? liveReverseProducts : products).map((p) => ({ ...p, fifoBatches: Array.isArray(p.fifoBatches) ? p.fifoBatches.map((b) => ({ ...b })) : [] }));
+        const deductOne = async (productId, productName, baseQty, meta = {}) => {
+            const qty = Math.max(0, finiteNumber(baseQty, 0));
             if (!productId || qty <= 0) return;
-            const stockIndex = updatedStockList.findIndex((row) => row.productId === productId && row.warehouseId === inv.warehouseId);
-            const current = stockIndex >= 0 ? Number(updatedStockList[stockIndex].baseQuantity) || 0 : 0;
-            const next = current + qty;
-            if (stockIndex >= 0) updatedStockList[stockIndex] = { ...updatedStockList[stockIndex], baseQuantity: next };
-            else updatedStockList.push({ productId, warehouseId: inv.warehouseId, baseQuantity: next });
+            updatedStockList = await addStockDelta({ rows: updatedStockList, productId, warehouseId: ret.warehouseId, delta: -qty, movement: {
+                productName, warehouseName: warehouses.find((w) => String(w.id) === String(ret.warehouseId))?.name || 'المخزن', type: meta.type || 'reverse_sales_return', unitName: meta.unitName || 'وحدة أساسية', quantityInUnit: meta.quantityInUnit ?? qty, conversionFactor: meta.conversionFactor || 1, referenceId: ret.id, referenceType: 'RETURN_REVERSAL', originalReferenceId: ret.originalInvoiceId, isReversal: true,
+            }});
         };
-        for (const item of inv.items) {
-            if (item.isManufacturedMeal && Array.isArray(item.recipeConsumption) && item.recipeConsumption.length > 0) {
-                for (const ing of item.recipeConsumption) addBackToStock(ing.productId, ing.baseQuantity);
+        for (const item of (ret.items || [])) {
+            if (item.isManufacturedMeal && Array.isArray(item.recipeConsumption) && item.recipeConsumption.length) {
+                for (const ing of item.recipeConsumption) await deductOne(ing.productId, ing.productName, ing.baseQuantity, { type: 'reverse_recipe_sales_return', unitName: ing.unitName, quantityInUnit: finiteNumber(ing.quantityPerMeal, 0) * finiteNumber(item.quantity, 0), conversionFactor: ing.conversionFactor });
             } else {
-                addBackToStock(item.productId, Number(item.baseQuantity) || (Number(item.quantity) || 0) * (Number(item.conversionFactor) || 1));
+                await deductOne(item.productId, item.productName, finiteNumber(item.baseQuantity, finiteNumber(item.quantity, 0) * finiteNumber(item.conversionFactor, 1)), { unitName: item.unitName, quantityInUnit: item.quantity, conversionFactor: item.conversionFactor });
+            }
+        }
+        updatedProducts = removeReturnFifoBatches(updatedProducts, ret.id);
+        await bulkPut('stock', updatedStockList);
+        await bulkPut('products', updatedProducts);
+        const debtReversed = Math.max(0, finiteNumber(ret.returnAllocation?.debtReversed, ret.paymentType === 'customer_balance' ? ret.grandTotal : 0));
+        if (debtReversed > 0 && ret.customerId && ret.customerId !== CASH_CUSTOMER.id) {
+            const currentCustomers = await getAllFromStore('customers');
+            const cust = currentCustomers.find((c) => c.id === ret.customerId);
+            if (cust) await appendReversalStatement({ partnerType: 'customer', partner: cust, amount: debtReversed, referenceType: 'RETURN_REVERSAL', referenceId: ret.id, referenceNumber: ret.invoiceNumber, description: `عكس مرتجع المبيعات ${ret.invoiceNumber}`, direction: 'increase' });
+        }
+        const refunds = Array.isArray(ret.returnAllocation?.accountRefunds) ? ret.returnAllocation.accountRefunds : (Array.isArray(ret.payments) ? ret.payments : []);
+        const currentAccounts = await getAllFromStore('accounts');
+        const nextAccounts = currentAccounts.map((a) => ({ ...a }));
+        for (const refund of refunds) {
+            const ai = nextAccounts.findIndex((a) => a.id === refund.accountId);
+            if (ai >= 0) nextAccounts[ai].balance = finiteNumber(nextAccounts[ai].balance, 0) + finiteNumber(refund.amount, 0);
+        }
+        if (nextAccounts.length) await bulkPut('accounts', nextAccounts);
+        const shift = ret.shiftId ? (await getAllFromStore('shifts')).find((x) => x.id === ret.shiftId) : null;
+        if (shift) {
+            const cashRefund = refunds.filter((r) => r.method === 'cash' || currentAccounts.find((a) => a.id === r.accountId)?.type === 'cash').reduce((s, r) => s + finiteNumber(r.amount, 0), 0);
+            if (cashRefund > 0) await putInStore('shifts', { ...shift, totalCashReturns: finiteNumber(shift.totalCashReturns, 0) - cashRefund, expectedCash: finiteNumber(shift.expectedCash, 0) + cashRefund });
+        }
+        await putInStore('audit_logs', { id: `audit-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date: new Date().toISOString(), type: 'return_deleted_reversal', referenceId: ret.id, originalReferenceId: ret.originalInvoiceId, originalDate: ret.date, referenceNumber: ret.invoiceNumber, amount: ret.grandTotal, debtReversed, refundsReversed: refunds, userId: currentUser.id, userName: currentUser.name });
+        if (deleteRecord) await deleteFromStore('invoices', ret.id);
+        return true;
+    }, [products, warehouses, currentUser, addStockDelta, removeReturnFifoBatches, appendReversalStatement]);
+
+    // Sales invoice deletion with a true reverse entry for inventory, customer debt, payment accounts, shift totals and FIFO.
+    const deleteInvoice = useCallback(async (id, options = {}) => {
+        const currentInvoices = await getAllFromStore('invoices');
+        const inv = currentInvoices.find((i) => i.id === id);
+        if (!inv) return false;
+        if (inv.type === 'return') {
+            await reverseReturnInvoice(inv, { deleteRecord: true });
+            await reloadData();
+            if (!options.silent) showToast(`تم حذف المرتجع [${inv.invoiceNumber}] وعكس أثره بالكامل`, 'success');
+            return true;
+        }
+        // If returns already exist, cancel their effects first so the original sale can be reversed exactly once.
+        const linkedReturns = currentInvoices.filter((row) => row.type === 'return' && row.originalInvoiceId === inv.id);
+        for (const ret of linkedReturns) await reverseReturnInvoice(ret, { deleteRecord: true });
+        const [liveDeleteStock, liveDeleteProducts] = await Promise.all([getAllFromStore('stock'), getAllFromStore('products')]);
+        let updatedStockList = [...(liveDeleteStock || [])];
+        let updatedProducts = (Array.isArray(liveDeleteProducts) && liveDeleteProducts.length ? liveDeleteProducts : products).map((p) => ({ ...p, fifoBatches: Array.isArray(p.fifoBatches) ? p.fifoBatches.map((b) => ({ ...b })) : [] }));
+        const restoreOne = async (productId, productName, baseQty, costTotal, meta = {}) => {
+            const qty = Math.max(0, finiteNumber(baseQty, 0));
+            if (!productId || qty <= 0) return;
+            updatedStockList = await addStockDelta({ rows: updatedStockList, productId, warehouseId: inv.warehouseId, delta: qty, movement: {
+                productName, warehouseName: warehouses.find((w) => String(w.id) === String(inv.warehouseId))?.name || 'المخزن', type: meta.type || 'sale_delete_reversal', unitName: meta.unitName || 'وحدة أساسية', quantityInUnit: meta.quantityInUnit ?? qty, conversionFactor: meta.conversionFactor || 1, referenceId: inv.id, referenceType: 'SALE_DELETE_REVERSAL', isReversal: true, recipeId: meta.recipeId, manufacturedProductId: meta.manufacturedProductId, manufacturedProductName: meta.manufacturedProductName,
+            }});
+            updatedProducts = restoreFifoQuantity(updatedProducts, productId, inv.warehouseId, qty, costTotal, { referenceId: inv.id });
+        };
+        for (const item of (inv.items || [])) {
+            if (item.isManufacturedMeal && Array.isArray(item.recipeConsumption) && item.recipeConsumption.length) {
+                for (const ing of item.recipeConsumption) await restoreOne(ing.productId, ing.productName, ing.baseQuantity, ing.fifoCostTotal, { type: 'recipe_sale_delete_reversal', unitName: ing.unitName, quantityInUnit: finiteNumber(ing.quantityPerMeal, 0) * finiteNumber(item.quantity, 0), conversionFactor: ing.conversionFactor, recipeId: item.recipeId, manufacturedProductId: item.productId, manufacturedProductName: item.productName });
+            } else {
+                await restoreOne(item.productId, item.productName, finiteNumber(item.baseQuantity, finiteNumber(item.quantity, 0) * finiteNumber(item.conversionFactor, 1)), item.fifoCostTotal, { unitName: item.unitName, quantityInUnit: item.quantity, conversionFactor: item.conversionFactor });
             }
         }
         await bulkPut('stock', updatedStockList);
-        // 2. Revert customer balance if debt/partial
-        if (inv.customerId && inv.remainingAmount > 0) {
-            const cust = customers.find((c) => c.id === inv.customerId);
-            if (cust) {
-                await putInStore('customers', {
-                    ...cust,
-                    balance: Math.max(0, cust.balance - inv.remainingAmount),
-                });
-            }
+        await bulkPut('products', updatedProducts);
+        const currentCustomers = await getAllFromStore('customers');
+        const cust = currentCustomers.find((c) => c.id === inv.customerId);
+        const debtAmount = Math.max(0, finiteNumber(inv.remainingAmount, 0));
+        if (cust && debtAmount > 0 && inv.customerId !== CASH_CUSTOMER.id) await appendReversalStatement({ partnerType: 'customer', partner: cust, amount: debtAmount, referenceType: 'SALE_DELETE_REVERSAL', referenceId: inv.id, referenceNumber: inv.invoiceNumber, description: `قيد عكسي لحذف فاتورة المبيعات ${inv.invoiceNumber}`, direction: 'decrease' });
+        const currentAccounts = await getAllFromStore('accounts');
+        const updatedAccounts = currentAccounts.map((a) => ({ ...a }));
+        for (const pay of (inv.payments || [])) {
+            const ai = updatedAccounts.findIndex((a) => a.id === pay.accountId);
+            if (ai >= 0) updatedAccounts[ai].balance = finiteNumber(updatedAccounts[ai].balance, 0) - finiteNumber(pay.amount, 0);
         }
-        // 3. Revert account balances for cash/card payments
-        if (inv.payments && inv.payments.length > 0) {
-            for (const p of inv.payments) {
-                const acc = accounts.find((a) => a.id === p.accountId);
-                if (acc) {
-                    await putInStore('accounts', {
-                        ...acc,
-                        balance: acc.balance - p.amount,
-                    });
-                }
-            }
+        if (updatedAccounts.length) await bulkPut('accounts', updatedAccounts);
+        const shift = inv.shiftId ? (await getAllFromStore('shifts')).find((x) => x.id === inv.shiftId) : null;
+        if (shift) {
+            const cashPaid = (inv.payments || []).filter((p) => p.method === 'cash' || currentAccounts.find((a) => a.id === p.accountId)?.type === 'cash').reduce((s, p) => s + finiteNumber(p.amount, 0), 0) - Math.max(0, finiteNumber(inv.changeAmount, 0));
+            const otherPaid = (inv.payments || []).filter((p) => !(p.method === 'cash' || currentAccounts.find((a) => a.id === p.accountId)?.type === 'cash')).reduce((s, p) => s + finiteNumber(p.amount, 0), 0);
+            await putInStore('shifts', { ...shift, totalCashSales: finiteNumber(shift.totalCashSales, 0) - Math.max(0, cashPaid), totalOtherSales: finiteNumber(shift.totalOtherSales, 0) - otherPaid, expectedCash: finiteNumber(shift.expectedCash, 0) - Math.max(0, cashPaid) });
         }
-        // 4. Remove invoice
+        await putInStore('audit_logs', { id: `audit-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date: new Date().toISOString(), type: 'sale_deleted_reversal', referenceId: inv.id, referenceNumber: inv.invoiceNumber, originalDate: inv.date, debtReversed: debtAmount, paymentsReversed: inv.payments || [], userId: currentUser.id, userName: currentUser.name });
         await deleteFromStore('invoices', id);
         await reloadData();
-        showToast(`تم إلغاء وحذف الفاتورة [${inv.invoiceNumber}] واسترجاع المخزون`, 'info');
-    }, [invoices, stock, customers, accounts, reloadData, showToast]);
-    // Purchase invoice deletion with full stock & financial reversal
-    const deletePurchase = useCallback(async (id) => {
-        const pur = purchases.find((p) => p.id === id);
-        if (!pur)
-            return;
-        // 1. Deduct back the added stock
-        const updatedStockList = [...stock];
-        for (const item of pur.items) {
-            const baseQtyToDeduct = item.baseQuantity;
-            const stockIndex = updatedStockList.findIndex((s) => s.productId === item.productId && s.warehouseId === pur.warehouseId);
-            if (stockIndex >= 0) {
-                updatedStockList[stockIndex] = {
-                    ...updatedStockList[stockIndex],
-                    baseQuantity: Math.max(0, updatedStockList[stockIndex].baseQuantity - baseQtyToDeduct),
-                };
+        if (!options.silent) showToast(`تم حذف الفاتورة [${inv.invoiceNumber}] وعكس المخزون والدين والدفع بالكامل`, 'success');
+        return true;
+    }, [products, warehouses, currentUser, reloadData, showToast, addStockDelta, restoreFifoQuantity, appendReversalStatement, reverseReturnInvoice]);
+
+    // Purchase invoice deletion with full reverse entry. Purchased stock is removed even if the resulting stock becomes negative.
+    const deletePurchase = useCallback(async (id, options = {}) => {
+        const currentPurchases = await getAllFromStore('purchases');
+        const pur = currentPurchases.find((p) => p.id === id);
+        if (!pur) return false;
+        const [livePurchaseDeleteStock, livePurchaseDeleteProducts] = await Promise.all([getAllFromStore('stock'), getAllFromStore('products')]);
+        let updatedStockList = [...(livePurchaseDeleteStock || [])];
+        let updatedProducts = (Array.isArray(livePurchaseDeleteProducts) && livePurchaseDeleteProducts.length ? livePurchaseDeleteProducts : products).map((p) => ({ ...p, fifoBatches: Array.isArray(p.fifoBatches) ? p.fifoBatches.map((b) => ({ ...b })) : [] }));
+        for (const item of (pur.items || [])) {
+            const baseQty = Math.max(0, finiteNumber(item.baseQuantity, finiteNumber(item.quantity, 0) * finiteNumber(item.conversionFactor, 1)));
+            updatedStockList = await addStockDelta({ rows: updatedStockList, productId: item.productId, warehouseId: pur.warehouseId, delta: -baseQty, movement: {
+                productName: item.productName, warehouseName: pur.warehouseName || warehouses.find((w) => String(w.id) === String(pur.warehouseId))?.name || 'المخزن', type: 'purchase_delete_reversal', unitName: item.unitName, quantityInUnit: item.quantity, conversionFactor: item.conversionFactor, referenceId: pur.id, referenceType: 'PURCHASE_DELETE_REVERSAL', isReversal: true,
+            }});
+            const pi = updatedProducts.findIndex((p) => p.id === item.productId);
+            if (pi >= 0) {
+                updatedProducts[pi].fifoBatches = (updatedProducts[pi].fifoBatches || []).filter((b) => b.purchaseId !== pur.id);
+                const positive = updatedProducts[pi].fifoBatches.filter((b) => finiteNumber(b.remainingBaseQty, 0) > 0);
+                const qtyTotal = positive.reduce((s, b) => s + finiteNumber(b.remainingBaseQty, 0), 0);
+                const valueTotal = positive.reduce((s, b) => s + finiteNumber(b.remainingBaseQty, 0) * finiteNumber(b.unitCost, 0), 0);
+                if (qtyTotal > 0) updatedProducts[pi].costPrice = parseFloat((valueTotal / qtyTotal).toFixed(4));
+                updatedProducts[pi].updatedAt = new Date().toISOString();
             }
         }
         await bulkPut('stock', updatedStockList);
-        // 2. Revert supplier balance
-        if (pur.supplierId && pur.remainingAmount > 0) {
-            const supp = suppliers.find((s) => s.id === pur.supplierId);
-            if (supp) {
-                await putInStore('suppliers', {
-                    ...supp,
-                    balance: Math.max(0, supp.balance - pur.remainingAmount),
-                });
-            }
+        await bulkPut('products', updatedProducts);
+        const currentSuppliers = await getAllFromStore('suppliers');
+        const supp = currentSuppliers.find((s) => s.id === pur.supplierId);
+        const debtAmount = Math.max(0, finiteNumber(pur.remainingAmount, 0));
+        if (supp && debtAmount > 0) await appendReversalStatement({ partnerType: 'supplier', partner: supp, amount: debtAmount, referenceType: 'PURCHASE_DELETE_REVERSAL', referenceId: pur.id, referenceNumber: pur.invoiceNumber, description: `قيد عكسي لحذف فاتورة المشتريات ${pur.invoiceNumber}`, direction: 'decrease' });
+        const currentAccounts = await getAllFromStore('accounts');
+        const updatedAccounts = currentAccounts.map((a) => ({ ...a }));
+        for (const pay of (pur.payments || [])) {
+            const ai = updatedAccounts.findIndex((a) => a.id === pay.accountId);
+            if (ai >= 0) updatedAccounts[ai].balance = finiteNumber(updatedAccounts[ai].balance, 0) + finiteNumber(pay.amount, 0);
         }
-        // 3. Revert accounts for paid payments
-        if (pur.payments && pur.payments.length > 0) {
-            for (const p of pur.payments) {
-                const acc = accounts.find((a) => a.id === p.accountId);
-                if (acc) {
-                    await putInStore('accounts', {
-                        ...acc,
-                        balance: acc.balance + p.amount,
-                    });
-                }
-            }
-        }
-        // 4. Remove purchase
+        if (updatedAccounts.length) await bulkPut('accounts', updatedAccounts);
+        await putInStore('audit_logs', { id: `audit-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date: new Date().toISOString(), type: 'purchase_deleted_reversal', referenceId: pur.id, referenceNumber: pur.invoiceNumber, originalDate: pur.date, debtReversed: debtAmount, paymentsReversed: pur.payments || [], userId: currentUser.id, userName: currentUser.name });
         await deleteFromStore('purchases', id);
         await reloadData();
-        showToast(`تم حذف فاتورة الشراء [${pur.invoiceNumber}] بنجاح`, 'info');
-    }, [purchases, stock, suppliers, accounts, reloadData, showToast]);
+        if (!options.silent) showToast(`تم حذف فاتورة الشراء [${pur.invoiceNumber}] وعكس المخزون وحساب المورد والدفع بالكامل`, 'success');
+        return true;
+    }, [products, warehouses, currentUser, reloadData, showToast, addStockDelta, appendReversalStatement]);
+    // Load a completed sale back into the cashier cart without touching balances yet.
+    // The old financial/stock effect is reversed only when the edited invoice is actually saved.
+    const beginEditSaleInvoice = useCallback((id) => {
+        const inv = invoices.find((row) => row.id === id && row.type === 'sale');
+        if (!inv) { showToast('لم يتم العثور على فاتورة المبيعات', 'error'); return false; }
+        const hasReturns = invoices.some((row) => row.type === 'return' && row.originalInvoiceId === id);
+        if (hasReturns) { showToast('لا يمكن تعديل فاتورة عليها مرتجع. احذف المرتجع أولاً ثم عدّل الفاتورة.', 'warning'); return false; }
+        const restoredCart = (inv.items || []).map((item) => {
+            const product = products.find((p) => p.id === item.productId);
+            const unit = product?.units?.find((u) => u.id === item.unitId) || product?.units?.[0];
+            return {
+                productId: item.productId,
+                productName: item.productName || product?.name || 'صنف',
+                unitId: item.unitId || unit?.id || '',
+                unitName: item.unitName || unit?.name || 'وحدة',
+                availableUnits: product?.units || [],
+                quantity: finiteNumber(item.quantity, 0),
+                conversionFactor: finiteNumber(item.conversionFactor, unit?.conversionToBase || 1) || 1,
+                unitPrice: finiteNumber(item.unitPrice, unit?.salePrice || product?.sellingPrice || 0),
+                catalogUnitPrice: finiteNumber(unit?.salePrice, item.unitPrice || 0),
+                discount: finiteNumber(item.discount, 0),
+                taxRate: finiteNumber(item.taxRate, product?.taxRate || 0),
+                costPriceAtSale: finiteNumber(item.costPriceAtSale, (product?.costPrice || 0) * (unit?.conversionToBase || 1)),
+                baseStockAvailable: getProductStock(item.productId, inv.warehouseId) + finiteNumber(item.baseQuantity, 0),
+                lastAddedAt: Date.now(),
+            };
+        });
+        setCart(restoredCart);
+        const cust = inv.customerId === CASH_CUSTOMER.id ? CASH_CUSTOMER : (customers.find((c) => c.id === inv.customerId) || CASH_CUSTOMER);
+        setSelectedCustomer(cust);
+        setInvoiceDiscountType(inv.invoiceDiscountType || 'fixed');
+        setInvoiceDiscountValue(finiteNumber(inv.invoiceDiscountValue, 0));
+        setEditingSaleInvoiceId(inv.id);
+        setActiveTab('pos');
+        showToast(`تم إرجاع الفاتورة [${inv.invoiceNumber}] للسلة للتعديل. لن يتغير الحساب إلا عند الحفظ.`, 'info');
+        return true;
+    }, [invoices, products, customers, getProductStock, setActiveTab, showToast]);
+
+    const updateSaleInvoice = useCallback(async (id, payload = {}) => {
+        const rows = await getAllFromStore('invoices');
+        const old = rows.find((row) => row.id === id && row.type === 'sale');
+        if (!old) throw new Error('فاتورة المبيعات غير موجودة');
+        if (rows.some((row) => row.type === 'return' && row.originalInvoiceId === id)) throw new Error('لا يمكن تعديل فاتورة عليها مرتجع قبل إلغاء المرتجع');
+        const reversed = await deleteInvoice(id, { silent: true });
+        if (!reversed) throw new Error('تعذر عكس الفاتورة القديمة');
+        try {
+            const replacement = await createSaleInvoice({
+                ...payload,
+                invoiceIdOverride: old.id,
+                invoiceNumberOverride: old.invoiceNumber,
+                dateOverride: old.date,
+                createdAtOverride: old.createdAt || old.date,
+                warehouseIdOverride: old.warehouseId,
+                isEdit: true,
+            });
+            await putInStore('audit_logs', { id:`audit-edit-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date:new Date().toISOString(), type:'sale_edited_reversal_repost', referenceId:old.id, referenceNumber:old.invoiceNumber, userId:currentUser.id, userName:currentUser.name });
+            setEditingSaleInvoiceId(null);
+            return replacement;
+        } catch (error) {
+            let restored = false;
+            try {
+                const restorePayload = {
+                    items: (old.items || []).map((it) => ({ ...it })), customerId: old.customerId, paymentType: old.paymentType, paidAmount: old.paidAmount, payments: old.payments || [], notes: old.notes,
+                    invoiceDiscountType: old.invoiceDiscountType || 'fixed', invoiceDiscountValue: old.invoiceDiscountValue || 0,
+                    invoiceIdOverride: old.id, invoiceNumberOverride: old.invoiceNumber, dateOverride: old.date, createdAtOverride: old.createdAt || old.date, warehouseIdOverride: old.warehouseId,
+                };
+                restored = !!(await createSaleInvoice(restorePayload));
+            } catch (_) {}
+            setEditingSaleInvoiceId(null);
+            await reloadData();
+            throw new Error(restored ? `تعذر حفظ التعديل وتمت إعادة الفاتورة القديمة كما كانت: ${String(error?.message || error)}` : `تم عكس الفاتورة القديمة لكن تعذر حفظ التعديل أو استعادتها: ${String(error?.message || error)}`);
+        }
+    }, [deleteInvoice, createSaleInvoice, currentUser, reloadData]);
+
+    const updatePurchaseInvoice = useCallback(async (id, payload = {}) => {
+        const rows = await getAllFromStore('purchases');
+        const old = rows.find((row) => row.id === id);
+        if (!old) throw new Error('فاتورة المشتريات غير موجودة');
+        const reversed = await deletePurchase(id, { silent: true });
+        if (!reversed) throw new Error('تعذر عكس فاتورة المشتريات القديمة');
+        try {
+            const replacement = await createPurchaseInvoice({
+                ...payload,
+                invoiceIdOverride: old.id,
+                invoiceNumberOverride: old.invoiceNumber,
+                createdAtOverride: old.createdAt || old.date,
+                isEdit: true,
+            });
+            await putInStore('audit_logs', { id:`audit-edit-pur-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date:new Date().toISOString(), type:'purchase_edited_reversal_repost', referenceId:old.id, referenceNumber:old.invoiceNumber, userId:currentUser.id, userName:currentUser.name });
+            return replacement;
+        } catch (error) {
+            let restored = false;
+            try {
+                restored = !!(await createPurchaseInvoice({
+                    supplierId:old.supplierId, supplierName:old.supplierName, warehouseId:old.warehouseId, items:(old.items || []).map((it)=>({ ...it })), paymentType:old.paymentType, paidAmount:old.paidAmount, payments:old.payments || [],
+                    discountType:old.discountType || 'fixed', discountValue:old.discountValue || 0, discountAmount:old.discountTotal || 0, notes:old.notes || '', date:String(old.date || '').slice(0,10), supplierInvoiceNumber:old.supplierInvoiceNumber || '',
+                    invoiceIdOverride:old.id, invoiceNumberOverride:old.invoiceNumber, createdAtOverride:old.createdAt || old.date,
+                }));
+            } catch (_) {}
+            await reloadData();
+            throw new Error(restored ? `تعذر حفظ التعديل وتمت إعادة فاتورة المشتريات القديمة كما كانت: ${String(error?.message || error)}` : `تم عكس فاتورة المشتريات القديمة لكن تعذر حفظ التعديل أو استعادتها: ${String(error?.message || error)}`);
+        }
+    }, [deletePurchase, createPurchaseInvoice, currentUser, reloadData]);
+
     // Cashier Shifts
     const openShift = useCallback(async (openingCash) => {
         const normalizedOpeningCash = Math.max(0, finiteNumber(openingCash, 0));
@@ -2086,6 +2279,10 @@ export const AppProvider = ({ children }) => {
         createSaleInvoice,
         createReturnInvoice,
         createPurchaseInvoice,
+        editingSaleInvoiceId,
+        beginEditSaleInvoice,
+        updateSaleInvoice,
+        updatePurchaseInvoice,
         recordDamagedStock,
         adjustStock,
         adjustStockCount,

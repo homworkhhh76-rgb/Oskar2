@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.41-recipe-accounting';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.41-recipe-accounting';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.41-recipe-accounting';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl } from './brand__logo.js?v=7.9.4.41-recipe-accounting';
-import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.41-recipe-accounting';
-import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.41-recipe-accounting';
-import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.41-recipe-accounting';
-import { Plus, Trash2, Building2, Eye, X, Image as ImageIcon, FileDown, FileSpreadsheet, Printer, AlertTriangle, ReceiptText, Sparkles, ScanLine } from 'lucide-react';
+import { useApp } from './context__AppContext.js?v=7.9.4.38-data-visible-reports-ledger';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.38-data-visible-reports-ledger';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.38-data-visible-reports-ledger';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl } from './brand__logo.js?v=7.9.4.38-data-visible-reports-ledger';
+import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.38-data-visible-reports-ledger';
+import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.38-data-visible-reports-ledger';
+import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.38-data-visible-reports-ledger';
+import { Plus, Trash2, Building2, Eye, X, Pencil, Image as ImageIcon, FileDown, FileSpreadsheet, Printer, AlertTriangle, ReceiptText, Sparkles, ScanLine } from 'lucide-react';
 
 const h = React.createElement;
 const money = (n) => Number(n || 0).toFixed(2);
@@ -34,11 +34,12 @@ export const PurchasesView = () => {
   const warehouses = Array.isArray(app.warehouses) ? app.warehouses.filter(Boolean) : [];
   const accounts = Array.isArray(app.accounts) ? app.accounts.filter(Boolean) : [];
   const settings = app.settings || {};
-  const { createPurchaseInvoice, deletePurchase, saveSupplier, saveWarehouse, currentUser, showToast } = app;
+  const { createPurchaseInvoice, updatePurchaseInvoice, deletePurchase, saveSupplier, saveWarehouse, currentUser, showToast } = app;
   const primaryWarehouse = warehouses[0] || warehouses.find((w) => w?.id === settings.activeWarehouseId) || warehouses.find((w) => w?.isDefault);
 
   const activeProducts = products.filter((p) => !p.deletedAt && p.status !== 'archived' && Array.isArray(p.units) && p.units.length > 0);
   const [mode, setMode] = useState('list');
+  const [editingId, setEditingId] = useState(null);
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id || '');
   const [warehouseId, setWarehouseId] = useState(primaryWarehouse?.id || settings.activeWarehouseId || warehouses[0]?.id || '');
   const [accountId, setAccountId] = useState(accounts.find(a=>a.isDefault)?.id || accounts[0]?.id || '');
@@ -134,17 +135,18 @@ export const PurchasesView = () => {
         expiryDate: r.expiryDate || p?.expiryDate || '',
       };
     });
-    const selectedPaymentAccount = accounts.find((a) => a.id === accountId);
-    const payments = paidSafe > 0 ? [{ method: selectedPaymentAccount?.type || 'cash', amount: paidSafe, accountId, accountName: selectedPaymentAccount?.name || 'الصندوق' }] : [];
+    const payments = paidSafe > 0 ? [{ method: 'cash', amount: paidSafe, accountId, accountName: accounts.find((a) => a.id === accountId)?.name || 'الصندوق' }] : [];
     const paymentType = paidSafe <= 0 ? 'debt' : paidSafe >= total ? 'cash' : 'partial';
-    const res = await createPurchaseInvoice?.({
+    const savePayload = {
       supplierId: supplier.id, supplierName: supplier.name, warehouseId, items,
       paymentType, paidAmount: paidSafe, payments,
       discountType, discountValue: num(discountValue), discountAmount, notes,
       date: purchaseDate || undefined, supplierInvoiceNumber: supplierInvoiceNumber.trim(),
-    });
+    };
+    const res = editingId ? await updatePurchaseInvoice?.(editingId, savePayload) : await createPurchaseInvoice?.(savePayload);
     if (res) {
       setMode('list');
+      setEditingId(null);
       setRows([makeRow()]);
       setPaid(''); setDiscountValue(''); setNotes(''); setSupplierInvoiceNumber(''); setPurchaseDate(new Date().toISOString().slice(0,10));
       const preferred = warehouses[0];
@@ -156,6 +158,24 @@ export const PurchasesView = () => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const startEditPurchase = (p) => {
+    if (!p) return;
+    setEditingId(p.id);
+    setSupplierId(p.supplierId || suppliers[0]?.id || '');
+    setWarehouseId(p.warehouseId || primaryWarehouse?.id || '');
+    setAccountId(p.payments?.[0]?.accountId || accounts.find((a)=>a.isDefault)?.id || accounts[0]?.id || '');
+    setPaid(String(Number(p.paidAmount || 0)));
+    setDiscountType(p.discountType || 'fixed');
+    setDiscountValue(String(Number(p.discountValue ?? p.discountTotal ?? 0)));
+    setNotes(p.notes || '');
+    setPurchaseDate(String(p.date || new Date().toISOString()).slice(0,10));
+    setSupplierInvoiceNumber(p.supplierInvoiceNumber || '');
+    setRows((p.items || []).map((it) => ({ productId:it.productId || '', unitId:it.unitId || '', quantity:String(Number(it.quantity || 0)), unitPrice:String(Number(it.unitPrice || 0)), expiryDate:it.expiryDate || '' })));
+    setViewing(null);
+    setMode('new');
+    showToast?.(`تعديل فاتورة ${p.invoiceNumber}: عند الحفظ سيتم عكس القيد القديم وتسجيل الجديد`, 'info');
   };
 
   const addSupplier = async (e) => {
@@ -245,7 +265,7 @@ export const PurchasesView = () => {
       h('div', { className: 'rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-700 p-2' }, h('div', { className: 'text-[10px] text-slate-500' }, 'الصافي بعد الخصم'), h('div', { className: 'font-mono font-black text-emerald-700 text-lg' }, `${money(total)} ${settings.currencySymbol || ''}`))
     ),
     h('input', { value: notes, onChange: (e) => setNotes(e.target.value), placeholder: 'ملاحظات فاتورة الشراء...', className: 'w-full px-3 py-2 border rounded-xl text-xs bg-white dark:bg-slate-900 dark:border-slate-700' }),
-    h('div', { className: 'flex justify-end gap-2' }, h('button', { type: 'button', onClick: () => setMode('list'), className: 'px-4 py-2 border rounded-xl text-xs font-bold' }, 'إلغاء'), h('button', { type: 'button', onClick: submit, disabled: isSaving, className: 'px-6 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-black disabled:opacity-60' }, isSaving ? 'جاري الحفظ محلياً...' : 'حفظ فاتورة الشراء'))
+    h('div', { className: 'flex justify-end gap-2' }, h('button', { type: 'button', onClick: () => { setMode('list'); setEditingId(null); }, className: 'px-4 py-2 border rounded-xl text-xs font-bold' }, 'إلغاء'), h('button', { type: 'button', onClick: submit, disabled: isSaving, className: 'px-6 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-black disabled:opacity-60' }, isSaving ? 'جاري الحفظ محلياً...' : (editingId ? 'حفظ تعديل الفاتورة' : 'حفظ فاتورة الشراء')))
   );
 
 
@@ -274,7 +294,7 @@ export const PurchasesView = () => {
         rows.push(['', '', '', '', 'الباقي دين', num(viewing.remainingAmount)]);
         ok = await downloadProfessionalTableExcel({
           title: 'فاتورة مشتريات',
-          subtitle: `رقم النظام: ${viewing.invoiceNumber || '-'}${viewing.supplierInvoiceNumber ? ` • فاتورة المورد: ${viewing.supplierInvoiceNumber}` : ''} • المورد: ${viewing.supplierName || 'مورد'} • التاريخ: ${safeDate(viewing.date).toLocaleString('ar-EG-u-nu-latn')}`,
+          subtitle: `رقم النظام: ${viewing.invoiceNumber || '-'}${viewing.supplierInvoiceNumber ? ` • فاتورة المورد: ${viewing.supplierInvoiceNumber}` : ''} • المورد: ${viewing.supplierName || 'مورد'} • التاريخ: ${safeDate(viewing.date).toLocaleString('ar-EG')}`,
           headers: ['#', 'الصنف', 'الوحدة', 'الكمية', 'السعر', 'الإجمالي'],
           rows,
           settings,
@@ -297,12 +317,12 @@ export const PurchasesView = () => {
           h('thead', null, h('tr', { className: 'bg-slate-50 dark:bg-slate-800 border-b text-slate-500 dark:border-slate-700' }, ...['الرقم', 'التاريخ', 'المورد', 'الإجمالي', 'المدفوع', 'الدين', ''].map((x, i) => h('th', { key: i, className: 'p-3' }, x)))),
           h('tbody', null, ...purchasesPager.pageItems.map((p, index) => h('tr', { key: p.id || index, className: 'border-b last:border-0 dark:border-slate-800' },
             h('td', { className: 'p-3 font-mono font-bold' }, p.invoiceNumber || `PUR-${index + 1}`),
-            h('td', { className: 'p-3' }, safeDate(p.date).toLocaleDateString('ar-EG-u-nu-latn')),
+            h('td', { className: 'p-3' }, safeDate(p.date).toLocaleDateString('ar-EG')),
             h('td', { className: 'p-3 font-bold' }, p.supplierName || 'مورد'),
             h('td', { className: 'p-3 font-mono' }, `${money(p.grandTotal)} ${settings.currencySymbol || ''}`),
             h('td', { className: 'p-3 font-mono text-emerald-700' }, money(p.paidAmount)),
             h('td', { className: 'p-3 font-mono text-rose-600' }, money(p.remainingAmount)),
-            h('td', { className: 'p-3 flex gap-1' }, h('button', { type: 'button', onClick: () => { warmExportLibraries(); setViewing(p); }, className: 'p-2 rounded-lg border dark:border-slate-700' }, h(Eye, { className: 'w-4 h-4' })), canDelete ? h('button', { type: 'button', onClick: () => setDeleting(p.id), className: 'p-2 rounded-lg border dark:border-slate-700 text-rose-600' }, h(Trash2, { className: 'w-4 h-4' })) : null)
+            h('td', { className: 'p-3 flex gap-1' }, h('button', { type: 'button', onClick: () => { warmExportLibraries(); setViewing(p); }, className: 'p-2 rounded-lg border dark:border-slate-700', title:'عرض' }, h(Eye, { className: 'w-4 h-4' })), h('button', { type:'button', onClick:()=>startEditPurchase(p), className:'p-2 rounded-lg border dark:border-slate-700 text-blue-600', title:'تعديل مع قيد عكسي' }, h(Pencil,{className:'w-4 h-4'})), canDelete ? h('button', { type: 'button', onClick: () => setDeleting(p.id), className: 'p-2 rounded-lg border dark:border-slate-700 text-rose-600' }, h(Trash2, { className: 'w-4 h-4' })) : null)
           )))
         ),
         h(Pagination,{pager:purchasesPager})
@@ -310,7 +330,7 @@ export const PurchasesView = () => {
   );
 
   return h('div', { id: 'purchases-screen', className: 'p-4 sm:p-6 space-y-4 max-w-7xl mx-auto text-right min-h-full' },
-    h('div', { className: 'flex items-center justify-end gap-2' }, h('button', { type: 'button', onClick: () => setMode(mode === 'list' ? 'new' : 'list'), className: 'px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-sm' }, mode === 'new' ? 'عرض السجل' : 'فاتورة شراء جديدة')),
+    h('div', { className: 'flex items-center justify-end gap-2' }, h('button', { type: 'button', onClick: () => { setEditingId(null); setMode(mode === 'list' ? 'new' : 'list'); }, className: 'px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-sm' }, mode === 'new' ? 'عرض السجل' : 'فاتورة شراء جديدة')),
     mode === 'new' ? form : list,
     h(PurchaseAIScanModal,{open:showAIScan,onClose:()=>setShowAIScan(false),onApply:applyAIScan}),
     viewing ? h('div', { className: 'fixed inset-x-0 oscar-bounded-modal p-2 sm:p-5 flex items-stretch sm:items-center justify-center overflow-hidden', style:{zIndex:2147482000,background:'rgba(15,23,42,.62)',backdropFilter:'blur(6px)',WebkitBackdropFilter:'blur(6px)'} },
@@ -332,7 +352,7 @@ export const PurchasesView = () => {
             ),
             h('section',{className:'grid grid-cols-2 gap-x-5 gap-y-2 p-4 sm:p-5 text-[11px] border-b border-slate-200 bg-slate-50/70'},
               h('div',null,h('span',{className:'text-slate-400'},'رقم الفاتورة: '),h('b',{className:'font-mono'},viewing.invoiceNumber || '-')),
-              h('div',null,h('span',{className:'text-slate-400'},'التاريخ: '),h('b',null,safeDate(viewing.date).toLocaleString('ar-EG-u-nu-latn'))),
+              h('div',null,h('span',{className:'text-slate-400'},'التاريخ: '),h('b',null,safeDate(viewing.date).toLocaleString('ar-EG'))),
               viewing.supplierInvoiceNumber ? h('div',null,h('span',{className:'text-slate-400'},'فاتورة المورد: '),h('b',{className:'font-mono'},viewing.supplierInvoiceNumber)) : null,
               h('div',null,h('span',{className:'text-slate-400'},'المورد: '),h('b',null,viewing.supplierName || 'مورد')),
               h('div',null,h('span',{className:'text-slate-400'},'المخزن: '),h('b',null,warehouses.find((w)=>w.id===viewing.warehouseId)?.name || '-'))

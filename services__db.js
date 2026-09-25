@@ -1,4 +1,4 @@
-import { calculateUnitConversions } from './utils__unitTree.js?v=7.9.4.41-recipe-accounting';
+import { calculateUnitConversions } from './utils__unitTree.js?v=7.9.4.38-data-visible-reports-ledger';
 const DB_BASE_NAME = 'Oscar_Accounting_POS_DB';
 const DB_VERSION = 6;
 export const getTenantId = () => String(window.OscarActivation?.readRuntime?.()?.companyId || 'local').trim() || 'local';
@@ -218,12 +218,11 @@ export async function getFromStore(storeName, key) {
 export async function putInStore(storeName, value, notifySync = true) {
     const db = await openDB();
     let changed = true;
-    let beforeValue = null;
     if (notifySync) {
         try {
-            beforeValue = await getFromStore(storeName, recordKey(storeName, value));
-            changed = !sameRecord(beforeValue, value);
-        } catch { changed = true; beforeValue = null; }
+            const before = await getFromStore(storeName, recordKey(storeName, value));
+            changed = !sameRecord(before, value);
+        } catch { changed = true; }
     }
     if (!changed) return;
     // Stock rows carry their own local modification time. This lets cloud sync reject
@@ -238,11 +237,6 @@ export async function putInStore(storeName, value, notifySync = true) {
             if (notifySync) {
                 scheduleCloudCapture(storeName, storedValue);
                 broadcastStoreUpdated(storeName);
-                try {
-                    window.dispatchEvent(new CustomEvent('oscar:db-mutation', { detail: {
-                        action: beforeValue ? 'update' : 'add', storeName, value: storedValue, before: beforeValue, at: new Date().toISOString()
-                    } }));
-                } catch {}
             }
             resolve();
         };
@@ -252,8 +246,6 @@ export async function putInStore(storeName, value, notifySync = true) {
 }
 export async function deleteFromStore(storeName, key, notifySync = true) {
     const db = await openDB();
-    let beforeValue = null;
-    if (notifySync) { try { beforeValue = await getFromStore(storeName, key); } catch {} }
     return new Promise((resolve, reject) => {
         const tx = db.transaction(storeName, 'readwrite');
         tx.objectStore(storeName).delete(key);
@@ -261,11 +253,6 @@ export async function deleteFromStore(storeName, key, notifySync = true) {
             if (notifySync) {
                 scheduleCloudCapture(storeName, null, { deleted: true, key });
                 broadcastStoreUpdated(storeName);
-                try {
-                    window.dispatchEvent(new CustomEvent('oscar:db-mutation', { detail: {
-                        action: 'delete', storeName, value: beforeValue, before: beforeValue, key, at: new Date().toISOString()
-                    } }));
-                } catch {}
             }
             resolve();
         };
@@ -314,9 +301,6 @@ export async function bulkPut(storeName, items, notifySync = true) {
             if (notifySync) {
                 changedItems.forEach(item => scheduleCloudCapture(storeName, item));
                 broadcastStoreUpdated(storeName);
-                try {
-                    if (changedItems.length <= 25) changedItems.forEach(item => window.dispatchEvent(new CustomEvent('oscar:db-mutation', { detail: { action:'update', storeName, value:item, before:null, bulk:true, at:new Date().toISOString() } })));
-                } catch {}
             }
             resolve();
         };
@@ -358,30 +342,6 @@ export const DEFAULT_SETTINGS = {
     barcodePrefix: '21',
     activeWarehouseId: 'wh-main',
     activeBranchName: 'الفرع الرئيسي',
-    telegramEnabled: true,
-    telegramBotUsername: 'Oskarteaam_bot',
-    telegramBotUrl: 'http://t.me/Oskarteaam_bot',
-    telegramInvoiceNotifications: true,
-    telegramPurchaseNotifications: true,
-    telegramReturnNotifications: true,
-    telegramNotifyCustomers: true,
-    telegramNotifySuppliers: true,
-    telegramNotifyVouchers: true,
-    telegramNotifyExpenses: true,
-    telegramNotifyTransfers: true,
-    telegramNotifyAccounts: true,
-    telegramNotifyProducts: true,
-    telegramNotifyInventory: true,
-    telegramNotifyWarehouses: true,
-    telegramNotifyEmployees: true,
-    telegramNotifyShifts: true,
-    telegramNotifyHeldInvoices: true,
-    telegramNotifyRestaurant: true,
-    telegramNotifyAuditLogs: true,
-    telegramAutoReportEnabled: true,
-    telegramReportIntervalHours: 24,
-    telegramSendImages: true,
-    telegramRecipients: [],
 };
 // Initial Warehouses
 export const DEFAULT_WAREHOUSES = [
