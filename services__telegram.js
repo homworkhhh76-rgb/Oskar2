@@ -1,5 +1,5 @@
-import { getAllFromStore, getFromStore, putInStore } from './services__db.js?v=7.9.4.41-recipe-accounting';
-import { renderInvoiceCanvas, renderVoucherCanvas, renderTableCanvas } from './utils__canvasRenderer.js?v=7.9.4.41-recipe-accounting';
+import { getAllFromStore, getFromStore, putInStore } from './services__db.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { renderInvoiceCanvas, renderVoucherCanvas, renderTableCanvas } from './utils__canvasRenderer.js?v=7.9.4.45-auto-backup-24h-report-fix';
 
 // Telegram integration for Oscar Accounting.
 // The owner explicitly requested embedding this token in the app build.
@@ -292,6 +292,96 @@ function dataUrlToBlob(dataUrl) {
   return new Blob([arr], { type:mime });
 }
 
+async function blobToDataUrl(blob) {
+  if (!(blob instanceof Blob)) throw new Error('ملف غير صالح للإرسال');
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('تعذر قراءة الملف'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function sendDocumentToChat(chatId, blob, { caption='', filename='oscar-file.bin', silent=false } = {}) {
+  if (!(blob instanceof Blob)) throw new Error('تعذر تجهيز الملف للإرسال');
+  if (!normalizeId(chatId)) throw new Error('Chat ID غير صالح');
+  // Telegram Bot API currently accepts large documents, but keep browser memory sane.
+  if (blob.size > 49 * 1024 * 1024) throw new Error('حجم الملف أكبر من الحد المسموح للإرسال عبر البوت');
+
+  // If the Oscar Node server is running, use the same-origin proxy first.
+  try {
+    const fileDataUrl = await blobToDataUrl(blob);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    const response = await fetch('./api/telegram', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body:JSON.stringify({ method:'sendDocument', payload:{
+        chat_id:normalizeId(chatId),
+        caption:String(caption || '').slice(0, 1024),
+        filename:String(filename || 'oscar-file.bin'),
+        fileDataUrl,
+        disable_notification:!!silent,
+      }}),
+      cache:'no-store',
+      signal:controller.signal,
+    });
+    clearTimeout(timer);
+    if (response.ok) {
+      const data = await response.json().catch(() => null);
+      if (data?.ok) return data;
+      if (data?.error) throw new Error(data.error);
+    } else if (response.status !== 404 && response.status !== 405) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data?.error || `Telegram proxy HTTP ${response.status}`);
+    }
+  } catch (error) {
+    if (error?.name !== 'AbortError' && !/Failed to fetch|NetworkError/i.test(String(error?.message || ''))) {
+      // Fall through to direct Bot API.
+    }
+  }
+
+  // Static hosting / HTML preview fallback: send directly with the SAME invoice bot token.
+  const form = new FormData();
+  form.append('chat_id', normalizeId(chatId));
+  if (caption) form.append('caption', String(caption).slice(0, 1024));
+  if (silent) form.append('disable_notification', 'true');
+  form.append('document', blob, filename || 'oscar-file.bin');
+  const response = await fetch(`${API_ROOT}/sendDocument`, { method:'POST', body:form, cache:'no-store' });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.ok === false) throw new Error(data?.description || data?.error || `Telegram HTTP ${response.status}`);
+  return data;
+}
+
+export async function sendTelegramTextToRecipients(text, { settings=null, silent=false } = {}) {
+  return deliverToRecipients(text, { settings, queueOnFailure:false, silent });
+}
+
+export async function sendTelegramPhotoBlobToRecipients(blob, { settings=null, caption='', filename='oscar.png', silent=false } = {}) {
+  const config = settings || await getStoreSettings();
+  const recipients = enabledRecipients(config);
+  if (!recipients.length) return { ok:false, skipped:true, reason:'NO_RECIPIENTS', sent:0, failed:0 };
+  const dataUrl = await blobToDataUrl(blob);
+  return deliverPhotoDataUrlToRecipients(dataUrl, { settings:config, caption, filename, silent });
+}
+
+export async function sendTelegramDocumentBlobToRecipients(blob, { settings=null, caption='', filename='oscar-file.bin', silent=false } = {}) {
+  const config = settings || await getStoreSettings();
+  const recipients = enabledRecipients(config);
+  if (!recipients.length) return { ok:false, skipped:true, reason:'NO_RECIPIENTS', sent:0, failed:0 };
+  let sent = 0;
+  const failures = [];
+  for (const recipient of recipients) {
+    try {
+      await sendDocumentToChat(recipient.chatId, blob, { caption, filename, silent });
+      sent += 1;
+    } catch (error) {
+      failures.push({ chatId:recipient.chatId, username:recipient.username || '', error:String(error?.message || error) });
+    }
+  }
+  return failures.length ? { ok:false, sent, failed:failures.length, failures } : { ok:true, sent, failed:0 };
+}
+
 async function canvasToDataUrl(canvas, type='image/png', quality=0.95) {
   if (!canvas) throw new Error('لا يوجد محتوى صورة');
   if (typeof canvas.toDataURL === 'function') return canvas.toDataURL(type, quality);
@@ -458,9 +548,9 @@ async function buildReportImageCards(data, settings, periodHours=24) {
   const heldInvoices = Array.isArray(data.held_invoices) ? data.held_invoices : [];
   const auditLogs = Array.isArray(data.audit_logs) ? data.audit_logs : [];
   const categories = Array.isArray(data.categories) ? data.categories : [];
-  const recentSales = invoices.filter(x => x?.type === 'sale' && dateMs(x.date || x.createdAt) >= since);
-  const recentReturns = invoices.filter(x => x?.type === 'return' && dateMs(x.date || x.createdAt) >= since);
-  const recentPurchases = purchases.filter(x => dateMs(x.date || x.createdAt) >= since);
+  const recentSales = invoices.filter(x => x?.type === 'sale' && !x?.deletedAt && dateMs(x.date || x.createdAt) >= since);
+  const recentReturns = invoices.filter(x => x?.type === 'return' && !x?.deletedAt && dateMs(x.date || x.createdAt) >= since);
+  const recentPurchases = purchases.filter(x => !x?.deletedAt && dateMs(x.date || x.createdAt) >= since);
   const recentExpenses = expenses.filter(x => !x?.deletedAt && dateMs(x.date || x.createdAt) >= since);
   const recentVouchers = vouchers.filter(x => dateMs(x.date || x.createdAt) >= since);
   const recentTransfers = transfers.filter(x => dateMs(x.date || x.createdAt) >= since);
@@ -476,7 +566,10 @@ async function buildReportImageCards(data, settings, periodHours=24) {
   const customerDebts = customers.filter(c=>!c?.deletedAt && asNumber(c.balance)>0).sort((a,b)=>asNumber(b.balance)-asNumber(a.balance));
   const supplierDebts = suppliers.filter(s=>!s?.deletedAt && asNumber(s.balance)>0).sort((a,b)=>asNumber(b.balance)-asNumber(a.balance));
   const productStockMap = new Map();
-  for (const row of stock) productStockMap.set(row.productId, (productStockMap.get(row.productId)||0) + asNumber(row.baseQuantity));
+  for (const row of stock) {
+    const qty = asNumber(row.baseQuantity ?? row.quantity);
+    productStockMap.set(row.productId, (productStockMap.get(row.productId)||0) + qty);
+  }
   const lowStock = products.filter(p => p.reorderPoint !== undefined && (productStockMap.get(p.id)||0) <= asNumber(p.reorderPoint));
   const outOfStock = products.filter(p => (productStockMap.get(p.id)||0) <= 0);
   const inventoryCostValue = products.reduce((s,p)=>s + Math.max(0,productStockMap.get(p.id)||0)*asNumber(p.costPrice),0);
@@ -890,7 +983,7 @@ const dateMs = (value) => {
   return Number.isFinite(t) ? t : 0;
 };
 
-function buildReportText(data, settings, periodHours=24) {
+export function buildFullTelegramReportText(data, settings, periodHours=24) {
   const symbol = settings?.currencySymbol || '₪';
   const now = Date.now();
   const since = now - Math.max(1, asNumber(periodHours) || 24) * 3600000;
@@ -912,15 +1005,15 @@ function buildReportText(data, settings, periodHours=24) {
   const auditLogs = Array.isArray(data.audit_logs) ? data.audit_logs : [];
   const categories = Array.isArray(data.categories) ? data.categories : [];
 
-  const recentSales = invoices.filter(x => x?.type === 'sale' && dateMs(x.date || x.createdAt) >= since);
-  const recentReturns = invoices.filter(x => x?.type === 'return' && dateMs(x.date || x.createdAt) >= since);
-  const recentPurchases = purchases.filter(x => dateMs(x.date || x.createdAt) >= since);
+  const recentSales = invoices.filter(x => x?.type === 'sale' && !x?.deletedAt && dateMs(x.date || x.createdAt) >= since);
+  const recentReturns = invoices.filter(x => x?.type === 'return' && !x?.deletedAt && dateMs(x.date || x.createdAt) >= since);
+  const recentPurchases = purchases.filter(x => !x?.deletedAt && dateMs(x.date || x.createdAt) >= since);
   const recentExpenses = expenses.filter(x => !x?.deletedAt && dateMs(x.date || x.createdAt) >= since);
   const recentVouchers = vouchers.filter(x => dateMs(x.date || x.createdAt) >= since);
   const recentTransfers = transfers.filter(x => dateMs(x.date || x.createdAt) >= since);
   const recentStockMovements = stockMovements.filter(x => dateMs(x.date || x.createdAt || x.timestamp) >= since);
   const recentAuditLogs = auditLogs.filter(x => dateMs(x.timestamp || x.date || x.createdAt) >= since);
-  const newCustomers = customers.filter(x => !x?.deletedAt && dateMs(x.createdAt || x.date) >= since);
+  const newCustomers = customers.filter(x => !x?.deletedAt && !x?.isVirtual && String(x?.id||'') !== 'cust-walkin' && dateMs(x.createdAt || x.date) >= since);
   const newSuppliers = suppliers.filter(x => !x?.deletedAt && dateMs(x.createdAt || x.date) >= since);
 
   const salesGross = recentSales.reduce((s,x)=>s+asNumber(x.grandTotal),0);
@@ -935,27 +1028,48 @@ function buildReportText(data, settings, periodHours=24) {
   const paymentsTotal = recentVouchers.filter(x=>x?.type==='payment').reduce((s,x)=>s+asNumber(x.amount),0);
   const transfersTotal = recentTransfers.reduce((s,x)=>s+asNumber(x.amount),0);
   const salesAverage = recentSales.length ? salesGross / recentSales.length : 0;
-  const cogs = recentSales.reduce((s,inv)=>s+(inv.items||[]).reduce((a,it)=>a+asNumber(it.fifoCostTotal),0),0)
-    - recentReturns.reduce((s,inv)=>s+(inv.items||[]).reduce((a,it)=>a+asNumber(it.fifoCostTotal),0),0);
-  const approxProfit = netSales - Math.max(0,cogs) - expensesTotal;
+  const productById = new Map(products.map(p=>[String(p.id||''),p]));
+  const itemCostTotal = (it) => {
+    if (it && it.fifoCostTotal !== undefined && it.fifoCostTotal !== null && Number.isFinite(Number(it.fifoCostTotal))) return asNumber(it.fifoCostTotal);
+    if (it && it.costPriceAtSale !== undefined && it.costPriceAtSale !== null && Number.isFinite(Number(it.costPriceAtSale))) return asNumber(it.quantity) * asNumber(it.costPriceAtSale);
+    const p = productById.get(String(it?.productId||''));
+    return asNumber(it?.baseQuantity ?? (asNumber(it?.quantity) * Math.max(1,asNumber(it?.conversionFactor)||1))) * asNumber(p?.costPrice);
+  };
+  const cogs = recentSales.reduce((s,inv)=>s+(inv.items||[]).reduce((a,it)=>a+itemCostTotal(it),0),0)
+    - recentReturns.reduce((s,inv)=>s+(inv.items||[]).reduce((a,it)=>a+itemCostTotal(it),0),0);
+  const approxProfit = netSales - cogs - expensesTotal;
   const expenseByCategory = new Map();
   for (const exp of recentExpenses) expenseByCategory.set(exp.category || 'أخرى', (expenseByCategory.get(exp.category || 'أخرى') || 0) + asNumber(exp.amount));
   const topExpenseCategories = [...expenseByCategory.entries()].sort((a,b)=>b[1]-a[1]).slice(0,10);
 
-  const customerDebts = customers.filter(c=>!c?.deletedAt && asNumber(c.balance)>0).sort((a,b)=>asNumber(b.balance)-asNumber(a.balance));
-  const customerCredits = customers.filter(c=>!c?.deletedAt && asNumber(c.balance)<0).sort((a,b)=>asNumber(a.balance)-asNumber(b.balance));
-  const supplierDebts = suppliers.filter(s=>!s?.deletedAt && asNumber(s.balance)>0).sort((a,b)=>asNumber(b.balance)-asNumber(a.balance));
+  const realCustomers = customers.filter(c=>!c?.deletedAt && !c?.isVirtual && String(c?.id||'') !== 'cust-walkin');
+  const realSuppliers = suppliers.filter(s=>!s?.deletedAt);
+  const customerDebts = realCustomers.filter(c=>asNumber(c.balance)>0).sort((a,b)=>asNumber(b.balance)-asNumber(a.balance));
+  const customerCredits = realCustomers.filter(c=>asNumber(c.balance)<0).sort((a,b)=>asNumber(a.balance)-asNumber(b.balance));
+  const supplierDebts = realSuppliers.filter(s=>asNumber(s.balance)>0).sort((a,b)=>asNumber(b.balance)-asNumber(a.balance));
+  const supplierCredits = realSuppliers.filter(s=>asNumber(s.balance)<0).sort((a,b)=>asNumber(a.balance)-asNumber(b.balance));
   const totalCustomerDebt = customerDebts.reduce((s,c)=>s+asNumber(c.balance),0);
   const totalCustomerCredit = customerCredits.reduce((s,c)=>s+Math.abs(asNumber(c.balance)),0);
   const totalSupplierDebt = supplierDebts.reduce((s,c)=>s+asNumber(c.balance),0);
+  const totalSupplierCredit = supplierCredits.reduce((s,c)=>s+Math.abs(asNumber(c.balance)),0);
 
   const productStockMap = new Map();
-  for (const row of stock) productStockMap.set(row.productId, (productStockMap.get(row.productId)||0) + asNumber(row.baseQuantity));
+  for (const row of stock) {
+    const qty = asNumber(row.baseQuantity ?? row.quantity);
+    productStockMap.set(row.productId, (productStockMap.get(row.productId)||0) + qty);
+  }
   const lowStock = products.filter(p => p.reorderPoint !== undefined && (productStockMap.get(p.id)||0) <= asNumber(p.reorderPoint))
     .sort((a,b)=>(productStockMap.get(a.id)||0)-(productStockMap.get(b.id)||0));
   const outOfStock = products.filter(p => (productStockMap.get(p.id)||0) <= 0);
   const inventoryCostValue = products.reduce((s,p)=>s + Math.max(0,productStockMap.get(p.id)||0)*asNumber(p.costPrice),0);
-  const inventorySaleValue = products.reduce((s,p)=>s + Math.max(0,productStockMap.get(p.id)||0)*asNumber(p.sellingPrice),0);
+  const baseSellingPrice = (p) => {
+    const direct = asNumber(p?.sellingPrice ?? p?.salePrice);
+    if (direct) return direct;
+    const units = Array.isArray(p?.units) ? p.units : [];
+    const base = units.find(u => String(u?.id||'') === String(p?.baseUnitId||'')) || units.find(u => asNumber(u?.conversionToBase || 1) === 1) || units[0];
+    return asNumber(base?.salePrice ?? base?.sellingPrice ?? base?.price);
+  };
+  const inventorySaleValue = products.reduce((s,p)=>s + Math.max(0,productStockMap.get(p.id)||0)*baseSellingPrice(p),0);
 
   const soldMap = new Map();
   for (const inv of recentSales) for (const item of (inv.items||[])) {
@@ -989,7 +1103,7 @@ function buildReportText(data, settings, periodHours=24) {
   lines.push(`• صافي ربح تقريبي للفترة: ${money(approxProfit,symbol)}`);
   lines.push('');
   lines.push('👥 العملاء والديون');
-  lines.push(`• عدد العملاء: ${customers.filter(c=>!c?.deletedAt).length}`);
+  lines.push(`• عدد العملاء: ${realCustomers.length}`);
   lines.push(`• عملاء جدد خلال الفترة: ${newCustomers.length}`);
   lines.push(`• عملاء عليهم رصيد: ${customerDebts.length} | ${money(totalCustomerDebt,symbol)}`);
   lines.push(`• أرصدة لصالح العملاء: ${customerCredits.length} | ${money(totalCustomerCredit,symbol)}`);
@@ -997,9 +1111,10 @@ function buildReportText(data, settings, periodHours=24) {
   if (customerDebts.length > 15) lines.push(`  ... و${customerDebts.length-15} عميل آخر`);
   lines.push('');
   lines.push('🚚 الموردون');
-  lines.push(`• عدد الموردين: ${suppliers.filter(s=>!s?.deletedAt).length}`);
+  lines.push(`• عدد الموردين: ${realSuppliers.length}`);
   lines.push(`• موردون جدد خلال الفترة: ${newSuppliers.length}`);
   lines.push(`• إجمالي المستحق للموردين: ${money(totalSupplierDebt,symbol)}`);
+  lines.push(`• أرصدة لنا على الموردين: ${supplierCredits.length} | ${money(totalSupplierCredit,symbol)}`);
   supplierDebts.slice(0,12).forEach((s,i)=>lines.push(`  ${i+1}) ${s.name || 'مورد'}: ${money(s.balance,symbol)}`));
   if (supplierDebts.length > 12) lines.push(`  ... و${supplierDebts.length-12} مورد آخر`);
   lines.push('');
@@ -1028,9 +1143,9 @@ function buildReportText(data, settings, periodHours=24) {
   lines.push('🏬 المخازن');
   warehouses.forEach(w => {
     const rows = stock.filter(s=>s.warehouseId===w.id);
-    const itemCount = rows.filter(r=>asNumber(r.baseQuantity)!==0).length;
+    const itemCount = new Set(rows.filter(r=>asNumber(r.baseQuantity ?? r.quantity)!==0).map(r=>r.productId)).size;
     const cost = rows.reduce((sum,r)=>{
-      const p=products.find(x=>x.id===r.productId); return sum + Math.max(0,asNumber(r.baseQuantity))*asNumber(p?.costPrice);
+      const p=products.find(x=>x.id===r.productId); return sum + Math.max(0,asNumber(r.baseQuantity ?? r.quantity))*asNumber(p?.costPrice);
     },0);
     lines.push(`• ${w.name || w.id}: ${itemCount} صنف برصيد | قيمة ${money(cost,symbol)}`);
   });
@@ -1039,9 +1154,9 @@ function buildReportText(data, settings, periodHours=24) {
   lines.push(`• الموظفون المسجلون: ${employees.filter(e=>!e?.deletedAt).length}`);
   lines.push(`• الفواتير المعلقة حالياً: ${heldInvoices.filter(x=>!x?.deletedAt).length}`);
   lines.push(`• عمليات السجل خلال الفترة: ${recentAuditLogs.length}`);
-  lines.push(`• إجمالي فواتير البيع المسجلة بالنظام: ${invoices.filter(x=>x?.type==='sale').length}`);
-  lines.push(`• إجمالي المرتجعات المسجلة بالنظام: ${invoices.filter(x=>x?.type==='return').length}`);
-  lines.push(`• إجمالي فواتير المشتريات المسجلة بالنظام: ${purchases.length}`);
+  lines.push(`• إجمالي فواتير البيع المسجلة بالنظام: ${invoices.filter(x=>x?.type==='sale'&&!x?.deletedAt).length}`);
+  lines.push(`• إجمالي المرتجعات المسجلة بالنظام: ${invoices.filter(x=>x?.type==='return'&&!x?.deletedAt).length}`);
+  lines.push(`• إجمالي فواتير المشتريات المسجلة بالنظام: ${purchases.filter(x=>!x?.deletedAt).length}`);
   if (topSold.length) {
     lines.push('');
     lines.push('🔥 أعلى الأصناف مبيعاً خلال الفترة');
@@ -1074,7 +1189,7 @@ async function syncServerReportSnapshot(settings, { force=false } = {}) {
     let text = '';
     if (enabled) {
       const data = await collectReportData();
-      text = buildReportText(data, settings, periodHours);
+      text = buildFullTelegramReportText(data, settings, periodHours);
     }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 7000);
@@ -1114,7 +1229,7 @@ export async function sendFullTelegramReport({ manual=false, force=false } = {})
   if (!enabledRecipients(settings).length) throw new Error('أضف مستخدم Telegram واحداً على الأقل');
   const periodHours = Math.max(1, asNumber(settings.telegramReportIntervalHours) || 24);
   const data = await collectReportData();
-  const text = buildReportText(data, settings, periodHours);
+  const text = buildFullTelegramReportText(data, settings, periodHours);
   const key = manual ? '' : `report:${Math.floor(Date.now()/(periodHours*3600000))}`;
   const result = await deliverToRecipients(text, { settings, key, queueOnFailure:!manual });
   if (settings.telegramSendImages !== false) {
@@ -1169,25 +1284,25 @@ async function autoReportTick() {
 export function startTelegramAutomation() {
   if (automationStarted) return () => {};
   automationStarted = true;
-  const run = () => autoReportTick().catch(()=>{});
+  // New PDF/image daily scheduling is managed by services__telegramReports.js + server.js.
+  // This legacy runtime remains responsible for instant business-event notifications
+  // and retrying queued Telegram messages only, so reports are never duplicated.
+  const run = () => flushTelegramOutbox().catch(()=>{});
   const onMutation = (event) => {
     const detail = event?.detail;
     if (!detail) return;
     Promise.resolve().then(() => notifyTelegramMutation(detail)).catch(()=>{});
   };
-  setTimeout(run, 2500);
+  setTimeout(run, 1500);
   automationTimer = setInterval(run, 60 * 1000);
   const onOnline = () => setTimeout(run, 300);
-  const onVisible = () => { if (document.visibilityState === 'visible') setTimeout(run, 300); };
   window.addEventListener('online', onOnline);
   window.addEventListener('oscar:db-mutation', onMutation);
-  document.addEventListener('visibilitychange', onVisible);
   return () => {
     if (automationTimer) clearInterval(automationTimer);
     automationTimer = null;
     automationStarted = false;
     window.removeEventListener('online', onOnline);
     window.removeEventListener('oscar:db-mutation', onMutation);
-    document.removeEventListener('visibilitychange', onVisible);
   };
 }

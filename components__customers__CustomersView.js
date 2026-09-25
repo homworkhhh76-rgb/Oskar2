@@ -1,13 +1,13 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.38-data-visible-reports-ledger';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.38-data-visible-reports-ledger';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.38-data-visible-reports-ledger';
-import { exportToCSV, printReceiptElement } from './utils__export.js?v=7.9.4.38-data-visible-reports-ledger';
-import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.38-data-visible-reports-ledger';
-import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.38-data-visible-reports-ledger';
-import { downloadProfessionalCustomerStatementPDF, downloadProfessionalCustomerStatementImage, downloadProfessionalCustomerStatementExcel, downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.38-data-visible-reports-ledger';
-import { createQrSvgDataUrl } from './utils__qrcode.js?v=7.9.4.38-data-visible-reports-ledger';
+import { useApp } from './context__AppContext.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { exportToCSV, printReceiptElement } from './utils__export.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { downloadProfessionalCustomerStatementPDF, downloadProfessionalCustomerStatementImage, downloadProfessionalCustomerStatementExcel, downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { createQrSvgDataUrl } from './utils__qrcode.js?v=7.9.4.45-auto-backup-24h-report-fix';
 import { Plus, Search, FileText, DollarSign, Download, Printer, Trash2, X, Edit, Image as ImageIcon, FileSpreadsheet, Link2, QrCode, Copy, } from 'lucide-react';
 const normalizeOpeningBalanceInput = (value) => {
     let raw = String(value ?? '')

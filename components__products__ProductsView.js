@@ -1,14 +1,14 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.38-data-visible-reports-ledger';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.38-data-visible-reports-ledger';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.38-data-visible-reports-ledger';
-import { BarcodeCameraModal } from './components__pos__CameraScannerModal.js?v=7.9.4.38-data-visible-reports-ledger';
-import { calculateUnitConversions, formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.38-data-visible-reports-ledger';
-import { exportToCSV } from './utils__export.js?v=7.9.4.38-data-visible-reports-ledger';
-import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.38-data-visible-reports-ledger';
-import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.38-data-visible-reports-ledger';
-import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.38-data-visible-reports-ledger';
+import { useApp } from './context__AppContext.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { BarcodeCameraModal } from './components__pos__CameraScannerModal.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { calculateUnitConversions, formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { exportToCSV } from './utils__export.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.45-auto-backup-24h-report-fix';
 import { Plus, Search, Trash2, Edit, Layers, FolderTree, X, Download, Image as ImageIcon, FileSpreadsheet, Camera, } from 'lucide-react';
 const h = React.createElement;
 const normalizeArabicDigits = (value) => String(value ?? '')
@@ -77,7 +77,7 @@ export const ProductsView = () => {
                     childUnitId: null,
                     multiplier: 1,
                     conversionToBase: 1,
-                    barcodes: [Date.now().toString().slice(-8)],
+                    barcodes: [],
                     salePrice: '',
                     openingQuantity: '',
                     wholesalePrice: '',
@@ -174,7 +174,7 @@ export const ProductsView = () => {
             childUnitId: topUnit.id,
             multiplier: 12,
             conversionToBase: (topUnit.conversionToBase || 1) * 12,
-            barcodes: [Date.now().toString().slice(-8)],
+            barcodes: [],
             salePrice: (topUnit.salePrice || 0) * 11, // discount for bulk
             openingQuantity: '',
             wholesalePrice: '',
@@ -211,8 +211,7 @@ export const ProductsView = () => {
                 ? ({ ...u, barcodes: [clean, ...(u.barcodes || []).filter((x) => x !== clean)] })
                 : u),
         }) : prev);
-        showToast(`تم التقاط الباركود: ${clean}`, 'success');
-        setBarcodeScanUnitId(null);
+        showToast(`تم التقاط الباركود: ${clean} — يمكنك مسح باركود آخر أو إغلاق الكاميرا`, 'success');
     };
     const updateUnitField = (unitId, field, value, recalculate = false) => {
         setEditingProduct((prev) => {

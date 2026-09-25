@@ -1,4 +1,4 @@
-import { renderElementTableCanvas, resolveExportElement } from './utils__canvasRenderer.js?v=7.9.4.38-data-visible-reports-ledger';
+import { renderElementTableCanvas, resolveExportElement } from './utils__canvasRenderer.js?v=7.9.4.45-auto-backup-24h-report-fix';
 
 const safe=v=>String(v||'export').replace(/[\\/:*?"<>|]+/g,'-').trim()||'export';
 const withExt=(name,ext)=>safe(name).toLowerCase().endsWith(ext)?safe(name):safe(name)+ext;
@@ -17,8 +17,9 @@ function canvasBlob(canvas,type='image/png',quality=.95){
     try{canvas.toBlob(b=>b&&b.size?resolve(b):fallback(),type,quality);}catch(_){fallback();}
   });
 }
+export async function canvasToImageBlob(canvas,options={}){const type=options.type||'image/png';return await canvasBlob(canvas,type,options.quality??.95);}
 export async function downloadCanvasAsImage(canvas,filename,options={}){
-  try{const type=options.type||'image/png',blob=await canvasBlob(canvas,type,options.quality??.95);return saveBlob(withExt(filename,type==='image/jpeg'?'.jpg':'.png'),blob);}catch(err){console.error('PNG export failed',err);return false;}
+  try{const type=options.type||'image/png',blob=await canvasToImageBlob(canvas,options);return saveBlob(withExt(filename,type==='image/jpeg'?'.jpg':'.png'),blob);}catch(err){console.error('PNG export failed',err);return false;}
 }
 export async function downloadElementAsImage(target,filename,options={}){
   try{const el=resolveExportElement(target);if(!el)return false;const canvas=await renderElementTableCanvas(el,options);if(!canvas)return false;return downloadCanvasAsImage(canvas,filename,options);}catch(err){console.error('Fast image export failed',err);return false;}

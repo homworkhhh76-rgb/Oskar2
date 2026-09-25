@@ -1,21 +1,44 @@
-import React, { useRef, useState, useMemo } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.38-data-visible-reports-ledger';
-import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.38-data-visible-reports-ledger';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.38-data-visible-reports-ledger';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { useApp } from './context__AppContext.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.45-auto-backup-24h-report-fix';
 import { Wifi, WifiOff, RefreshCw, Maximize2, Minimize2, Clock, Store, Camera, Menu, LogOut, Building2, Bell } from 'lucide-react';
-import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.38-data-visible-reports-ledger';
-import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.38-data-visible-reports-ledger';
+import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { saveTelegramConfig, uploadTelegramSnapshot } from './services__telegramReports.js?v=7.9.4.45-auto-backup-24h-report-fix';
 
 const h = React.createElement;
 
 export const Header = () => {
+  const app = useApp();
   const {
     settings, saveSettings, isOnline, isSyncing, syncQueue, setShowSyncModal,
     activeShift, setActiveTab, mobileSidebarOpen, setMobileSidebarOpen, showToast,
-    customers, suppliers, products, invoices, stock, getProductStock, currentUser, activeEmployee,
-  } = useApp();
+    customers, suppliers, products, categories, invoices, purchases, expenses, auditLogs, stock, stockMovements, warehouses, accounts, transfers, vouchers, shifts, employees, heldInvoices, getProductStock, currentUser, activeEmployee,
+  } = app;
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const telegramRevision = useMemo(() => {
+    const stockSig=(stock||[]).reduce((s,x)=>s+Number(x?.baseQuantity ?? x?.quantity ?? 0),0).toFixed(4);
+    const customerSig=(customers||[]).reduce((s,x)=>s+Number(x?.balance||0),0).toFixed(2);
+    const supplierSig=(suppliers||[]).reduce((s,x)=>s+Number(x?.balance||0),0).toFixed(2);
+    const accountSig=(accounts||[]).reduce((s,x)=>s+Number(x?.balance||0),0).toFixed(2);
+    return [
+      invoices?.length||0,purchases?.length||0,expenses?.length||0,vouchers?.length||0,transfers?.length||0,
+      auditLogs?.length||0,stockMovements?.length||0,products?.length||0,categories?.length||0,warehouses?.length||0,
+      employees?.length||0,heldInvoices?.length||0,shifts?.length||0,stockSig,customerSig,supplierSig,accountSig,
+      settings.storeName||'',settings.logoUrl||'',settings.currencySymbol||''
+    ].join('|');
+  }, [invoices,purchases,expenses,vouchers,transfers,auditLogs,stockMovements,products,categories,warehouses,employees,heldInvoices,shifts,stock,customers,suppliers,accounts,settings.storeName,settings.logoUrl,settings.currencySymbol]);
+  useEffect(() => {
+    if (!(settings.telegramAutoReportEnabled !== false || settings.telegramDailyReportEnabled || settings.telegramDailyBackupEnabled)) return;
+    let cancelled=false;
+    const timer=window.setTimeout(async()=>{
+      if(cancelled)return;
+      try{await saveTelegramConfig(settings);await uploadTelegramSnapshot(app,{includeBackup:!!settings.telegramDailyBackupEnabled});}catch(_){/* سيعاد رفع اللقطة عند التغيير التالي أو فتح الإشعارات */}
+    },12000);
+    return()=>{cancelled=true;window.clearTimeout(timer);};
+  }, [telegramRevision, settings.telegramAutoReportEnabled, settings.telegramDailyReportEnabled, settings.telegramDailyBackupEnabled, settings.telegramRecipients]);
   const notificationCount = useMemo(() => buildSystemNotifications({ customers, suppliers, products, invoices, stock, settings, getProductStock }).length, [customers, suppliers, products, invoices, stock, settings.activeWarehouseId, settings.currencySymbol]);
   const runtime = window.OscarActivation?.readRuntime?.();
   const accessArgs = { runtime, currentUser, activeEmployee, restaurantEnabled: !!settings.isRestaurantModeEnabled };

@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.38-data-visible-reports-ledger';
-import { exportToCSV } from './utils__export.js?v=7.9.4.38-data-visible-reports-ledger';
-import { Download, ReceiptText, Package, Users, Truck, WalletCards, CalendarDays, CircleDollarSign } from 'lucide-react';
+import { useApp } from './context__AppContext.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { exportToCSV, downloadBlob } from './utils__export.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { generateAllReportsArtifacts } from './services__telegramReports.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { Download, ReceiptText, Package, Users, Truck, WalletCards, CalendarDays, CircleDollarSign, FileText, Image as ImageIcon } from 'lucide-react';
 
 const h = React.createElement;
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
@@ -154,6 +155,14 @@ export const ReportsView = () => {
   const periodButtons = [
     ['today','اليوم'], ['week','أسبوع'], ['month','شهر'], ['all','الكل']
   ];
+  const exportProfessionalPdf = async () => {
+    try { const a=await generateAllReportsArtifacts(app); downloadBlob(a.pdf,a.pdfName); app.showToast?.('تم تجهيز PDF احترافي بالترويسة والشعار','success'); }
+    catch(e){ app.showToast?.(e?.message||'تعذر إنشاء PDF','error'); }
+  };
+  const exportProfessionalImage = async () => {
+    try { const a=await generateAllReportsArtifacts(app); downloadBlob(a.image,a.imageName); app.showToast?.('تم تجهيز صورة التقرير الاحترافية','success'); }
+    catch(e){ app.showToast?.(e?.message||'تعذر إنشاء صورة التقرير','error'); }
+  };
 
   return h('div', { id:'reports-screen', className:'p-3 sm:p-6 space-y-5 max-w-7xl mx-auto text-right select-none' },
     h('div', { className:'flex flex-col xl:flex-row xl:items-end justify-between gap-4' },
@@ -167,7 +176,9 @@ export const ReportsView = () => {
         }, label))),
         h('label', { className:'text-[10px] font-bold text-slate-500' }, 'من تاريخ', h('input', { type:'date', value:fromDate, onChange:(e)=>{setFromDate(e.target.value);setPeriod('custom');}, className:'block mt-1 px-2 py-1.5 rounded-lg border bg-white dark:bg-slate-900 dark:border-slate-700 text-xs' })),
         h('label', { className:'text-[10px] font-bold text-slate-500' }, 'إلى تاريخ', h('input', { type:'date', value:toDate, onChange:(e)=>{setToDate(e.target.value);setPeriod('custom');}, className:'block mt-1 px-2 py-1.5 rounded-lg border bg-white dark:bg-slate-900 dark:border-slate-700 text-xs' })),
-        h('button', { type:'button', onClick:exportSummary, className:'inline-flex items-center gap-2 px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 dark:border-slate-700 text-xs font-bold' }, h(Download,{className:'w-4 h-4 text-emerald-600'}),'تصدير ملخص')
+        h('button', { type:'button', onClick:exportSummary, className:'inline-flex items-center gap-2 px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 dark:border-slate-700 text-xs font-bold' }, h(Download,{className:'w-4 h-4 text-emerald-600'}),'Excel'),
+        h('button', { type:'button', onClick:exportProfessionalPdf, className:'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-black shadow-sm' }, h(FileText,{className:'w-4 h-4'}),'PDF احترافي'),
+        h('button', { type:'button', onClick:exportProfessionalImage, className:'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-600 text-white text-xs font-black shadow-sm' }, h(ImageIcon,{className:'w-4 h-4'}),'صورة التقرير')
       )
     ),
 

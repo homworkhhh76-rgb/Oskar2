@@ -8,12 +8,182 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const PORT = Number(process.env.PORT || 8787);
 const ROOT = __dirname;
 const OPENROUTER_API_KEY = String(process.env.OPENROUTER_API_KEY || '').trim();
 const OPENROUTER_MODEL = String(process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash:free').trim();
 const ALLOWED_ORIGIN = String(process.env.OSCAR_ALLOWED_ORIGIN || '').trim();
+
+const TELEGRAM_BOT_TOKEN = String(process.env.TELEGRAM_BOT_TOKEN || '8893463288:AAHn77qegDsR3Yu1LYGicM0Dfh1Fznw4agg').trim();
+const TELEGRAM_CHAT_IDS = String(process.env.TELEGRAM_CHAT_IDS || process.env.TELEGRAM_CHAT_ID || '').trim();
+const TELEGRAM_DATA_DIR = String(process.env.OSCAR_DATA_DIR || path.join(os.homedir(), '.oscar-accounting')).trim();
+try { fs.mkdirSync(TELEGRAM_DATA_DIR, { recursive:true }); } catch(_) {}
+const TELEGRAM_STATE_FILE = path.join(TELEGRAM_DATA_DIR, 'telegram-state.json');
+const TELEGRAM_USERS_FILE = path.join(TELEGRAM_DATA_DIR, 'telegram-users.json');
+let telegramUsersSyncBusy = false;
+let telegramState = { config:{ token:'', chatIds:'', dailyReportEnabled:false, dailyBackupEnabled:true }, snapshot:{}, lastDailyReportSentAt:0, lastDailyBackupSentAt:0 };
+try { const saved=JSON.parse(fs.readFileSync(TELEGRAM_STATE_FILE,'utf8')); if(saved&&typeof saved==='object') telegramState={...telegramState,...saved,config:{...telegramState.config,...(saved.config||{})},snapshot:{...(saved.snapshot||{})}}; } catch(_) {}
+const persistTelegramState=()=>{ try{fs.writeFileSync(TELEGRAM_STATE_FILE,JSON.stringify(telegramState));}catch(err){console.warn('Telegram state persistence unavailable:',err?.message||err);} };
+const parseChatIds=v=>String(v||'').split(/[\s,;]+/).map(x=>x.trim()).filter(Boolean);
+const telegramConfig=()=>({ token:String(TELEGRAM_BOT_TOKEN||'').trim(), chatIds:parseChatIds(telegramState.config?.chatIds||'') });
+const telegramReady=()=>{const c=telegramConfig();return !!(c.token&&c.chatIds.length);};
+
+
+const normalizeTelegramUsername = (value) => String(value || '').trim().replace(/^@+/, '').toLowerCase();
+const readTelegramUsersState = () => {
+  try { const parsed=JSON.parse(fs.readFileSync(TELEGRAM_USERS_FILE,'utf8')); return parsed&&typeof parsed==='object'?parsed:{offset:0,users:{}}; }
+  catch { return {offset:0,users:{}}; }
+};
+const writeTelegramUsersState = (state) => { try { fs.writeFileSync(TELEGRAM_USERS_FILE,JSON.stringify(state,null,2),'utf8'); return true; } catch(e){ console.error('Telegram users state write error:',e); return false; } };
+async function telegramRawCall(method,payload={}){
+  const token=telegramConfig().token; if(!token) throw new Error('Telegram Bot Token غير مضبوط');
+  const response=await fetch(`https://api.telegram.org/bot${token}/${method}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload||{})});
+  const data=await response.json().catch(()=>({})); if(!response.ok||data?.ok===false) throw new Error(data?.description||`Telegram HTTP ${response.status}`); return data;
+}
+function rememberTelegramUser(state,update){
+  const msg=update?.message||update?.edited_message||update?.callback_query?.message;
+  const chat=msg?.chat||{}, from=update?.callback_query?.from||msg?.from||{};
+  const username=String(chat?.username||from?.username||'').trim(), key=normalizeTelegramUsername(username);
+  const chatId=chat?.id||(chat?.type==='private'?from?.id:null); if(!key||!chatId) return false;
+  const previous=state.users?.[key]||{}; state.users=state.users||{};
+  state.users[key]={...previous,chatId:String(chatId),username:`@${username}`,firstName:String(chat?.first_name||from?.first_name||previous.firstName||'').trim(),lastName:String(chat?.last_name||from?.last_name||previous.lastName||'').trim(),type:String(chat?.type||previous.type||'private'),lastSeenAt:new Date().toISOString()};
+  return true;
+}
+async function refreshTelegramUsers({maxBatches=5}={}){
+  if(telegramUsersSyncBusy||!telegramConfig().token) return readTelegramUsersState(); telegramUsersSyncBusy=true;
+  try{
+    const state=readTelegramUsersState(); state.users=state.users||{}; let offset=Number(state.offset||0),changed=false;
+    for(let batch=0;batch<Math.max(1,maxBatches);batch++){
+      const data=await telegramRawCall('getUpdates',{offset,limit:100,timeout:0,allowed_updates:['message','edited_message','callback_query']});
+      const updates=Array.isArray(data?.result)?data.result:[]; if(!updates.length) break;
+      for(const update of updates){if(rememberTelegramUser(state,update)) changed=true; const id=Number(update?.update_id); if(Number.isFinite(id)) offset=Math.max(offset,id+1);}
+      if(updates.length<100) break;
+    }
+    if(offset!==Number(state.offset||0)){state.offset=offset;changed=true;} state.updatedAt=new Date().toISOString();
+    if(changed||!fs.existsSync(TELEGRAM_USERS_FILE)) writeTelegramUsersState(state); return state;
+  }finally{telegramUsersSyncBusy=false;}
+}
+async function handleTelegramResolve(req,res,origin){
+  let body; try{body=await readBody(req,256*1024);}catch(e){return sendJson(res,400,{ok:false,error:e.message},origin);}
+  const key=normalizeTelegramUsername(body?.username); if(!/^[a-z0-9_]{5,32}$/i.test(key)) return sendJson(res,400,{ok:false,error:'اكتب يوزر Telegram صحيح مثل @username'},origin);
+  try{await refreshTelegramUsers({maxBatches:5});}catch(e){console.error('Telegram user sync error:',e?.message||e);}
+  const row=readTelegramUsersState().users?.[key];
+  if(!row?.chatId) return sendJson(res,404,{ok:false,error:`لم يتم العثور على @${key}. يجب أن يكون المستخدم قد فتح البوت وضغط Start مرة واحدة على الأقل.`},origin);
+  return sendJson(res,200,{ok:true,result:{chatId:row.chatId,username:row.username||`@${key}`,name:[row.firstName,row.lastName].filter(Boolean).join(' ').trim()}},origin);
+}
+async function handleTelegramUsers(req,res,origin){
+  try{await refreshTelegramUsers({maxBatches:5});}catch(e){console.error('Telegram users refresh error:',e?.message||e);}
+  const state=readTelegramUsersState();
+  const users=Object.values(state.users||{}).map(row=>({username:row.username||'',name:[row.firstName,row.lastName].filter(Boolean).join(' ').trim(),type:row.type||'private',lastSeenAt:row.lastSeenAt||null})).sort((a,b)=>String(b.lastSeenAt||'').localeCompare(String(a.lastSeenAt||'')));
+  return sendJson(res,200,{ok:true,users,updatedAt:state.updatedAt||null},origin);
+}
+async function handleTelegramProxy(req,res,origin){
+  let body; try{body=await readBody(req,8*1024*1024);}catch(e){return sendJson(res,400,{ok:false,error:e.message},origin);}
+  const method=String(body?.method||'').trim(), allowed=new Set(['sendMessage','sendPhoto','sendDocument','getMe']);
+  if(!allowed.has(method)) return sendJson(res,400,{ok:false,error:'Telegram method is not allowed'},origin);
+  try{
+    const payload=body?.payload||{};
+    if(method==='sendPhoto' || method==='sendDocument'){
+      const isPhoto=method==='sendPhoto';
+      const raw=String(isPhoto?payload.photoDataUrl:payload.fileDataUrl||''), match=raw.match(/^data:([^;,]+)?(;base64)?,(.*)$/s); if(!match) return sendJson(res,400,{ok:false,error:isPhoto?'صورة Telegram غير صالحة':'ملف Telegram غير صالح'},origin);
+      const mime=match[1]||(isPhoto?'image/png':'application/octet-stream'), bodyData=match[3]||'', buffer=match[2]?Buffer.from(bodyData,'base64'):Buffer.from(decodeURIComponent(bodyData),'utf8');
+      const form=new FormData(); form.append('chat_id',String(payload.chat_id||'')); if(payload.caption)form.append('caption',String(payload.caption).slice(0,1024)); if(payload.disable_notification)form.append('disable_notification','true');
+      const field=isPhoto?'photo':'document'; form.append(field,new Blob([buffer],{type:mime}),String(payload.filename||(isPhoto?'oscar.png':'oscar-file.bin')));
+      const token=telegramConfig().token; const response=await fetch(`https://api.telegram.org/bot${token}/${method}`,{method:'POST',body:form}); const data=await response.json().catch(()=>({})); if(!response.ok||data?.ok===false) throw new Error(data?.description||`Telegram HTTP ${response.status}`); return sendJson(res,200,data,origin);
+    }
+    const data=await telegramRawCall(method,payload); return sendJson(res,200,data,origin);
+  }catch(e){return sendJson(res,502,{ok:false,error:String(e?.message||e)},origin);}
+}
+
+async function telegramApi(method,{chatId,text,base64,filename,mime='application/octet-stream',caption=''}={}){
+  const cfg=telegramConfig(); if(!cfg.token) throw new Error('Telegram Bot Token غير مضبوط');
+  const url=`https://api.telegram.org/bot${cfg.token}/${method}`;
+  let response;
+  if(method==='sendMessage'){
+    response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:chatId,text:String(text||'').slice(0,4000)})});
+  } else {
+    const field=method==='sendPhoto'?'photo':'document'; const form=new FormData(); form.append('chat_id',chatId); if(caption) form.append('caption',String(caption).slice(0,900));
+    const bytes=Buffer.from(String(base64||''),'base64'); if(!bytes.length) throw new Error(`ملف ${filename||field} فارغ`);
+    form.append(field,new Blob([bytes],{type:mime}),filename||`oscar.${method==='sendPhoto'?'jpg':'bin'}`);
+    response=await fetch(url,{method:'POST',body:form});
+  }
+  const data=await response.json().catch(()=>({})); if(!response.ok||data?.ok===false) throw new Error(data?.description||`Telegram HTTP ${response.status}`); return data;
+}
+function splitTelegramServerText(text,max=3900){
+  const lines=String(text||'').split('\n'), parts=[]; let current='';
+  for(const rawLine of lines){
+    const line=String(rawLine||'');
+    if(line.length>max){
+      if(current){parts.push(current);current='';}
+      for(let i=0;i<line.length;i+=max) parts.push(line.slice(i,i+max));
+      continue;
+    }
+    const next=current?`${current}\n${line}`:line;
+    if(next.length>max){if(current)parts.push(current);current=line;}else current=next;
+  }
+  if(current)parts.push(current); return parts.filter(Boolean);
+}
+async function telegramBroadcast(kind,payload={}){
+  const cfg=telegramConfig(); if(!cfg.chatIds.length) throw new Error('لم يتم تحديد Chat ID للمستلمين');
+  const out=[];
+  for(const chatId of cfg.chatIds){
+    if(kind==='sendMessage'){
+      for(const part of splitTelegramServerText(payload.text)) out.push(await telegramApi(kind,{...payload,text:part,chatId}));
+    } else out.push(await telegramApi(kind,{...payload,chatId}));
+  }
+  return out;
+}
+async function sendStoredDailyReport(){
+  const snap=telegramState.snapshot||{}; if(!telegramReady()) throw new Error('إعدادات Telegram غير مكتملة'); if(!snap.reportText&&!snap.dailyPdfBase64) throw new Error('لا توجد نسخة حديثة من التقرير اليومي');
+  if(snap.reportText) await telegramBroadcast('sendMessage',{text:snap.reportText});
+  if(snap.dailyImageBase64) await telegramBroadcast('sendPhoto',{base64:snap.dailyImageBase64,filename:snap.dailyImageName||'daily-report.jpg',mime:'image/jpeg',caption:`صورة التقرير — ${snap.storeName||'أوسكار المحاسبي'}`});
+  if(snap.dailyPdfBase64) await telegramBroadcast('sendDocument',{base64:snap.dailyPdfBase64,filename:snap.dailyPdfName||'daily-report.pdf',mime:'application/pdf',caption:`PDF التقرير اليومي — ${snap.storeName||'أوسكار المحاسبي'}`});
+}
+async function sendStoredCustomerReport(){
+  const snap=telegramState.snapshot||{}; if(!telegramReady()) throw new Error('إعدادات Telegram غير مكتملة'); if(!snap.customerPdfBase64) throw new Error('لا يوجد تقرير عملاء مرفوع بعد');
+  await telegramBroadcast('sendDocument',{base64:snap.customerPdfBase64,filename:snap.customerPdfName||'customers-debts.pdf',mime:'application/pdf',caption:`تقرير العملاء والديون — ${snap.storeName||'أوسكار المحاسبي'}`});
+}
+async function sendStoredAllReports(){
+  const snap=telegramState.snapshot||{}; if(!telegramReady()) throw new Error('إعدادات Telegram غير مكتملة'); if(snap.allReportsText||snap.reportText) await telegramBroadcast('sendMessage',{text:snap.allReportsText||snap.reportText});
+  if(snap.allReportsImageBase64) await telegramBroadcast('sendPhoto',{base64:snap.allReportsImageBase64,filename:snap.allReportsImageName||'reports-summary.jpg',mime:'image/jpeg',caption:`ملخص التقارير — ${snap.storeName||'أوسكار المحاسبي'}`});
+  if(snap.allReportsPdfBase64) await telegramBroadcast('sendDocument',{base64:snap.allReportsPdfBase64,filename:snap.allReportsPdfName||'all-reports.pdf',mime:'application/pdf',caption:`جميع التقارير — ${snap.storeName||'أوسكار المحاسبي'}`});
+  else if(snap.dailyPdfBase64) await telegramBroadcast('sendDocument',{base64:snap.dailyPdfBase64,filename:snap.dailyPdfName||'daily-report.pdf',mime:'application/pdf',caption:'التقرير اليومي'});
+  if(snap.customerPdfBase64) await telegramBroadcast('sendDocument',{base64:snap.customerPdfBase64,filename:snap.customerPdfName||'customers-debts.pdf',mime:'application/pdf',caption:'تقرير العملاء والديون'});
+}
+async function sendStoredBackup(){
+  const snap=telegramState.snapshot||{}; if(!telegramReady()) throw new Error('إعدادات Telegram غير مكتملة'); if(!snap.backupBase64) throw new Error('لا توجد نسخة احتياطية مرفوعة');
+  await telegramBroadcast('sendDocument',{base64:snap.backupBase64,filename:snap.backupName||'Oscar_Backup.json',mime:'application/json',caption:`نسخة احتياطية — ${snap.storeName||'أوسكار المحاسبي'}`});
+}
+async function handleTelegram(req,res,origin){
+  let body; try{body=await readBody(req,90*1024*1024);}catch(e){return sendJson(res,400,{ok:false,error:e.message},origin);}
+  try{
+    const action=String(body.action||'');
+    if(action==='status') return sendJson(res,200,{ok:true,configured:telegramReady(),dailyReportEnabled:!!telegramState.config.dailyReportEnabled,dailyBackupEnabled:!!telegramState.config.dailyBackupEnabled,lastDailyReportSentAt:telegramState.lastDailyReportSentAt||0,lastDailyBackupSentAt:telegramState.lastDailyBackupSentAt||0,hasSnapshot:!!telegramState.snapshot?.dailyPdfBase64},origin);
+    if(action==='save_config'){
+      const c=body.config||{}, prevR=!!telegramState.config.dailyReportEnabled, prevB=!!telegramState.config.dailyBackupEnabled;
+      telegramState.config={...telegramState.config,token:String(TELEGRAM_BOT_TOKEN||'').trim(),chatIds:String(c.chatIds ?? '').trim(),dailyReportEnabled:!!c.dailyReportEnabled,dailyBackupEnabled:!!c.dailyBackupEnabled};
+      const now=Date.now(); if(!prevR&&telegramState.config.dailyReportEnabled) telegramState.lastDailyReportSentAt=now; if(!prevB&&telegramState.config.dailyBackupEnabled) telegramState.lastDailyBackupSentAt=now;
+      persistTelegramState(); return sendJson(res,200,{ok:true,configured:telegramReady()},origin);
+    }
+    if(action==='snapshot'){telegramState.snapshot={...telegramState.snapshot,...(body.snapshot||{}),updatedAt:Date.now()};persistTelegramState();return sendJson(res,200,{ok:true},origin);}
+    if(action==='upload_customer_report'){telegramState.snapshot={...telegramState.snapshot,customerPdfBase64:String(body.pdfBase64||''),customerPdfName:String(body.pdfName||'customers-debts.pdf'),updatedAt:Date.now()};persistTelegramState();return sendJson(res,200,{ok:true},origin);}
+    if(action==='upload_all_reports'){telegramState.snapshot={...telegramState.snapshot,allReportsPdfBase64:String(body.pdfBase64||''),allReportsPdfName:String(body.pdfName||'all-reports.pdf'),allReportsImageBase64:String(body.imageBase64||''),allReportsImageName:String(body.imageName||'reports-summary.jpg'),allReportsText:String(body.text||''),updatedAt:Date.now()};persistTelegramState();return sendJson(res,200,{ok:true},origin);}
+    if(action==='upload_backup'){telegramState.snapshot={...telegramState.snapshot,backupBase64:String(body.backupBase64||''),backupName:String(body.backupName||'Oscar_Backup.json'),updatedAt:Date.now()};persistTelegramState();return sendJson(res,200,{ok:true},origin);}
+    if(action==='send_daily_now'){await sendStoredDailyReport();telegramState.lastDailyReportSentAt=Date.now();persistTelegramState();return sendJson(res,200,{ok:true},origin);}
+    if(action==='send_customer_report'){await sendStoredCustomerReport();return sendJson(res,200,{ok:true},origin);}
+    if(action==='send_all_reports'){await sendStoredAllReports();return sendJson(res,200,{ok:true},origin);}
+    if(action==='send_backup'){await sendStoredBackup();telegramState.lastDailyBackupSentAt=Date.now();persistTelegramState();return sendJson(res,200,{ok:true},origin);}
+    return sendJson(res,400,{ok:false,error:'أمر Telegram غير معروف'},origin);
+  }catch(e){console.error('Telegram error:',e);return sendJson(res,502,{ok:false,error:String(e?.message||e)},origin);}
+}
+async function checkTelegramSchedules(){
+  if(!telegramReady()) return; const now=Date.now(), day=24*60*60*1000;
+  try{if(telegramState.config.dailyReportEnabled&&telegramState.snapshot?.dailyPdfBase64&&now-numSafe(telegramState.lastDailyReportSentAt)>=day){await sendStoredDailyReport();telegramState.lastDailyReportSentAt=now;persistTelegramState();}}catch(e){console.error('Scheduled daily report failed:',e?.message||e);}
+  try{if(telegramState.config.dailyBackupEnabled&&telegramState.snapshot?.backupBase64&&now-numSafe(telegramState.lastDailyBackupSentAt)>=day){await sendStoredBackup();telegramState.lastDailyBackupSentAt=now;persistTelegramState();}}catch(e){console.error('Scheduled backup failed:',e?.message||e);}
+}
+function numSafe(v){const n=Number(v);return Number.isFinite(n)?n:0;}
 
 const MIME = {
   '.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8',
@@ -133,7 +303,7 @@ async function handleAI(req,res,origin){
 
 const server=http.createServer(async(req,res)=>{
   const origin=String(req.headers.origin||'');
-  if(req.method==='OPTIONS' && req.url.startsWith('/api/oscar-ai')){
+  if(req.method==='OPTIONS' && (req.url.startsWith('/api/oscar-ai') || req.url.startsWith('/api/oscar-telegram') || req.url.startsWith('/api/telegram'))){
     const headers={'Access-Control-Allow-Methods':'POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type','Access-Control-Max-Age':'86400'};
     if(ALLOWED_ORIGIN && origin===ALLOWED_ORIGIN) headers['Access-Control-Allow-Origin']=origin;
     res.writeHead(204,headers); return res.end();
@@ -142,12 +312,28 @@ const server=http.createServer(async(req,res)=>{
     if(req.method!=='POST') return sendJson(res,405,{error:'POST فقط'},origin);
     return handleAI(req,res,origin);
   }
+  if(req.url.startsWith('/api/oscar-telegram')){
+    if(req.method!=='POST') return sendJson(res,405,{ok:false,error:'POST فقط'},origin);
+    return handleTelegram(req,res,origin);
+  }
+  if(req.url.startsWith('/api/telegram/resolve')){
+    if(req.method!=='POST') return sendJson(res,405,{ok:false,error:'POST فقط'},origin);
+    return handleTelegramResolve(req,res,origin);
+  }
+  if(req.url.startsWith('/api/telegram/users')){
+    if(req.method!=='POST') return sendJson(res,405,{ok:false,error:'POST فقط'},origin);
+    return handleTelegramUsers(req,res,origin);
+  }
+  if(req.url.startsWith('/api/telegram')){
+    if(req.method!=='POST') return sendJson(res,405,{ok:false,error:'POST فقط'},origin);
+    return handleTelegramProxy(req,res,origin);
+  }
   if(req.method!=='GET' && req.method!=='HEAD'){res.writeHead(405);return res.end('Method Not Allowed');}
   let pathname;
   try { pathname=decodeURIComponent(new URL(req.url,'http://localhost').pathname); } catch { pathname='/'; }
   if(pathname==='/') pathname='/index.html';
   const filePath=path.resolve(ROOT,'.'+pathname);
-  if(!filePath.startsWith(ROOT)){res.writeHead(403);return res.end('Forbidden');}
+  if(!filePath.startsWith(ROOT) || path.basename(filePath).startsWith('.')){res.writeHead(403);return res.end('Forbidden');}
   fs.stat(filePath,(err,stat)=>{
     if(err||!stat.isFile()){res.writeHead(404,{'Content-Type':'text/plain; charset=utf-8'});return res.end('Not found');}
     const ext=path.extname(filePath).toLowerCase();
@@ -156,4 +342,4 @@ const server=http.createServer(async(req,res)=>{
     fs.createReadStream(filePath).pipe(res);
   });
 });
-server.listen(PORT,()=>console.log(`Oscar Accounting + AI: http://localhost:${PORT}`));
+server.listen(PORT,()=>{console.log(`Oscar Accounting + AI + Telegram: http://localhost:${PORT}`);setTimeout(()=>checkTelegramSchedules().catch(()=>{}),5000);setTimeout(()=>refreshTelegramUsers({maxBatches:5}).catch(()=>{}),1500);const timer=setInterval(()=>checkTelegramSchedules().catch(()=>{}),60000);timer.unref?.();const usersTimer=setInterval(()=>refreshTelegramUsers({maxBatches:3}).catch(()=>{}),15000);usersTimer.unref?.();});

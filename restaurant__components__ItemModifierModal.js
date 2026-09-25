@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState } from 'react';
-import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.38-data-visible-reports-ledger';
+import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.45-auto-backup-24h-report-fix';
 import { Plus, Minus, X, Check, UtensilsCrossed } from 'lucide-react';
 // Preset common modifiers for restaurants & cafés
 const SIZES = [

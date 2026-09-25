@@ -1,8 +1,8 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useEffect } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.38-data-visible-reports-ledger';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.38-data-visible-reports-ledger';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.38-data-visible-reports-ledger';
+import { useApp } from './context__AppContext.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.45-auto-backup-24h-report-fix';
 import { Banknote, Clock, Split, CheckCircle2, X, AlertCircle, Coins, } from 'lucide-react';
 export const PaymentModal = ({ isOpen, onClose, onSuccess }) => {
     const { cart, customers, invoices, selectedCustomer, setSelectedCustomer, accounts, settings, createSaleInvoice, updateSaleInvoice, editingSaleInvoiceId, setShowThermalModal, saveCustomer, showToast, invoiceDiscountType, setInvoiceDiscountType, invoiceDiscountValue, setInvoiceDiscountValue, } = useApp();

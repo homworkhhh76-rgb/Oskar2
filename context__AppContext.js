@@ -1,9 +1,10 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.38-data-visible-reports-ledger';
-import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.38-data-visible-reports-ledger';
-import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.38-data-visible-reports-ledger';
-import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.38-data-visible-reports-ledger';
+import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { notifyTelegramInvoice } from './services__telegram.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.45-auto-backup-24h-report-fix';
 const AppContext = createContext(null);
 const recordTime = (item = {}) => {
     const fields = ['createdAt', 'date', 'timestamp', 'startTime', 'updatedAt'];
@@ -274,6 +275,12 @@ export const AppProvider = ({ children }) => {
                     normalizedSettings = { ...normalizedSettings, isRestaurantModeEnabled: true, restaurantModeDefaultInitialized: true };
                     settingsChanged = true;
                 }
+                // v7.9.4.45: enable the 24-hour Telegram backup once for existing companies.
+                // The marker preserves the user's later choice if they turn it off manually.
+                if (normalizedSettings.telegramBackupDefaultV45Initialized !== true) {
+                    normalizedSettings = { ...normalizedSettings, telegramDailyBackupEnabled: true, telegramBackupDefaultV45Initialized: true };
+                    settingsChanged = true;
+                }
                 setSettings(normalizedSettings);
                 if (settingsChanged) {
                     await putInStore('settings', { key: 'store_config', ...normalizedSettings });
@@ -318,9 +325,14 @@ export const AppProvider = ({ children }) => {
         if (wanted.has('employees')) jobs.push(getAllFromStore('employees').then(v => { if(v?.length){ setEmployees(newestFirst(v)); const loginId=window.OscarActivation?.readRuntime?.()?.account?.id; setActiveEmployee(prev => v.find(e=>e.id===loginId)||v.find(e=>e.id===prev?.id)||v[0]); } }));
         if (wanted.has('settings')) jobs.push(Promise.all([getFromStore('settings','store_config'), getAllFromStore('warehouses')]).then(async ([v, whRows]) => {
             if (!v) return;
-            const normalizedSettings = normalizeActiveWarehouseSettings(normalizeCurrencySettings(v), whRows || []);
+            let normalizedSettings = normalizeActiveWarehouseSettings(normalizeCurrencySettings(v), whRows || []);
+            let settingsChanged = normalizedSettings.currency !== v.currency || normalizedSettings.currencySymbol !== v.currencySymbol || normalizedSettings.activeWarehouseId !== v.activeWarehouseId;
+            if (normalizedSettings.telegramBackupDefaultV45Initialized !== true) {
+                normalizedSettings = { ...normalizedSettings, telegramDailyBackupEnabled: true, telegramBackupDefaultV45Initialized: true };
+                settingsChanged = true;
+            }
             setSettings(normalizedSettings);
-            if (normalizedSettings.currency !== v.currency || normalizedSettings.currencySymbol !== v.currencySymbol || normalizedSettings.activeWarehouseId !== v.activeWarehouseId) {
+            if (settingsChanged) {
                 await putInStore('settings', { key: 'store_config', ...normalizedSettings });
             }
         }));
@@ -775,7 +787,7 @@ export const AppProvider = ({ children }) => {
         if(customerStatement)setPartnerStatements(prev => [customerStatement, ...prev]);
         if(updatedShift)setShifts(prev => prev.map(x => x.id===updatedShift.id?updatedShift:x));
         setSyncQueue(window.OscarCloudSync?.pendingItems?.() || []);
-        playSuccessSound(settings.scannerBeepEnabled); if(!isDirectSale) clearCart(); setEditingSaleInvoiceId(null); showToast(payload.isEdit ? `تم تعديل الفاتورة [${invoiceNumber}] مع عكس القيد القديم وإعادة احتساب الجديد` : `تم حفظ الفاتورة بنجاح [${invoiceNumber}]`,'success'); return invoice;
+        playSuccessSound(settings.scannerBeepEnabled); if(!isDirectSale) clearCart(); setEditingSaleInvoiceId(null); notifyTelegramInvoice(invoice,'sale').catch(()=>{}); showToast(payload.isEdit ? `تم تعديل الفاتورة [${invoiceNumber}] مع عكس القيد القديم وإعادة احتساب الجديد` : `تم حفظ الفاتورة بنجاح [${invoiceNumber}]`,'success'); return invoice;
     }, [cart, invoiceDiscountType, invoiceDiscountValue, settings, warehouses, products, customers, selectedCustomer, currentUser, activeShift, stock, accounts, clearCart, showToast]);
     // Transaction reversal helpers: all invoice changes pass through the same accounting/stock logic.
     const addStockDelta = useCallback(async ({ rows, productId, warehouseId, delta, movement }) => {
@@ -1024,6 +1036,7 @@ export const AppProvider = ({ children }) => {
         }
         await putInStore('audit_logs', { id: `audit-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date: now, type: 'sales_return_reverse_entry', referenceId: returnInvoice.id, originalReferenceId: original.id, amount: refundTotal, debtReversed, accountRefunds, userId: currentUser.id, userName: currentUser.name });
         await reloadData();
+        notifyTelegramInvoice(returnInvoice,'return').catch(()=>{});
         showToast(`تم تسجيل المرتجع وعكس المخزون والدين والدفع [${returnNumber}]`, 'success');
         return returnInvoice;
     }, [invoices, products, customers, currentUser, activeShift, accounts, stock, warehouses, reloadData, showToast, addStockDelta, restoreFifoQuantity, appendReversalStatement]);
@@ -1059,7 +1072,7 @@ export const AppProvider = ({ children }) => {
         setProducts(updatedProducts);setStock(updatedStockList);setStockMovements(prev=>[...newMovements,...prev]);setAccounts(updatedAccounts);
         if(updatedSupplier)setSuppliers(prev=>prev.some(x=>x.id===updatedSupplier.id)?prev.map(x=>x.id===updatedSupplier.id?updatedSupplier:x):[updatedSupplier,...prev]);if(supplierStatement)setPartnerStatements(prev=>[supplierStatement,...prev]);
         setSyncQueue(window.OscarCloudSync?.pendingItems?.() || []);
-        playSuccessSound(settings.scannerBeepEnabled);showToast(payload?.isEdit ? `تم تعديل فاتورة الشراء [${invoiceNumber}] مع عكس القيد القديم وإعادة احتساب الجديد` : `تم تسجيل فاتورة الشراء بنجاح [${invoiceNumber}]`,'success');return purchaseInvoice;
+        playSuccessSound(settings.scannerBeepEnabled);notifyTelegramInvoice(purchaseInvoice,'purchase').catch(()=>{});showToast(payload?.isEdit ? `تم تعديل فاتورة الشراء [${invoiceNumber}] مع عكس القيد القديم وإعادة احتساب الجديد` : `تم تسجيل فاتورة الشراء بنجاح [${invoiceNumber}]`,'success');return purchaseInvoice;
     }, [warehouses,products,stock,accounts,suppliers,currentUser,showToast,settings.activeWarehouseId,settings.scannerBeepEnabled]);
 
     // Damaged/expired stock: deduct quantity and exact FIFO cost as a loss expense.

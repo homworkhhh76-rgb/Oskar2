@@ -1,4 +1,4 @@
-import { calculateUnitConversions } from './utils__unitTree.js?v=7.9.4.38-data-visible-reports-ledger';
+import { calculateUnitConversions } from './utils__unitTree.js?v=7.9.4.45-auto-backup-24h-report-fix';
 const DB_BASE_NAME = 'Oscar_Accounting_POS_DB';
 const DB_VERSION = 6;
 export const getTenantId = () => String(window.OscarActivation?.readRuntime?.()?.companyId || 'local').trim() || 'local';
@@ -56,8 +56,6 @@ function openDB() {
     if (cachedDB && cachedTenant !== wantedTenant) { try { cachedDB.close(); } catch {} cachedDB = null; dbOpenPromise = null; }
     if (dbOpenPromise) {
         if (openingTenant === wantedTenant) return dbOpenPromise;
-        // A database for another tenant is still opening. Let it settle, close it,
-        // then open the database that belongs to the currently active company.
         return dbOpenPromise.catch(() => null).then(() => {
             if (cachedDB && cachedTenant !== wantedTenant) { try { cachedDB.close(); } catch {} cachedDB = null; cachedTenant = ''; }
             dbOpenPromise = null;
@@ -68,84 +66,61 @@ function openDB() {
     openingTenant = wantedTenant;
     dbOpenPromise = new Promise((resolve, reject) => {
         try {
-            if (typeof window === 'undefined' || !window.indexedDB) {
-                throw new Error('IndexedDB is not supported');
-            }
-            const request = indexedDB.open(dbNameForTenant(wantedTenant), DB_VERSION);
-            request.onblocked = () => {
-                console.warn('IndexedDB version upgrade blocked by another connection');
-            };
-            request.onerror = () => {
-                dbOpenPromise = null;
-                openingTenant = '';
-                reject(request.error || new Error('Failed to open database'));
-            };
-            request.onsuccess = () => {
-                cachedDB = request.result;
-                cachedTenant = wantedTenant;
-                openingTenant = wantedTenant;
-                cachedDB.onclose = () => {
-                    cachedDB = null;
-                    cachedTenant = '';
-                    dbOpenPromise = null;
-                    openingTenant = '';
-                };
-                cachedDB.onversionchange = () => {
-                    cachedDB?.close();
-                    cachedDB = null;
-                    cachedTenant = '';
-                    dbOpenPromise = null;
-                    openingTenant = '';
-                };
-                resolve(cachedDB);
-            };
-            request.onupgradeneeded = (event) => {
-                const db = event.target.result;
-                const stores = [
-                    'products',
-                    'categories',
-                    'warehouses',
-                    'stock',
-                    'stock_movements',
-                    'invoices',
-                    'purchases',
-                    'customers',
-                    'suppliers',
-                    'partner_statements',
-                    'accounts',
-                    'transfers',
-                    'expenses',
-                    'shifts',
-                    'audit_logs',
-                    'held_invoices',
-                    'sync_queue',
-                    'settings',
-                    'vouchers',
-                    'employees',
-                    'restaurant_tables',
-                    'restaurant_sections',
-                    'restaurant_orders',
-                    'kitchen_sections',
-                    'table_reservations',
-                    'recipes',
-                    'waste_records',
-                ];
-                stores.forEach((storeName) => {
-                    if (!db.objectStoreNames.contains(storeName)) {
-                        if (storeName === 'stock') {
-                            db.createObjectStore(storeName, { keyPath: ['productId', 'warehouseId'] });
-                        }
-                        else if (storeName === 'settings') {
-                            db.createObjectStore(storeName, { keyPath: 'key' });
-                        }
-                        else {
-                            db.createObjectStore(storeName, { keyPath: 'id' });
+            if (typeof window === 'undefined' || !window.indexedDB) throw new Error('IndexedDB is not supported');
+            const dbName = dbNameForTenant(wantedTenant);
+            let fellBackToExistingVersion = false;
+            const wireRequest = (request) => {
+                request.onblocked = () => console.warn('IndexedDB version upgrade blocked by another connection');
+                request.onerror = () => {
+                    // Never downgrade an existing customer database. Older builds used version 6,
+                    // while some real installations are already at version 7+. In that case open
+                    // the database at its existing version instead of failing with VersionError.
+                    if (!fellBackToExistingVersion && request.error?.name === 'VersionError') {
+                        fellBackToExistingVersion = true;
+                        try { wireRequest(indexedDB.open(dbName)); return; }
+                        catch (fallbackError) {
+                            dbOpenPromise = null; openingTenant = ''; reject(fallbackError); return;
                         }
                     }
-                });
+                    dbOpenPromise = null;
+                    openingTenant = '';
+                    reject(request.error || new Error('Failed to open database'));
+                };
+                request.onsuccess = () => {
+                    cachedDB = request.result;
+                    cachedTenant = wantedTenant;
+                    openingTenant = wantedTenant;
+                    cachedDB.onclose = () => {
+                        cachedDB = null;
+                        cachedTenant = '';
+                        dbOpenPromise = null;
+                        openingTenant = '';
+                    };
+                    cachedDB.onversionchange = () => {
+                        cachedDB?.close();
+                        cachedDB = null;
+                        cachedTenant = '';
+                        dbOpenPromise = null;
+                        openingTenant = '';
+                    };
+                    resolve(cachedDB);
+                };
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    const stores = [
+                        'products','categories','warehouses','stock','stock_movements','invoices','purchases','customers','suppliers','partner_statements','accounts','transfers','expenses','shifts','audit_logs','held_invoices','sync_queue','settings','vouchers','employees','restaurant_tables','restaurant_sections','restaurant_orders','kitchen_sections','table_reservations','recipes','waste_records',
+                    ];
+                    stores.forEach((storeName) => {
+                        if (!db.objectStoreNames.contains(storeName)) {
+                            if (storeName === 'stock') db.createObjectStore(storeName, { keyPath: ['productId', 'warehouseId'] });
+                            else if (storeName === 'settings') db.createObjectStore(storeName, { keyPath: 'key' });
+                            else db.createObjectStore(storeName, { keyPath: 'id' });
+                        }
+                    });
+                };
             };
-        }
-        catch (e) {
+            wireRequest(indexedDB.open(dbName, DB_VERSION));
+        } catch (e) {
             dbOpenPromise = null;
             openingTenant = '';
             reject(e);
@@ -218,11 +193,12 @@ export async function getFromStore(storeName, key) {
 export async function putInStore(storeName, value, notifySync = true) {
     const db = await openDB();
     let changed = true;
+    let beforeValue = null;
     if (notifySync) {
         try {
-            const before = await getFromStore(storeName, recordKey(storeName, value));
-            changed = !sameRecord(before, value);
-        } catch { changed = true; }
+            beforeValue = await getFromStore(storeName, recordKey(storeName, value));
+            changed = !sameRecord(beforeValue, value);
+        } catch { changed = true; beforeValue = null; }
     }
     if (!changed) return;
     // Stock rows carry their own local modification time. This lets cloud sync reject
@@ -237,6 +213,11 @@ export async function putInStore(storeName, value, notifySync = true) {
             if (notifySync) {
                 scheduleCloudCapture(storeName, storedValue);
                 broadcastStoreUpdated(storeName);
+                try {
+                    window.dispatchEvent(new CustomEvent('oscar:db-mutation', { detail: {
+                        action: beforeValue ? 'update' : 'add', storeName, value: storedValue, before: beforeValue, at: new Date().toISOString()
+                    } }));
+                } catch {}
             }
             resolve();
         };
@@ -246,6 +227,8 @@ export async function putInStore(storeName, value, notifySync = true) {
 }
 export async function deleteFromStore(storeName, key, notifySync = true) {
     const db = await openDB();
+    let beforeValue = null;
+    if (notifySync) { try { beforeValue = await getFromStore(storeName, key); } catch {} }
     return new Promise((resolve, reject) => {
         const tx = db.transaction(storeName, 'readwrite');
         tx.objectStore(storeName).delete(key);
@@ -253,6 +236,11 @@ export async function deleteFromStore(storeName, key, notifySync = true) {
             if (notifySync) {
                 scheduleCloudCapture(storeName, null, { deleted: true, key });
                 broadcastStoreUpdated(storeName);
+                try {
+                    window.dispatchEvent(new CustomEvent('oscar:db-mutation', { detail: {
+                        action: 'delete', storeName, value: beforeValue, before: beforeValue, key, at: new Date().toISOString()
+                    } }));
+                } catch {}
             }
             resolve();
         };
@@ -301,6 +289,9 @@ export async function bulkPut(storeName, items, notifySync = true) {
             if (notifySync) {
                 changedItems.forEach(item => scheduleCloudCapture(storeName, item));
                 broadcastStoreUpdated(storeName);
+                try {
+                    if (changedItems.length <= 25) changedItems.forEach(item => window.dispatchEvent(new CustomEvent('oscar:db-mutation', { detail: { action:'update', storeName, value:item, before:null, bulk:true, at:new Date().toISOString() } })));
+                } catch {}
             }
             resolve();
         };
@@ -340,6 +331,36 @@ export const DEFAULT_SETTINGS = {
     warnSellingBelowCost: true,
     receiptFooterMessage: 'شكراً لاستخدام أوسكار المحاسبي - نسعد بخدمتكم دائماً',
     barcodePrefix: '21',
+    telegramBotToken: '',
+    telegramChatIds: '',
+    telegramDailyReportEnabled: false,
+    telegramDailyBackupEnabled: true,
+    telegramBackupDefaultV45Initialized: true,
+    dismissedNotificationIds: [],
+    telegramEnabled: true,
+    telegramBotUsername: 'Oskarteaam_bot',
+    telegramBotUrl: 'http://t.me/Oskarteaam_bot',
+    telegramInvoiceNotifications: true,
+    telegramPurchaseNotifications: true,
+    telegramReturnNotifications: true,
+    telegramNotifyCustomers: true,
+    telegramNotifySuppliers: true,
+    telegramNotifyVouchers: true,
+    telegramNotifyExpenses: true,
+    telegramNotifyTransfers: true,
+    telegramNotifyAccounts: true,
+    telegramNotifyProducts: true,
+    telegramNotifyInventory: true,
+    telegramNotifyWarehouses: true,
+    telegramNotifyEmployees: true,
+    telegramNotifyShifts: true,
+    telegramNotifyHeldInvoices: true,
+    telegramNotifyRestaurant: true,
+    telegramNotifyAuditLogs: true,
+    telegramAutoReportEnabled: true,
+    telegramReportIntervalHours: 24,
+    telegramSendImages: true,
+    telegramRecipients: [],
     activeWarehouseId: 'wh-main',
     activeBranchName: 'الفرع الرئيسي',
 };

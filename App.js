@@ -1,38 +1,39 @@
 import React, { useEffect, useState } from 'react';
-import { AppProvider, useApp } from './context__AppContext.js?v=7.9.4.38-data-visible-reports-ledger';
-import { Header } from './components__common__Header.js?v=7.9.4.38-data-visible-reports-ledger';
-import { Sidebar } from './components__common__Sidebar.js?v=7.9.4.38-data-visible-reports-ledger';
-import { BottomNav } from './components__common__BottomNav.js?v=7.9.4.38-data-visible-reports-ledger';
-import { Toast } from './components__common__Toast.js?v=7.9.4.38-data-visible-reports-ledger';
-import { SyncModal } from './components__sync__SyncModal.js?v=7.9.4.38-data-visible-reports-ledger';
-import { POSView } from './components__pos__POSView.js?v=7.9.4.38-data-visible-reports-ledger';
-import { DashboardView } from './components__dashboard__DashboardView.js?v=7.9.4.38-data-visible-reports-ledger';
-import { SalesView } from './components__sales__SalesView.js?v=7.9.4.38-data-visible-reports-ledger';
-import { PurchasesView } from './components__purchases__PurchasesView.js?v=7.9.4.38-data-visible-reports-ledger';
-import { ProductsView } from './components__products__ProductsView.js?v=7.9.4.38-data-visible-reports-ledger';
-import { CategoriesView } from './components__categories__CategoriesView.js?v=7.9.4.38-data-visible-reports-ledger';
-import { InventoryView } from './components__inventory__InventoryView.js?v=7.9.4.38-data-visible-reports-ledger';
-import { CustomersView } from './components__customers__CustomersView.js?v=7.9.4.38-data-visible-reports-ledger';
-import { SuppliersView } from './components__suppliers__SuppliersView.js?v=7.9.4.38-data-visible-reports-ledger';
-import { AccountsView } from './components__accounts__AccountsView.js?v=7.9.4.38-data-visible-reports-ledger';
-import { ExpensesView } from './components__expenses__ExpensesView.js?v=7.9.4.38-data-visible-reports-ledger';
-import { VouchersView } from './components__vouchers__VouchersView.js?v=7.9.4.38-data-visible-reports-ledger';
-import { EmployeesView } from './components__employees__EmployeesView.js?v=7.9.4.38-data-visible-reports-ledger';
-import { BarcodesView } from './components__barcodes__BarcodesView.js?v=7.9.4.38-data-visible-reports-ledger';
-import { ReportsView } from './components__reports__ReportsView.js?v=7.9.4.38-data-visible-reports-ledger';
-import { TrashView } from './components__trash__TrashView.js?v=7.9.4.38-data-visible-reports-ledger';
-import { SettingsView } from './components__settings__SettingsView.js?v=7.9.4.38-data-visible-reports-ledger';
-import { ThermalReceiptModal } from './components__pos__ThermalReceiptModal.js?v=7.9.4.38-data-visible-reports-ledger';
-import { DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.38-data-visible-reports-ledger';
-import { LoginGate } from './components__auth__LoginGate.js?v=7.9.4.38-data-visible-reports-ledger';
-import { RestaurantProvider } from './restaurant__context__RestaurantContext.js?v=7.9.4.38-data-visible-reports-ledger';
-import { RestaurantTablesView } from './restaurant__components__RestaurantTablesView.js?v=7.9.4.38-data-visible-reports-ledger';
-import { RestaurantWaiterView } from './restaurant__components__RestaurantWaiterView.js?v=7.9.4.38-data-visible-reports-ledger';
-import { RestaurantKDSView } from './restaurant__components__RestaurantKDSView.js?v=7.9.4.38-data-visible-reports-ledger';
-import { RestaurantWasteView } from './restaurant__components__RestaurantWasteView.js?v=7.9.4.38-data-visible-reports-ledger';
-import { RestaurantSettingsPanel } from './restaurant__components__RestaurantSettingsPanel.js?v=7.9.4.38-data-visible-reports-ledger';
-import { OscarAI } from './components__ai__OscarAI.js?v=7.9.4.38-data-visible-reports-ledger';
-import { canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.38-data-visible-reports-ledger';
+import { AppProvider, useApp } from './context__AppContext.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { Header } from './components__common__Header.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { Sidebar } from './components__common__Sidebar.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { BottomNav } from './components__common__BottomNav.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { Toast } from './components__common__Toast.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { SyncModal } from './components__sync__SyncModal.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { POSView } from './components__pos__POSView.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { DashboardView } from './components__dashboard__DashboardView.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { SalesView } from './components__sales__SalesView.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { PurchasesView } from './components__purchases__PurchasesView.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { ProductsView } from './components__products__ProductsView.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { CategoriesView } from './components__categories__CategoriesView.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { InventoryView } from './components__inventory__InventoryView.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { CustomersView } from './components__customers__CustomersView.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { SuppliersView } from './components__suppliers__SuppliersView.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { AccountsView } from './components__accounts__AccountsView.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { ExpensesView } from './components__expenses__ExpensesView.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { VouchersView } from './components__vouchers__VouchersView.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { EmployeesView } from './components__employees__EmployeesView.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { BarcodesView } from './components__barcodes__BarcodesView.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { ReportsView } from './components__reports__ReportsView.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { TrashView } from './components__trash__TrashView.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { SettingsView } from './components__settings__SettingsView.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { ThermalReceiptModal } from './components__pos__ThermalReceiptModal.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { LoginGate } from './components__auth__LoginGate.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { RestaurantProvider } from './restaurant__context__RestaurantContext.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { RestaurantTablesView } from './restaurant__components__RestaurantTablesView.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { RestaurantWaiterView } from './restaurant__components__RestaurantWaiterView.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { RestaurantKDSView } from './restaurant__components__RestaurantKDSView.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { RestaurantWasteView } from './restaurant__components__RestaurantWasteView.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { RestaurantSettingsPanel } from './restaurant__components__RestaurantSettingsPanel.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { OscarAI } from './components__ai__OscarAI.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { startTelegramAutomation } from './services__telegram.js?v=7.9.4.45-auto-backup-24h-report-fix';
 
 const h = React.createElement;
 const ScrollScreen = ({ children }) => h('div', { className:'scroll-chain-page h-full min-h-0 overflow-y-auto custom-scrollbar mobile-safe-bottom lg:pb-0' }, children);
@@ -53,6 +54,11 @@ const MainLayout = () => {
     const timer = setTimeout(() => setShowSkipButton(true), 1500);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    return startTelegramAutomation();
+  }, [isLoaded]);
 
   useEffect(() => {
     const isVisible = (el) => {

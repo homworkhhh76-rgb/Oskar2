@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useApp } from './context__AppContext.js?v=7.9.4.38-data-visible-reports-ledger';
+import { useApp } from './context__AppContext.js?v=7.9.4.45-auto-backup-24h-report-fix';
 import { Camera, X, AlertCircle, ScanLine } from 'lucide-react';
 
 const h = React.createElement;
@@ -11,6 +11,11 @@ export const BarcodeCameraModal = ({ open, onClose, onDetected, title = 'مسح 
   const detectorRef = useRef(null);
   const rafRef = useRef(0);
   const busyRef = useRef(false);
+  const lastCodeRef = useRef({ code:'', at:0 });
+  const onDetectedRef = useRef(onDetected);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onDetectedRef.current = onDetected; }, [onDetected]);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
   const [cameraError, setCameraError] = useState('');
   const [status, setStatus] = useState('جاري تشغيل الكاميرا...');
 
@@ -29,10 +34,23 @@ export const BarcodeCameraModal = ({ open, onClose, onDetected, title = 'مسح 
     };
 
     const finish = (code) => {
-      if (!code || cancelled || busyRef.current) return;
+      const clean = String(code || '').trim();
+      if (!clean || cancelled || busyRef.current) return;
+      const now = Date.now();
+      // منع تكرار نفس الباركود عشرات المرات أثناء بقائه أمام العدسة،
+      // مع إبقاء الكاميرا مفتوحة للمسح المتتابع حتى يغلقها المستخدم بنفسه.
+      if (lastCodeRef.current.code === clean && (now - lastCodeRef.current.at) < 1400) return;
+      lastCodeRef.current = { code: clean, at: now };
       busyRef.current = true;
-      stop();
-      try { onDetected?.(String(code).trim()); } finally { onClose?.(); }
+      setStatus(`تمت قراءة ${clean} — الكاميرا ما زالت مفتوحة`);
+      try { onDetectedRef.current?.(clean); } finally {
+        window.setTimeout(() => {
+          if (!cancelled) {
+            busyRef.current = false;
+            setStatus('وجّه الباركود التالي داخل الإطار');
+          }
+        }, 420);
+      }
     };
 
     const scanFrame = async (time) => {
@@ -106,9 +124,10 @@ export const BarcodeCameraModal = ({ open, onClose, onDetected, title = 'مسح 
       }
     };
 
+    lastCodeRef.current = { code:'', at:0 };
     start();
     return () => { cancelled = true; busyRef.current = false; stop(); };
-  }, [open, onClose, onDetected]);
+  }, [open]);
 
   if (!open) return null;
   const overlay = h('div', {
@@ -139,7 +158,7 @@ export const BarcodeCameraModal = ({ open, onClose, onDetected, title = 'مسح 
               h('div', { className: 'absolute left-[16%] right-[16%] top-1/2 h-0.5 bg-emerald-400 shadow-[0_0_12px_#34d399] animate-pulse pointer-events-none' }),
               h('div', { className: 'absolute bottom-3 left-0 right-0 flex justify-center pointer-events-none' },
                 h('span', { className: 'inline-flex items-center gap-1.5 rounded-full bg-black/55 text-white px-3 py-1.5 text-[10px] font-bold backdrop-blur' },
-                  h(ScanLine, { className: 'w-3.5 h-3.5 text-emerald-300' }), 'يتم الالتقاط تلقائياً عند وضوح الرمز'
+                  h(ScanLine, { className: 'w-3.5 h-3.5 text-emerald-300' }), 'مسح متتابع — الكاميرا تبقى مفتوحة حتى تضغط إغلاق'
                 )
               )
             )

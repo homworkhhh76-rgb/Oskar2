@@ -1,5 +1,5 @@
-import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.38-data-visible-reports-ledger';
-import { code128Geometry } from './utils__code128.js?v=7.9.4.38-data-visible-reports-ledger';
+import { getBrandLogoDataUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.45-auto-backup-24h-report-fix';
+import { code128Geometry } from './utils__code128.js?v=7.9.4.45-auto-backup-24h-report-fix';
 
 const imageCache = new Map();
 const num = v => { const n=Number(v); return Number.isFinite(n)?n:0; };
@@ -77,6 +77,49 @@ export async function renderTableCanvas({title='تقرير',subtitle='',headers=
   const w=orientation==='landscape'?1600:1120;const ctxProbe=document.createElement('canvas').getContext('2d');const cols=tableColumnGeometry(headers,48,w-96);const fs=headers.length>9?16:headers.length>7?17:19;let bodyH=0;(rows||[]).forEach(r=>bodyH+=rowHeight(ctxProbe,r,cols,fs,56));const h=Math.max(900,320+bodyH+100);const {canvas,ctx}=createCanvas(w,h);let y=await drawBrand(ctx,w,settings,title,subtitle,30);
   roundedRect(ctx,48,y,w-96,52,10,'#f8fafc','#e2e8f0');txt(ctx,`تاريخ التقرير: ${new Date().toLocaleString('ar-EG')}`,w-68,y+26,16,600,'right','#64748b');txt(ctx,pageNote||`عدد السجلات: ${(rows||[]).length}`,68,y+26,16,700,'left','#334155');y+=70;
   y=drawTable(ctx,{x:48,y,w:w-96,headers,rows,fontSize:fs});y+=38;txt(ctx,`تم إنشاء هذا التقرير من نظام ${settings.storeName||'أوسكار المحاسبي'}`,w/2,y,14,600,'center','#94a3b8');return canvas;
+}
+
+
+function drawMetricGlyph(ctx,type,cx,cy,size=34,color='#059669'){
+  ctx.save(); ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=Math.max(2,size*.08); ctx.lineCap='round'; ctx.lineJoin='round';
+  const r=size*.42;
+  if(type==='sales'){
+    ctx.strokeRect(cx-r*.72,cy-r*.9,r*1.44,r*1.8); line(ctx,cx-r*.48,cy-r*.45,cx+r*.48,cy-r*.45,ctx.lineWidth,color); line(ctx,cx-r*.48,cy,cx+r*.28,cy,ctx.lineWidth,color); line(ctx,cx-r*.48,cy+r*.45,cx+r*.48,cy+r*.45,ctx.lineWidth,color);
+  }else if(type==='stock'){
+    ctx.beginPath();ctx.moveTo(cx,cy-r);ctx.lineTo(cx+r,cy-r*.45);ctx.lineTo(cx+r,cy+r*.55);ctx.lineTo(cx,cy+r);ctx.lineTo(cx-r,cy+r*.55);ctx.lineTo(cx-r,cy-r*.45);ctx.closePath();ctx.stroke();line(ctx,cx-r,cy-r*.45,cx,cy+.05*r,ctx.lineWidth,color);line(ctx,cx+r,cy-r*.45,cx,cy+.05*r,ctx.lineWidth,color);line(ctx,cx,cy+.05*r,cx,cy+r,ctx.lineWidth,color);
+  }else if(type==='customers'){
+    ctx.beginPath();ctx.arc(cx,cy-r*.42,r*.34,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(cx,cy+r*.55,r*.62,Math.PI,Math.PI*2);ctx.stroke();
+  }else if(type==='suppliers'){
+    ctx.strokeRect(cx-r,cy-r*.35,r*1.25,r*.75);ctx.strokeRect(cx+r*.25,cy-r*.12,r*.58,r*.52);ctx.beginPath();ctx.arc(cx-r*.52,cy+r*.55,r*.19,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(cx+r*.5,cy+r*.55,r*.19,0,Math.PI*2);ctx.stroke();
+  }else if(type==='expense'){
+    ctx.strokeRect(cx-r,cy-r*.62,r*2,r*1.24);ctx.beginPath();ctx.arc(cx+r*.45,cy,r*.16,0,Math.PI*2);ctx.fill();line(ctx,cx-r*.68,cy-r*.26,cx-r*.05,cy-r*.26,ctx.lineWidth,color);
+  }else{
+    ctx.beginPath();ctx.arc(cx,cy,r*.9,0,Math.PI*2);ctx.stroke();line(ctx,cx-r*.45,cy,cx+r*.45,cy,ctx.lineWidth,color);line(ctx,cx,cy-r*.45,cx,cy+r*.45,ctx.lineWidth,color);
+  }
+  ctx.restore();
+}
+
+export async function renderExecutiveReportCanvas({title='التقرير اليومي',subtitle='',metrics=[],headers=[],rows=[],settings={}}){
+  try{await document.fonts?.ready;}catch(_){}
+  settings=documentBrandSettings(settings);
+  const w=1600, h=Math.max(1280, 760 + Math.ceil((rows||[]).length/1)*64);
+  const {canvas,ctx}=createCanvas(w,h); let y=await drawBrand(ctx,w,settings,title,subtitle,30);
+  const cards=(metrics||[]).slice(0,6); const gap=22, margin=48, cols=3, cardW=(w-margin*2-gap*(cols-1))/cols, cardH=142;
+  for(let i=0;i<cards.length;i++){
+    const m=cards[i]||{}, row=Math.floor(i/cols), col=i%cols, right=w-margin-col*(cardW+gap), left=right-cardW, cy=y+row*(cardH+gap);
+    roundedRect(ctx,left,cy,cardW,cardH,18,'#ffffff','#dbe7e2',1.4);
+    roundedRect(ctx,left+18,cy+22,74,74,18,'#ecfdf5','#a7f3d0',1);
+    drawMetricGlyph(ctx,m.icon||'generic',left+55,cy+59,42,m.tone==='rose'?'#e11d48':m.tone==='blue'?'#2563eb':m.tone==='amber'?'#d97706':'#059669');
+    const textRight=right-18, textMax=Math.max(120,cardW-128);
+    wrapped(ctx,m.label||'-',textRight,cy+32,textMax,16,800,'right','#64748b',22,2);
+    txt(ctx,m.value||'0',textRight,cy+82,27,900,'right',m.tone==='rose'?'#be123c':m.tone==='blue'?'#1d4ed8':m.tone==='amber'?'#b45309':'#047857');
+    if(m.sub) wrapped(ctx,m.sub,textRight,cy+113,textMax,13,600,'right','#94a3b8',18,2);
+  }
+  y+=Math.ceil(Math.max(1,cards.length)/cols)*(cardH+gap)+22;
+  roundedRect(ctx,margin,y,w-margin*2,50,12,'#f0fdf4','#bbf7d0');txt(ctx,'ملخص المؤشرات التفصيلية',w-margin-22,y+25,18,900,'right','#166534');txt(ctx,`تم التحديث: ${new Date().toLocaleString('ar-EG')}`,margin+22,y+25,14,700,'left','#64748b');y+=70;
+  if((headers||[]).length){y=drawTable(ctx,{x:margin,y,w:w-margin*2,headers,rows:rows||[],fontSize:17,headH:58});}
+  y+=34;txt(ctx,`تقرير رسمي من نظام ${settings.storeName||'أوسكار المحاسبي'}`,w/2,y,14,700,'center','#94a3b8');
+  const finalH=Math.min(canvas.height,Math.ceil(y+70));if(finalH<canvas.height){const out=createCanvas(w,finalH);out.ctx.drawImage(canvas,0,0,w,finalH,0,0,w,finalH);return out.canvas;}return canvas;
 }
 
 export async function renderTablePages(args){
