@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#229ED9" />
+  <title>تسجيل الدخول عبر Telegram</title>
+
+  <!-- Telegram Mini App SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
+
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,Arial,sans-serif}
+    body{
+      background:var(--tg-theme-bg-color,#f4f7fb);
+      color:var(--tg-theme-text-color,#172033);
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+    }
+    .app{width:min(100%,480px)}
+    .card{
+      background:var(--tg-theme-secondary-bg-color,#fff);
+      border:1px solid rgba(0,0,0,.06);
+      border-radius:24px;
+      padding:22px;
+      box-shadow:0 16px 50px rgba(30,55,90,.10);
+    }
+    .brand{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      margin-bottom:22px;
+    }
+    .logo{
+      width:48px;height:48px;border-radius:16px;
+      display:grid;place-items:center;
+      background:#229ED9;color:#fff;
+      font-size:25px;font-weight:900;
+      box-shadow:0 8px 22px rgba(34,158,217,.25)
+    }
+    h1{margin:0;font-size:21px}
+    .muted{color:var(--tg-theme-hint-color,#7c8799);font-size:13px;margin-top:4px}
+    .hero{text-align:center;padding:14px 0 8px}
+    .hero .big{font-size:52px;margin-bottom:10px}
+    .hero h2{margin:0 0 7px;font-size:22px}
+    .hero p{margin:0 auto 22px;max-width:330px;line-height:1.8;color:var(--tg-theme-hint-color,#7c8799)}
+    button{
+      width:100%;border:0;border-radius:15px;padding:15px 18px;
+      cursor:pointer;font-size:16px;font-weight:800;
+      transition:.15s transform,.15s opacity
+    }
+    button:active{transform:scale(.985)}
+    .primary{
+      background:var(--tg-theme-button-color,#229ED9);
+      color:var(--tg-theme-button-text-color,#fff)
+    }
+    .ghost{background:rgba(34,158,217,.10);color:#1687bd;margin-top:10px}
+    .hidden{display:none!important}
+    .avatar{
+      width:82px;height:82px;border-radius:50%;
+      object-fit:cover;background:#dceaf3;
+      border:4px solid rgba(34,158,217,.18);
+      display:block;margin:0 auto 12px
+    }
+    .avatar-fallback{
+      width:82px;height:82px;border-radius:50%;
+      display:grid;place-items:center;margin:0 auto 12px;
+      background:linear-gradient(135deg,#229ED9,#5bc0eb);
+      color:#fff;font-size:30px;font-weight:900
+    }
+    .welcome{text-align:center;margin-bottom:20px}
+    .welcome h2{margin:0 0 5px;font-size:22px}
+    .badge{
+      display:inline-flex;align-items:center;gap:6px;
+      border-radius:999px;padding:6px 10px;
+      background:rgba(35,170,90,.10);color:#159447;
+      font-size:12px;font-weight:800
+    }
+    .grid{display:grid;gap:10px}
+    .row{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
+      padding:14px;border-radius:15px;
+      background:rgba(120,135,160,.08)
+    }
+    .row .label{font-size:12px;color:var(--tg-theme-hint-color,#7c8799)}
+    .row .value{
+      margin-top:3px;font-size:15px;font-weight:800;
+      word-break:break-all;text-align:left;direction:ltr
+    }
+    .row .ico{font-size:23px}
+    .dash-title{font-size:14px;font-weight:900;margin:18px 0 10px}
+    .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .tile{
+      padding:16px;border-radius:17px;background:rgba(34,158,217,.08);
+      min-height:96px
+    }
+    .tile b{display:block;font-size:26px;margin-bottom:9px}
+    .tile span{font-size:13px;font-weight:800}
+    .notice{
+      margin-top:14px;padding:12px 14px;border-radius:14px;
+      background:rgba(255,166,0,.10);color:#956100;
+      font-size:12px;line-height:1.7
+    }
+    .error{
+      background:rgba(230,65,65,.09);
+      color:#bd3030;padding:13px;border-radius:14px;
+      font-size:13px;line-height:1.7;margin-top:14px
+    }
+    .footer{text-align:center;font-size:11px;color:var(--tg-theme-hint-color,#8b95a4);margin-top:14px}
+  </style>
+</head>
+<body>
+  <main class="app">
+    <!-- شاشة الدخول -->
+    <section class="card" id="loginView">
+      <div class="brand">
+        <div class="logo">✈</div>
+        <div>
+          <h1>تجربة Telegram Login</h1>
+          <div class="muted">Mini App — ملف HTML واحد</div>
+        </div>
+      </div>
+
+      <div class="hero">
+        <div class="big">🔐</div>
+        <h2>دخول سريع وآمن</h2>
+        <p>افتح الصفحة من داخل البوت على Telegram، وسنقرأ بيانات حسابك التي يرسلها Telegram إلى الـ Mini App.</p>
+        <button class="primary" id="loginBtn">الدخول عبر Telegram</button>
+      </div>
+
+      <div class="error hidden" id="outsideError">
+        الصفحة مفتوحة خارج Telegram أو لم يتم تمرير بيانات المستخدم.
+        اربط هذا الرابط كبوت Mini App وافتحه من داخل Telegram.
+      </div>
+    </section>
+
+    <!-- لوحة التحكم -->
+    <section class="card hidden" id="dashboardView">
+      <div id="avatarWrap"></div>
+
+      <div class="welcome">
+        <h2>أهلاً <span id="displayName">—</span> 👋</h2>
+        <span class="badge">● تم تسجيل الدخول عبر Telegram</span>
+      </div>
+
+      <div class="grid">
+        <div class="row">
+          <div>
+            <div class="label">الاسم</div>
+            <div class="value" id="fullName" style="direction:rtl;text-align:right">—</div>
+          </div>
+          <div class="ico">👤</div>
+        </div>
+
+        <div class="row">
+          <div>
+            <div class="label">Telegram ID</div>
+            <div class="value" id="telegramId">—</div>
+          </div>
+          <div class="ico">🆔</div>
+        </div>
+
+        <div class="row">
+          <div>
+            <div class="label">Username</div>
+            <div class="value" id="username">—</div>
+          </div>
+          <div class="ico">💬</div>
+        </div>
+
+        <div class="row">
+          <div>
+            <div class="label">اللغة</div>
+            <div class="value" id="language">—</div>
+          </div>
+          <div class="ico">🌐</div>
+        </div>
+      </div>
+
+      <div class="dash-title">لوحة التحكم</div>
+      <div class="tiles">
+        <div class="tile"><b>📦</b><span>طلباتي</span></div>
+        <div class="tile"><b>💎</b><span>اشتراكي</span></div>
+        <div class="tile"><b>🔔</b><span>الإشعارات</span></div>
+        <div class="tile"><b>⚙️</b><span>الإعدادات</span></div>
+      </div>
+
+      <div class="notice">
+        هذه نسخة اختبار Frontend. في التطبيق الحقيقي يجب إرسال
+        <b>Telegram.WebApp.initData</b> إلى السيرفر والتحقق منه هناك قبل اعتبار المستخدم مسجلًا.
+      </div>
+
+      <button class="ghost" id="closeBtn">إغلاق التطبيق</button>
+    </section>
+
+    <div class="footer">Telegram Mini App Test</div>
+  </main>
+
+  <script>
+    (() => {
+      const tg = window.Telegram?.WebApp;
+
+      const loginView = document.getElementById('loginView');
+      const dashboardView = document.getElementById('dashboardView');
+      const outsideError = document.getElementById('outsideError');
+      const loginBtn = document.getElementById('loginBtn');
+      const closeBtn = document.getElementById('closeBtn');
+
+      if (tg) {
+        tg.ready();
+        tg.expand();
+
+        try {
+          tg.setHeaderColor?.('secondary_bg_color');
+          tg.setBackgroundColor?.('bg_color');
+        } catch (_) {}
+      }
+
+      function esc(s) {
+        return String(s ?? '')
+          .replaceAll('&','&amp;')
+          .replaceAll('<','&lt;')
+          .replaceAll('>','&gt;')
+          .replaceAll('"','&quot;')
+          .replaceAll("'","&#039;");
+      }
+
+      function getUser() {
+        return tg?.initDataUnsafe?.user || null;
+      }
+
+      function renderAvatar(user) {
+        const wrap = document.getElementById('avatarWrap');
+        wrap.innerHTML = '';
+
+        if (user.photo_url) {
+          const img = document.createElement('img');
+          img.className = 'avatar';
+          img.src = user.photo_url;
+          img.alt = 'الصورة الشخصية';
+          wrap.appendChild(img);
+        } else {
+          const div = document.createElement('div');
+          div.className = 'avatar-fallback';
+          div.textContent = (user.first_name || '?').trim().charAt(0).toUpperCase();
+          wrap.appendChild(div);
+        }
+      }
+
+      function enterDashboard() {
+        const user = getUser();
+
+        if (!user) {
+          outsideError.classList.remove('hidden');
+          tg?.HapticFeedback?.notificationOccurred?.('error');
+          return;
+        }
+
+        const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
+
+        document.getElementById('displayName').textContent = user.first_name || 'بك';
+        document.getElementById('fullName').textContent = fullName || 'غير متوفر';
+        document.getElementById('telegramId').textContent = user.id ?? 'غير متوفر';
+        document.getElementById('username').textContent = user.username ? '@' + user.username : 'بدون username';
+        document.getElementById('language').textContent = user.language_code || 'غير معروف';
+
+        renderAvatar(user);
+
+        loginView.classList.add('hidden');
+        dashboardView.classList.remove('hidden');
+
+        tg?.HapticFeedback?.notificationOccurred?.('success');
+      }
+
+      loginBtn.addEventListener('click', enterDashboard);
+
+      closeBtn.addEventListener('click', () => {
+        if (tg?.close) tg.close();
+        else history.back();
+      });
+
+      // لو تريد الدخول مباشرة عند فتح الـ Mini App، فعّل السطر التالي:
+      // if (getUser()) enterDashboard();
+    })();
+  </script>
+</body>
+</html>
