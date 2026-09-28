@@ -1,13 +1,13 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.50-customer-p2p';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.50-customer-p2p';
-import { formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.50-customer-p2p';
-import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.50-customer-p2p';
-import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.50-customer-p2p';
-import { downloadProfessionalTablePDF, downloadProfessionalTableExcel, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.50-customer-p2p';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.50-customer-p2p';
-import { TransferForm } from './components__inventory__TransferForm.js?v=7.9.4.50-customer-p2p';
+import { useApp } from './context__AppContext.js?v=7.9.4.52-draft-sections';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.52-draft-sections';
+import { formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.52-draft-sections';
+import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.52-draft-sections';
+import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.52-draft-sections';
+import { downloadProfessionalTablePDF, downloadProfessionalTableExcel, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.52-draft-sections';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.52-draft-sections';
+import { TransferForm } from './components__inventory__TransferForm.js?v=7.9.4.52-draft-sections';
 import { ArrowLeftRight, Building2, Download, Search, Image as ImageIcon, FileSpreadsheet, Trash2, } from 'lucide-react';
 export const InventoryView = () => {
     const { products, warehouses, settings, getProductStock, adjustStockCount, transferStock, recordDamagedStock, showToast, } = useApp();

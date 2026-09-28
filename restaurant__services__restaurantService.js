@@ -1,4 +1,4 @@
-import { getAllFromStore, getFromStore, saveToStore } from './restaurant__services__db.js?v=7.9.4.50-customer-p2p';
+import { getAllFromStore, getFromStore, saveToStore } from './restaurant__services__db.js?v=7.9.4.52-draft-sections';
 // Default Sections
 export const DEFAULT_RESTAURANT_SECTIONS = [
     { id: 'sec-indoor', name: 'الصالة الداخلية', displayOrder: 1 },

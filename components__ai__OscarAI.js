@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, X, Send, Sparkles, TrendingUp, PackageSearch, WalletCards, Receipt, ChefHat, Settings2, CheckCircle2, LoaderCircle, ShoppingCart, RotateCcw, BarChart3, FileDown, Paperclip, PackagePlus } from 'lucide-react';
-import { useApp } from './context__AppContext.js?v=7.9.4.50-customer-p2p';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.50-customer-p2p';
-import { askOscar, getAIConfig, aiHealthCheck, fileToDataUrl } from './services__ai.js?v=7.9.4.50-customer-p2p';
-import { executeAIActions, isMutationAction } from './services__aiActions.js?v=7.9.4.50-customer-p2p';
-import { canAccessPermission } from './utils__permissions.js?v=7.9.4.50-customer-p2p';
+import { useApp } from './context__AppContext.js?v=7.9.4.52-draft-sections';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.52-draft-sections';
+import { askOscar, getAIConfig, aiHealthCheck, fileToDataUrl } from './services__ai.js?v=7.9.4.52-draft-sections';
+import { executeAIActions, isMutationAction } from './services__aiActions.js?v=7.9.4.52-draft-sections';
+import { canAccessPermission } from './utils__permissions.js?v=7.9.4.52-draft-sections';
 
 const h = React.createElement;
 const DAY = 86400000;

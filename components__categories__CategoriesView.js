@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.50-customer-p2p';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.50-customer-p2p';
+import { useApp } from './context__AppContext.js?v=7.9.4.52-draft-sections';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.52-draft-sections';
 import { Plus, Trash2, Edit } from 'lucide-react';
 export const CategoriesView = () => {
     const { categories, products, saveCategory, deleteCategory, showToast } = useApp();

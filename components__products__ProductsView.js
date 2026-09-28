@@ -1,14 +1,14 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.50-customer-p2p';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.50-customer-p2p';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.50-customer-p2p';
-import { BarcodeCameraModal } from './components__pos__CameraScannerModal.js?v=7.9.4.50-customer-p2p';
-import { calculateUnitConversions, formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.50-customer-p2p';
-import { exportToCSV } from './utils__export.js?v=7.9.4.50-customer-p2p';
-import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.50-customer-p2p';
-import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.50-customer-p2p';
-import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.50-customer-p2p';
+import { useApp } from './context__AppContext.js?v=7.9.4.52-draft-sections';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.52-draft-sections';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.52-draft-sections';
+import { BarcodeCameraModal } from './components__pos__CameraScannerModal.js?v=7.9.4.52-draft-sections';
+import { calculateUnitConversions, formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.52-draft-sections';
+import { exportToCSV } from './utils__export.js?v=7.9.4.52-draft-sections';
+import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.52-draft-sections';
+import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.52-draft-sections';
+import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.52-draft-sections';
 import { Plus, Search, Trash2, Edit, Layers, FolderTree, X, Download, Image as ImageIcon, FileSpreadsheet, Camera, } from 'lucide-react';
 const h = React.createElement;
 const normalizeArabicDigits = (value) => String(value ?? '')

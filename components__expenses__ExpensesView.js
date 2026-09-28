@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.50-customer-p2p';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.50-customer-p2p';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.50-customer-p2p';
-import { downloadProfessionalTablePDF, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.50-customer-p2p';
+import { useApp } from './context__AppContext.js?v=7.9.4.52-draft-sections';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.52-draft-sections';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.52-draft-sections';
+import { downloadProfessionalTablePDF, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.52-draft-sections';
 import { Plus, Search, Trash2, Edit2, FileSpreadsheet, FileText, Settings2, UsersRound, Receipt, WalletCards, X } from 'lucide-react';
 
 const h = React.createElement;

@@ -1,10 +1,10 @@
 import { jsx as _jsx } from "react/jsx-runtime";
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.50-customer-p2p';
-import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.50-customer-p2p';
-import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.50-customer-p2p';
-import { notifyTelegramInvoice } from './services__telegram.js?v=7.9.4.50-customer-p2p';
-import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.50-customer-p2p';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.52-draft-sections';
+import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.52-draft-sections';
+import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.52-draft-sections';
+import { notifyTelegramInvoice } from './services__telegram.js?v=7.9.4.52-draft-sections';
+import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.52-draft-sections';
 const AppContext = createContext(null);
 const recordTime = (item = {}) => {
     const fields = ['createdAt', 'date', 'timestamp', 'startTime', 'updatedAt'];
@@ -134,6 +134,10 @@ export const AppProvider = ({ children }) => {
     const [toasts, setToasts] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState(null);
+    // Remote sync is allowed to continue, but visual dataset replacement is postponed
+    // while the user is actively editing any field. This prevents disappearing text
+    // across settings and all data-entry screens.
+    const deferredRemoteStoresRef = useRef(new Set());
     // Modals state
     const [showThermalModal, setShowThermalModal] = useState(null);
     const [showCameraModal, setShowCameraModal] = useState(false);
@@ -352,6 +356,42 @@ export const AppProvider = ({ children }) => {
         if (wanted.has('sync_queue')) jobs.push(Promise.resolve().then(()=>setSyncQueue(window.OscarCloudSync?.pendingItems?.() || [])));
         await Promise.allSettled(jobs);
     }, []);
+    const isUserEditingField = useCallback(() => {
+        if (typeof document === 'undefined') return false;
+        const el = document.activeElement;
+        if (!el || el === document.body) return false;
+        if (el.matches?.('input, textarea, select, [contenteditable="true"]')) return true;
+        return !!el.closest?.('[data-oscar-draft-lock="true"]');
+    }, []);
+    const applyRemoteRefresh = useCallback(async (storeNames = []) => {
+        const names = Array.isArray(storeNames) ? storeNames.filter(Boolean) : [storeNames].filter(Boolean);
+        if (isUserEditingField()) {
+            if (!names.length) deferredRemoteStoresRef.current.add('*');
+            else names.forEach((name) => deferredRemoteStoresRef.current.add(name));
+            return false;
+        }
+        if (!names.length || names.includes('*')) await reloadData();
+        else await reloadStores(names);
+        return true;
+    }, [isUserEditingField, reloadData, reloadStores]);
+    useEffect(() => {
+        let timer = null;
+        const flush = () => {
+            clearTimeout(timer);
+            timer = setTimeout(async () => {
+                if (isUserEditingField() || !deferredRemoteStoresRef.current.size) return;
+                const names = Array.from(deferredRemoteStoresRef.current);
+                deferredRemoteStoresRef.current.clear();
+                try {
+                    if (names.includes('*')) await reloadData();
+                    else await reloadStores(names);
+                } catch (err) { console.warn('Deferred sync UI refresh warning:', err); }
+            }, 450);
+        };
+        document.addEventListener('focusout', flush, true);
+        document.addEventListener('change', flush, true);
+        return () => { clearTimeout(timer); document.removeEventListener('focusout', flush, true); document.removeEventListener('change', flush, true); };
+    }, [isUserEditingField, reloadData, reloadStores]);
     // Initial load with guaranteed fallback
     useEffect(() => {
         let isMounted = true;
@@ -377,7 +417,7 @@ export const AppProvider = ({ children }) => {
                 syncResult = await window.OscarCloudSync?.initialize?.({
                     bridge: {
                         putInStore, deleteFromStore, getAllFromStore, getFromStore,
-                        onApplied: async (stores) => { if (isMounted) await reloadStores(stores || []); }
+                        onApplied: async (stores) => { if (isMounted) await applyRemoteRefresh(stores || []); }
                     }
                 });
             } catch (syncError) { console.warn('Cloud sync bootstrap warning:', syncError); }
@@ -425,7 +465,7 @@ export const AppProvider = ({ children }) => {
                 const msg = event?.data || {};
                 const tenantId = window.OscarActivation?.readRuntime?.()?.companyId || '';
                 if (msg.tenantId && msg.tenantId !== tenantId) return;
-                msg.storeName ? reloadStores([msg.storeName]) : reloadData();
+                msg.storeName ? applyRemoteRefresh([msg.storeName]) : applyRemoteRefresh([]);
             };
             syncChannel.addEventListener('message', handleMessage);
             return () => {
@@ -436,19 +476,19 @@ export const AppProvider = ({ children }) => {
         return () => {
             isMounted = false;
         };
-    }, [reloadData, reloadStores]);
+    }, [reloadData, reloadStores, applyRemoteRefresh]);
     useEffect(() => {
         const onStatus = (event) => {
             const d = event.detail || {};
             setIsSyncing(!!d.busy || d.state === 'syncing');
             setSyncQueue(window.OscarCloudSync?.pendingItems?.() || []);
         };
-        const onApplied = (event) => reloadStores(event?.detail?.stores || []);
+        const onApplied = (event) => applyRemoteRefresh(event?.detail?.stores || []);
         window.addEventListener('oscar:sync-status', onStatus);
         window.addEventListener('oscar:sync-applied', onApplied);
         onStatus({ detail: {} });
         return () => { window.removeEventListener('oscar:sync-status', onStatus); window.removeEventListener('oscar:sync-applied', onApplied); };
-    }, [reloadStores]);
+    }, [applyRemoteRefresh]);
     // Online / Offline monitor
     useEffect(() => {
         const handleOnline = () => {
@@ -2268,7 +2308,7 @@ export const AppProvider = ({ children }) => {
             const result = await window.OscarCloudSync?.syncNow?.({ manual: true, force: true });
             if (result?.error) throw new Error(result.message || 'فشل الاتصال');
             setSyncQueue(window.OscarCloudSync?.pendingItems?.() || []);
-            if (result?.changedStores?.length) await reloadStores(result.changedStores);
+            if (result?.changedStores?.length) await applyRemoteRefresh(result.changedStores);
             showToast(result?.applied ? `تمت المزامنة وتحديث الشاشة (${result.applied} تغيير)` : 'اكتملت المزامنة — البيانات محدثة', 'success');
         } catch (err) {
             console.error('Sync failed:', err);

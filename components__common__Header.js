@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.50-customer-p2p';
-import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.50-customer-p2p';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.50-customer-p2p';
+import { useApp } from './context__AppContext.js?v=7.9.4.52-draft-sections';
+import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.52-draft-sections';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.52-draft-sections';
 import { Wifi, WifiOff, RefreshCw, Maximize2, Minimize2, Clock, Store, Camera, Menu, LogOut, Building2, Bell } from 'lucide-react';
-import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.50-customer-p2p';
-import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.50-customer-p2p';
-import { saveTelegramConfig, uploadTelegramSnapshot } from './services__telegramReports.js?v=7.9.4.50-customer-p2p';
+import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.52-draft-sections';
+import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.52-draft-sections';
+import { saveTelegramConfig, uploadTelegramSnapshot } from './services__telegramReports.js?v=7.9.4.52-draft-sections';
 
 const h = React.createElement;
 
@@ -76,7 +76,7 @@ export const Header = () => {
         h('span', { className: 'absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity' }, h(Camera, { className: 'w-4 h-4' }))
       ),
       h('button', { type: 'button', onClick: () => setActiveTab(homeTab), className: 'flex flex-col text-right min-w-0 group focus:outline-none' },
-        h('h1', { className: 'text-sm font-black text-slate-900 dark:text-white tracking-tight truncate max-w-[160px] sm:max-w-[220px] group-hover:text-emerald-600 transition' }, settings.storeName),
+        h('h1', { className: 'text-[11px] sm:text-xs font-black leading-tight text-slate-900 dark:text-white tracking-tight max-w-[155px] sm:max-w-[210px] line-clamp-2 group-hover:text-emerald-600 transition' }, settings.storeName),
         h('span', { className: 'text-[10px] text-emerald-600 dark:text-emerald-400 font-bold block leading-none truncate' }, settings.subtitle || 'إدارة ذكية')
       ),
       h('div', { className: 'hidden xl:flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] font-medium' }, h(Store, { className: 'w-3 h-3 text-slate-400' }), h('span', null, settings.activeBranchName))

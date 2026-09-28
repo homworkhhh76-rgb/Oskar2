@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useApp } from './context__AppContext.js?v=7.9.4.50-customer-p2p';
+import { useApp } from './context__AppContext.js?v=7.9.4.52-draft-sections';
 import { X, Bell, CreditCard, PackageX, History, CalendarClock, Truck, AlertTriangle, Trash2, Send, FileText, DatabaseBackup, Bot, Save, RotateCcw, Clock3, Users, FileArchive, Radio, Image as ImageIcon } from 'lucide-react';
-import { saveTelegramConfig, telegramRequest, uploadTelegramSnapshot, sendDailyReportNow, sendCustomersReportNow, sendAllReportsNow, sendBackupNow } from './services__telegramReports.js?v=7.9.4.50-customer-p2p';
+import { saveTelegramConfig, telegramRequest, uploadTelegramSnapshot, sendDailyReportNow, sendCustomersReportNow, sendAllReportsNow, sendBackupNow } from './services__telegramReports.js?v=7.9.4.52-draft-sections';
 
 const h = React.createElement;
 const DAY = 86400000;

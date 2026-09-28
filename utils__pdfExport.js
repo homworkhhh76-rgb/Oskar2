@@ -1,4 +1,4 @@
-import { renderElementTablePages, resolveExportElement } from './utils__canvasRenderer.js?v=7.9.4.50-customer-p2p';
+import { renderElementTablePages, resolveExportElement } from './utils__canvasRenderer.js?v=7.9.4.52-draft-sections';
 
 const safe=v=>String(v||'export').replace(/[\\/:*?"<>|]+/g,'-').trim()||'export';
 const withExt=(name,ext)=>safe(name).toLowerCase().endsWith(ext)?safe(name):safe(name)+ext;
