@@ -1,4 +1,4 @@
-import { calculateUnitConversions } from './utils__unitTree.js?v=7.9.4.46-profit-report';
+import { calculateUnitConversions } from './utils__unitTree.js?v=7.9.4.50-customer-p2p';
 const DB_BASE_NAME = 'Oscar_Accounting_POS_DB';
 const DB_VERSION = 6;
 export const getTenantId = () => String(window.OscarActivation?.readRuntime?.()?.companyId || 'local').trim() || 'local';
@@ -363,6 +363,9 @@ export const DEFAULT_SETTINGS = {
     telegramRecipients: [],
     activeWarehouseId: 'wh-main',
     activeBranchName: 'الفرع الرئيسي',
+    financialYears: [],
+    activeFinancialYearId: '',
+    financialYearInitializedV48: false,
 };
 // Initial Warehouses
 export const DEFAULT_WAREHOUSES = [

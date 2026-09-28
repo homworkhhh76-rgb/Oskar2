@@ -6,8 +6,8 @@
   - Every print waits for a healthy connection and retries once after a transport failure.
   - Supports BLE printers with a writable GATT characteristic and Web Serial printers as a fallback.
 */
-const PREF_KEY = 'oscar-accounting-printer-pref-v2';
-const LEGACY_PREF_KEY = 'oscar-accounting-printer-pref-v1';
+const PREF_KEY = 'oscar-accounting-printer-pref-v3';
+const LEGACY_PREF_KEYS = ['oscar-accounting-printer-pref-v2','oscar-accounting-printer-pref-v1'];
 const BLE_SERVICES = [
   '0000ffe0-0000-1000-8000-00805f9b34fb',
   '0000ff00-0000-1000-8000-00805f9b34fb',
@@ -43,8 +43,10 @@ class SmartPrinterManager {
   _migratePreference() {
     try {
       if (!localStorage.getItem(PREF_KEY)) {
-        const legacy = localStorage.getItem(LEGACY_PREF_KEY);
-        if (legacy) localStorage.setItem(PREF_KEY, legacy);
+        for (const key of LEGACY_PREF_KEYS) {
+          const legacy = localStorage.getItem(key);
+          if (legacy) { localStorage.setItem(PREF_KEY, legacy); break; }
+        }
       }
     } catch {}
   }
@@ -93,19 +95,55 @@ class SmartPrinterManager {
     return false;
   }
 
+  _platformInfo() {
+    const ua = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : '';
+    const platform = typeof navigator !== 'undefined' ? String(navigator.platform || '') : '';
+    const touchPoints = typeof navigator !== 'undefined' ? Number(navigator.maxTouchPoints || 0) : 0;
+    const isIOS = /iPad|iPhone|iPod/i.test(ua) || (/Mac/i.test(platform) && touchPoints > 1);
+    const isMac = !isIOS && (/Macintosh|Mac OS X/i.test(ua) || /Mac/i.test(platform));
+    const secureContext = typeof window === 'undefined' ? true : window.isSecureContext !== false;
+    const bluetoothSupported = typeof navigator !== 'undefined' && !!navigator.bluetooth?.requestDevice && secureContext;
+    const serialSupported = typeof navigator !== 'undefined' && !!navigator.serial?.requestPort && secureContext;
+    return { isIOS, isMac, secureContext, bluetoothSupported, serialSupported };
+  }
+
   getState() {
     const pref = this._readPref();
+    const platform = this._platformInfo();
+    const mode = this.mode || pref?.mode || '';
+    const systemMode = mode === 'system';
+    const connected = this.isConnected();
     return {
-      connected: this.isConnected(),
-      mode: this.mode || pref?.mode || '',
-      name: this.name || (this.isConnected() ? this.device?.name : '') || '',
+      connected,
+      ready: connected || systemMode,
+      systemMode,
+      mode,
+      name: this.name || (connected ? this.device?.name : '') || (systemMode ? (pref?.name || 'طباعة النظام') : ''),
       preferredName: pref?.name || '',
       hasRememberedPrinter: !!pref?.mode,
       connecting: this.connecting || '',
       lastError: this.lastError,
-      bluetoothSupported: typeof navigator !== 'undefined' && !!navigator.bluetooth,
-      serialSupported: typeof navigator !== 'undefined' && !!navigator.serial,
+      bluetoothSupported: platform.bluetoothSupported,
+      serialSupported: platform.serialSupported,
+      secureContext: platform.secureContext,
+      isIOS: platform.isIOS,
+      isMac: platform.isMac,
+      systemPrintSupported: typeof window !== 'undefined' && typeof window.print === 'function',
     };
+  }
+
+  async enableSystemPrint(name = '') {
+    const platform = this._platformInfo();
+    const label = name || (platform.isIOS ? 'iPhone / AirPrint / طباعة النظام' : platform.isMac ? 'macOS / طباعة النظام' : 'طباعة النظام');
+    if (this.mode === 'bluetooth' && this.device?.gatt?.connected) { try { this.device.gatt.disconnect(); } catch {} }
+    if (this.mode === 'serial' && this.port) { try { await this.port.close(); } catch {} }
+    this.mode = 'system';
+    this.name = label;
+    this.device = null; this.server = null; this.characteristic = null; this.port = null;
+    this.lastError = '';
+    this._writePref({ mode:'system', name:label });
+    this._emit();
+    return this.getState();
   }
 
   async getRememberedBluetoothDevices() {
@@ -117,8 +155,10 @@ class SmartPrinterManager {
   }
 
   async connectBluetooth() {
-    if (!navigator.bluetooth) throw new Error('متصفحك لا يدعم Web Bluetooth. استخدم Chrome على Android أو اتصال Serial إن كان متاحاً.');
-    // This opens the browser/device picker from inside the application.
+    const platform = this._platformInfo();
+    // Safari/iPhone does not expose Web Bluetooth. Do not hide/disable the printer button:
+    // switch to the operating-system print path so paired/AirPrint/driver printers remain usable.
+    if (!platform.bluetoothSupported) return this.enableSystemPrint();
     const device = await navigator.bluetooth.requestDevice({
       acceptAllDevices: true,
       optionalServices: BLE_SERVICES
@@ -216,7 +256,8 @@ class SmartPrinterManager {
   }
 
   async connectSerial() {
-    if (!navigator.serial) throw new Error('متصفحك لا يدعم Web Serial. استخدم Chrome/Edge على جهاز يدعم Serial.');
+    const platform = this._platformInfo();
+    if (!platform.serialSupported) return this.enableSystemPrint();
     const port = await navigator.serial.requestPort();
     return this._attachSerial(port, true);
   }
@@ -267,6 +308,13 @@ class SmartPrinterManager {
     }
     const pref = this._readPref();
     if (!pref?.mode) return this.getState();
+    if (pref.mode === 'system') {
+      this.mode = 'system';
+      this.name = pref.name || 'طباعة النظام';
+      this.lastError = '';
+      this._emit();
+      return this.getState();
+    }
 
     let lastErr = null;
     for (let attempt=0; attempt<Math.max(1,retries); attempt++) {
@@ -302,6 +350,8 @@ class SmartPrinterManager {
   async ensureConnected() {
     if (this.isConnected()) return this.getState();
     await this.autoReconnect({ retries:3 });
+    const state = this.getState();
+    if (state.systemMode) { const err = new Error('SYSTEM_PRINT_REQUIRED'); err.code = 'SYSTEM_PRINT_REQUIRED'; throw err; }
     if (!this.isConnected()) throw new Error('الطابعة المحفوظة غير متصلة. اختر الطابعة مرة واحدة من الإعدادات.');
     return this.getState();
   }
@@ -430,6 +480,7 @@ class SmartPrinterManager {
 
   async printCanvas(canvas, { paperWidth='80mm' }={}) {
     if (!canvas) throw new Error('تعذر تجهيز الفاتورة للطباعة.');
+    if (this.getState().systemMode) { const err = new Error('SYSTEM_PRINT_REQUIRED'); err.code = 'SYSTEM_PRINT_REQUIRED'; throw err; }
     const bytes = this._canvasToRaster(canvas, paperWidth);
     await this.writeBytes(bytes);
     return true;

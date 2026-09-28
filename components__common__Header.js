@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.46-profit-report';
-import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.46-profit-report';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.46-profit-report';
+import { useApp } from './context__AppContext.js?v=7.9.4.50-customer-p2p';
+import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.50-customer-p2p';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.50-customer-p2p';
 import { Wifi, WifiOff, RefreshCw, Maximize2, Minimize2, Clock, Store, Camera, Menu, LogOut, Building2, Bell } from 'lucide-react';
-import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.46-profit-report';
-import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.46-profit-report';
-import { saveTelegramConfig, uploadTelegramSnapshot } from './services__telegramReports.js?v=7.9.4.46-profit-report';
+import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.50-customer-p2p';
+import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.50-customer-p2p';
+import { saveTelegramConfig, uploadTelegramSnapshot } from './services__telegramReports.js?v=7.9.4.50-customer-p2p';
 
 const h = React.createElement;
 

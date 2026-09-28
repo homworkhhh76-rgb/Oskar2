@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.46-profit-report';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.46-profit-report';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.46-profit-report';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl } from './brand__logo.js?v=7.9.4.46-profit-report';
-import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.46-profit-report';
-import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.46-profit-report';
-import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.46-profit-report';
+import { useApp } from './context__AppContext.js?v=7.9.4.50-customer-p2p';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.50-customer-p2p';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.50-customer-p2p';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl } from './brand__logo.js?v=7.9.4.50-customer-p2p';
+import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.50-customer-p2p';
+import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.50-customer-p2p';
+import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.50-customer-p2p';
 import { Plus, Trash2, Building2, Eye, X, Pencil, Image as ImageIcon, FileDown, FileSpreadsheet, Printer, AlertTriangle, ReceiptText, Sparkles, ScanLine } from 'lucide-react';
 
 const h = React.createElement;
@@ -61,6 +61,16 @@ export const PurchasesView = () => {
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().slice(0,10));
   const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState('');
   const singleRef = useRef(null);
+  const statementRef = useRef(null);
+  const todayIso = new Date().toISOString().slice(0,10);
+  const firstDayIso = `${todayIso.slice(0,8)}01`;
+  const [showPurchaseStatement, setShowPurchaseStatement] = useState(false);
+  const [statementFrom, setStatementFrom] = useState(firstDayIso);
+  const [statementTo, setStatementTo] = useState(todayIso);
+  const financialYears = Array.isArray(settings.financialYears) ? settings.financialYears : [];
+  const activeFinancialYearId = settings.activeFinancialYearId || financialYears.find((y)=>y?.status==='open')?.id || 'fy-initial';
+  const legacyFinancialYearId = financialYears[0]?.id || activeFinancialYearId;
+  const [financialYearFilter, setFinancialYearFilter] = useState(activeFinancialYearId);
 
   useEffect(() => {
     if (warehouses.length) {
@@ -71,6 +81,10 @@ export const PurchasesView = () => {
     const preferredAccount = accounts.find((a) => a?.isDefault) || accounts[0];
     if (preferredAccount && (!accountId || !accounts.some((a) => a.id === accountId))) setAccountId(preferredAccount.id);
   }, [warehouses, suppliers, accounts, settings.activeWarehouseId]);
+
+  useEffect(() => {
+    if (activeFinancialYearId && !financialYears.some((y)=>y?.id===financialYearFilter) && financialYearFilter !== 'all') setFinancialYearFilter(activeFinancialYearId);
+  }, [activeFinancialYearId, settings.financialYears]);
 
   const makeRow = (p = activeProducts[0]) => ({
     productId: p?.id || '',
@@ -162,6 +176,7 @@ export const PurchasesView = () => {
 
   const startEditPurchase = (p) => {
     if (!p) return;
+    if ((p.financialYearId || activeFinancialYearId) !== activeFinancialYearId) { showToast?.('الفاتورة ضمن سنة مالية مؤرشفة. يمكن عرضها وطباعتها فقط.', 'warning'); return; }
     setEditingId(p.id);
     setSupplierId(p.supplierId || suppliers[0]?.id || '');
     setWarehouseId(p.warehouseId || primaryWarehouse?.id || '');
@@ -201,8 +216,13 @@ export const PurchasesView = () => {
   const supplierOpts = suppliers.map((s) => ({ id: s.id, label: s.name || 'مورد', subLabel: s.phone || '', badge: Number(s.balance) ? `رصيد ${money(s.balance)}` : undefined }));
   const whOpts = warehouses.map((w) => ({ id: w.id, label: w.name || 'مخزن', subLabel: w.code || '' }));
   const accountOpts = accounts.map((a) => ({ id: a.id, label: a.name || 'حساب', subLabel: `الرصيد: ${money(a.balance)} ${settings.currencySymbol || ''}` }));
-  const sortedPurchases = purchases.slice().sort((a, b) => safeDate(b?.date) - safeDate(a?.date));
-  const purchasesPager = usePagination(sortedPurchases, 50, String(sortedPurchases.length));
+  const yearPurchases = purchases.filter((row) => financialYearFilter === 'all' || (row.financialYearId || legacyFinancialYearId) === financialYearFilter);
+  const sortedPurchases = yearPurchases.slice().sort((a, b) => safeDate(b?.date) - safeDate(a?.date));
+  const purchasesPager = usePagination(sortedPurchases, 50, `${sortedPurchases.length}|${financialYearFilter}`);
+  const statementStart = new Date(`${statementFrom || todayIso}T00:00:00`).getTime();
+  const statementEnd = new Date(`${statementTo || todayIso}T23:59:59.999`).getTime();
+  const statementRows = sortedPurchases.filter((row) => { const t=safeDate(row?.date).getTime(); return t>=statementStart && t<=statementEnd; });
+  const statementTotals = statementRows.reduce((acc,row)=>{ acc.total += num(row.grandTotal); acc.paid += num(row.paidAmount); acc.debt += num(row.remainingAmount); return acc; },{total:0,paid:0,debt:0});
 
   const applyAIScan = (data) => {
     if (!data) return;
@@ -322,16 +342,63 @@ export const PurchasesView = () => {
             h('td', { className: 'p-3 font-mono' }, `${money(p.grandTotal)} ${settings.currencySymbol || ''}`),
             h('td', { className: 'p-3 font-mono text-emerald-700' }, money(p.paidAmount)),
             h('td', { className: 'p-3 font-mono text-rose-600' }, money(p.remainingAmount)),
-            h('td', { className: 'p-3 flex gap-1' }, h('button', { type: 'button', onClick: () => { warmExportLibraries(); setViewing(p); }, className: 'p-2 rounded-lg border dark:border-slate-700', title:'عرض' }, h(Eye, { className: 'w-4 h-4' })), h('button', { type:'button', onClick:()=>startEditPurchase(p), className:'p-2 rounded-lg border dark:border-slate-700 text-blue-600', title:'تعديل مع قيد عكسي' }, h(Pencil,{className:'w-4 h-4'})), canDelete ? h('button', { type: 'button', onClick: () => setDeleting(p.id), className: 'p-2 rounded-lg border dark:border-slate-700 text-rose-600' }, h(Trash2, { className: 'w-4 h-4' })) : null)
+            h('td', { className: 'p-3 flex gap-1' }, h('button', { type: 'button', onClick: () => { warmExportLibraries(); setViewing(p); }, className: 'p-2 rounded-lg border dark:border-slate-700', title:'عرض' }, h(Eye, { className: 'w-4 h-4' })), ((p.financialYearId || activeFinancialYearId) === activeFinancialYearId ? h('button', { type:'button', onClick:()=>startEditPurchase(p), className:'p-2 rounded-lg border dark:border-slate-700 text-blue-600', title:'تعديل مع قيد عكسي' }, h(Pencil,{className:'w-4 h-4'})) : null), (canDelete && (p.financialYearId || activeFinancialYearId) === activeFinancialYearId) ? h('button', { type: 'button', onClick: () => setDeleting(p.id), className: 'p-2 rounded-lg border dark:border-slate-700 text-rose-600' }, h(Trash2, { className: 'w-4 h-4' })) : null)
           )))
         ),
         h(Pagination,{pager:purchasesPager})
       )
   );
 
+  const purchaseStatementModal = showPurchaseStatement ? h('div',{className:'fixed inset-0 p-2 sm:p-5 flex items-center justify-center bg-slate-950/65',style:{zIndex:2147482500}},
+    h('div',{className:'w-full max-w-5xl max-h-[96vh] bg-slate-100 rounded-2xl overflow-hidden flex flex-col shadow-2xl'},
+      h('div',{className:'no-print shrink-0 p-3 bg-white border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2'},
+        h('div',null,h('div',{className:'font-black text-sm'},'كشف المشتريات والتوريد'),h('div',{className:'text-[10px] text-slate-500'},'حدد الفترة ثم اطبع الكشف أو احفظه PDF من نافذة الطباعة')),
+        h('div',{className:'flex flex-wrap gap-2 items-end'},
+          h('label',{className:'text-[10px] font-bold'},'من',h('input',{type:'date',value:statementFrom,onChange:e=>setStatementFrom(e.target.value),className:'block mt-1 px-2 py-1.5 border rounded-lg text-xs'})),
+          h('label',{className:'text-[10px] font-bold'},'إلى',h('input',{type:'date',value:statementTo,onChange:e=>setStatementTo(e.target.value),className:'block mt-1 px-2 py-1.5 border rounded-lg text-xs'})),
+          h('button',{type:'button',onClick:async()=>{if(statementRef.current){const ok=await printElementOnly(statementRef.current,'a4',`كشف مشتريات ${statementFrom} إلى ${statementTo}`);if(!ok)showToast?.('تعذر تجهيز كشف المشتريات للطباعة','error');}},className:'px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-black flex items-center gap-1.5'},h(Printer,{className:'w-4 h-4'}),'طباعة / PDF'),
+          h('button',{type:'button',onClick:()=>setShowPurchaseStatement(false),className:'p-2 rounded-xl border bg-white'},h(X,{className:'w-4 h-4'}))
+        )
+      ),
+      h('div',{className:'flex-1 overflow-auto p-3 sm:p-5'},
+        h('article',{ref:statementRef,dir:'rtl',className:'mx-auto bg-white text-slate-900 border rounded-xl overflow-hidden',style:{width:'100%',maxWidth:'980px',fontFamily:"'Cairo',Arial,sans-serif",padding:'10mm',boxSizing:'border-box'}},
+          h('header',{className:'text-center pb-4 border-b-2 border-emerald-600'},
+            h('img',{src:getBrandLogoDisplayUrl(settings),alt:'',style:{width:'64px',height:'64px',objectFit:'contain',margin:'0 auto 6px'}}),
+            h('h2',{className:'text-xl font-black'},settings.storeName || 'أوسكار المحاسبي'),
+            h('div',{className:'text-sm font-black text-emerald-700 mt-1'},'كشف المشتريات والتوريد'),
+            h('div',{className:'text-[11px] text-slate-500 mt-2'},`${statementFrom || '-'}  ←  ${statementTo || '-'} • ${financialYears.find(y=>y.id===financialYearFilter)?.name || (financialYearFilter==='all'?'كل السنوات':'السنة المالية الحالية')}`),
+            h('div',{className:'text-[10px] text-slate-400 mt-1'},[settings.address,settings.phone?`هاتف: ${settings.phone}`:'',settings.taxNumber?`الرقم الضريبي: ${settings.taxNumber}`:''].filter(Boolean).join(' • '))
+          ),
+          h('div',{className:'grid grid-cols-2 sm:grid-cols-4 gap-2 my-4'},
+            h('div',{className:'border rounded-lg p-2 text-center'},h('div',{className:'text-[10px] text-slate-500'},'عدد الفواتير'),h('div',{className:'font-black'},String(statementRows.length))),
+            h('div',{className:'border rounded-lg p-2 text-center'},h('div',{className:'text-[10px] text-slate-500'},'الإجمالي'),h('div',{className:'font-black'},`${money(statementTotals.total)} ${settings.currencySymbol||''}`)),
+            h('div',{className:'border rounded-lg p-2 text-center'},h('div',{className:'text-[10px] text-slate-500'},'المدفوع'),h('div',{className:'font-black text-emerald-700'},`${money(statementTotals.paid)} ${settings.currencySymbol||''}`)),
+            h('div',{className:'border rounded-lg p-2 text-center'},h('div',{className:'text-[10px] text-slate-500'},'المتبقي'),h('div',{className:'font-black text-rose-700'},`${money(statementTotals.debt)} ${settings.currencySymbol||''}`))
+          ),
+          h('table',{className:'w-full text-[11px] border-collapse'},
+            h('thead',null,h('tr',{className:'bg-emerald-600 text-white'},...['#','التاريخ','رقم الفاتورة','المورد','الإجمالي','المدفوع','المتبقي'].map((x,i)=>h('th',{key:i,className:'border border-emerald-500 p-2 text-right'},x)))),
+            h('tbody',null,...(statementRows.length?statementRows:[null]).map((row,i)=>row?h('tr',{key:row.id||i},
+              h('td',{className:'border p-2'},i+1),h('td',{className:'border p-2'},safeDate(row.date).toLocaleDateString('ar-EG')),h('td',{className:'border p-2 font-mono'},row.invoiceNumber||'-'),h('td',{className:'border p-2 font-bold'},row.supplierName||'-'),h('td',{className:'border p-2'},money(row.grandTotal)),h('td',{className:'border p-2'},money(row.paidAmount)),h('td',{className:'border p-2'},money(row.remainingAmount))
+            ):h('tr',{key:'empty'},h('td',{colSpan:7,className:'border p-6 text-center text-slate-400'},'لا توجد مشتريات في الفترة المختارة'))))
+          )
+        )
+      )
+    )
+  ) : null;
+
   return h('div', { id: 'purchases-screen', className: 'p-4 sm:p-6 space-y-4 max-w-7xl mx-auto text-right min-h-full' },
-    h('div', { className: 'flex items-center justify-end gap-2' }, h('button', { type: 'button', onClick: () => { setEditingId(null); setMode(mode === 'list' ? 'new' : 'list'); }, className: 'px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-sm' }, mode === 'new' ? 'عرض السجل' : 'فاتورة شراء جديدة')),
+    h('div', { className: 'flex flex-wrap items-center justify-between gap-2' },
+      h('div',{className:'flex items-center gap-2 flex-wrap'},
+        h('select',{value:financialYearFilter,onChange:e=>setFinancialYearFilter(e.target.value),className:'px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 text-xs font-bold'},
+          h('option',{value:'all'},'كل السنوات المالية'),
+          ...financialYears.map(y=>h('option',{key:y.id,value:y.id},`${y.name || 'سنة مالية'}${y.id===activeFinancialYearId?' — الحالية':' — أرشيف'}`))
+        ),
+        h('button',{type:'button',onClick:()=>setShowPurchaseStatement(true),className:'px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-black flex items-center gap-1.5'},h(Printer,{className:'w-4 h-4'}),'كشف مشتريات من تاريخ إلى تاريخ')
+      ),
+      h('button', { type: 'button', onClick: () => { setEditingId(null); setMode(mode === 'list' ? 'new' : 'list'); }, className: 'px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-sm' }, mode === 'new' ? 'عرض السجل' : 'فاتورة شراء جديدة')
+    ),
     mode === 'new' ? form : list,
+    purchaseStatementModal,
     h(PurchaseAIScanModal,{open:showAIScan,onClose:()=>setShowAIScan(false),onApply:applyAIScan}),
     viewing ? h('div', { className: 'fixed inset-x-0 oscar-bounded-modal p-2 sm:p-5 flex items-stretch sm:items-center justify-center overflow-hidden', style:{zIndex:2147482000,background:'rgba(15,23,42,.62)',backdropFilter:'blur(6px)',WebkitBackdropFilter:'blur(6px)'} },
       h('div', { className: 'w-full max-w-3xl h-full max-h-full sm:h-auto bg-slate-100 dark:bg-slate-950 rounded-2xl shadow-2xl overflow-hidden flex flex-col' },

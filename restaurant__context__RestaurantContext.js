@@ -1,8 +1,8 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { getAllFromStore, getFromStore, deleteFromStore, putInStore, syncChannel, } from './restaurant__services__db.js?v=7.9.4.46-profit-report';
-import { initRestaurantDefaults, generateOrderNumber, generateTakeawayQueueNumber, generateKitchenTicketId, playChimeSound, } from './restaurant__services__restaurantService.js?v=7.9.4.46-profit-report';
-import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.46-profit-report';
+import { getAllFromStore, getFromStore, deleteFromStore, putInStore, syncChannel, } from './restaurant__services__db.js?v=7.9.4.50-customer-p2p';
+import { initRestaurantDefaults, generateOrderNumber, generateTakeawayQueueNumber, generateKitchenTicketId, playChimeSound, } from './restaurant__services__restaurantService.js?v=7.9.4.50-customer-p2p';
+import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.50-customer-p2p';
 const RestaurantContext = createContext(null);
 const RESTAURANT_STORES = new Set([
     'restaurant_sections',
@@ -16,7 +16,7 @@ const RESTAURANT_STORES = new Set([
 const isRestaurantTab = (tab) => String(tab || '').startsWith('restaurant_');
 const makeRestaurantId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 export const RestaurantProvider = ({ children }) => {
-    const { products, customers, setSelectedCustomer, setCart, setActiveTab, showToast, settings, isLoaded, isCloudReady, activeTab, } = useApp();
+    const { products, customers, setSelectedCustomer, setCart, setActiveTab, showToast, settings, isLoaded, isCloudReady, activeTab, refreshData, } = useApp();
     const [sections, setSections] = useState([]);
     const [tables, setTables] = useState([]);
     const [orders, setOrders] = useState([]);
@@ -28,7 +28,7 @@ export const RestaurantProvider = ({ children }) => {
     const refreshRestaurantData = useCallback(async () => {
         try {
             const defaults = await initRestaurantDefaults();
-            const [secList, tblList, ordList, ksList, resList, recList, wstList] = await Promise.all([
+            const [secList, tblList, ordList, ksList, resList, recList, wstList, productRows] = await Promise.all([
                 getAllFromStore('restaurant_sections'),
                 getAllFromStore('restaurant_tables'),
                 getAllFromStore('restaurant_orders'),
@@ -36,19 +36,45 @@ export const RestaurantProvider = ({ children }) => {
                 getAllFromStore('table_reservations'),
                 getAllFromStore('recipes'),
                 getAllFromStore('waste_records'),
+                getAllFromStore('products'),
             ]);
             setSections(secList && secList.length > 0 ? secList : defaults.sections);
             setTables(tblList && tblList.length > 0 ? tblList : defaults.tables);
             setKitchenSections(ksList && ksList.length > 0 ? ksList : defaults.kitchenSections);
             setOrders(ordList ? ordList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : []);
             setReservations(resList || []);
-            setRecipes(recList || []);
-            setWasteRecords(wstList ? wstList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : []);
+            const reconciledRecipes = [];
+            let productCostChanged = false;
+            for (const rawRecipe of (recList || [])) {
+                const ingredients = rawRecipe.ingredients || rawRecipe.items || [];
+                const recipeCost = ingredients.reduce((sum, ing) => {
+                    const raw = (productRows || []).find((p) => p.id === (ing.ingredientProductId || ing.productId));
+                    const unit = (raw?.units || []).find((u) => u.id === (ing.ingredientUnitId || ing.unitId)) || (raw?.units || []).find((u) => (Number(u.conversionToBase) || 1) === 1) || (raw?.units || [])[0];
+                    const factor = Number(ing.conversionFactor ?? unit?.conversionToBase ?? 1) || 1;
+                    const baseQty = Number(ing.baseQuantity) > 0 ? Number(ing.baseQuantity) : (Number(ing.quantity) || 0) * factor;
+                    const baseCost = Number(raw?.costPrice) || (Number(unit?.costPrice) / Math.max(1, Number(unit?.conversionToBase) || 1)) || 0;
+                    return sum + baseQty * baseCost;
+                }, 0);
+                const roundedCost = Number(recipeCost.toFixed(4));
+                const recipe = Math.abs(Number(rawRecipe.recipeCost || 0) - roundedCost) > 0.0001 ? { ...rawRecipe, recipeCost: roundedCost, costPrice: roundedCost, updatedAt: new Date().toISOString() } : rawRecipe;
+                if (recipe !== rawRecipe) await putInStore('recipes', recipe);
+                reconciledRecipes.push(recipe);
+                const productId = recipe.productId || recipe.mealProductId;
+                const meal = (productRows || []).find((p) => p.id === productId);
+                if (meal && Math.abs(Number(meal.costPrice || 0) - roundedCost) > 0.0001) {
+                    const updatedUnits = (meal.units || []).map((u) => ({ ...u, costPrice: Number((roundedCost * Math.max(1, Number(u.conversionToBase) || 1)).toFixed(4)) }));
+                    await putInStore('products', { ...meal, costPrice: roundedCost, units: updatedUnits, manufacturedCost: roundedCost, manufacturedCostUpdatedAt: new Date().toISOString() });
+                    productCostChanged = true;
+                }
+            }
+            setRecipes(reconciledRecipes);
+            setWasteRecords(wstList ? wstList.sort((a, b) => new Date(b.date || b.loggedAt || 0).getTime() - new Date(a.date || a.loggedAt || 0).getTime()) : []);
+            if (productCostChanged) refreshData?.().catch?.(() => {});
         }
         catch (e) {
             console.warn('Error loading restaurant data:', e);
         }
-    }, []);
+    }, [refreshData]);
     useEffect(() => {
         // Wait until AppContext has completed the initial cloud pull. Previously the
         // restaurant provider could seed defaults before cloud data arrived, which made
@@ -836,6 +862,15 @@ export const RestaurantProvider = ({ children }) => {
         const productName = recipeData.mealProductName || recipeData.productName || 'وجبة';
         const items = recipeData.items || recipeData.ingredients || [];
         const ingredients = recipeData.ingredients || recipeData.items || [];
+        const recipeCost = ingredients.reduce((sum, ing) => {
+            const raw = products.find((p) => p.id === (ing.ingredientProductId || ing.productId));
+            const unit = (raw?.units || []).find((u) => u.id === (ing.ingredientUnitId || ing.unitId)) || (raw?.units || []).find((u) => (Number(u.conversionToBase) || 1) === 1) || (raw?.units || [])[0];
+            const factor = Number(ing.conversionFactor ?? unit?.conversionToBase ?? 1) || 1;
+            const baseQty = Number(ing.baseQuantity) > 0 ? Number(ing.baseQuantity) : (Number(ing.quantity) || 0) * factor;
+            const baseCost = Number(raw?.costPrice) || (Number(unit?.costPrice) / Math.max(1, Number(unit?.conversionToBase) || 1)) || 0;
+            return sum + baseQty * baseCost;
+        }, 0);
+        const roundedRecipeCost = Number(recipeCost.toFixed(4));
         const recipe = {
             id,
             productId,
@@ -844,10 +879,18 @@ export const RestaurantProvider = ({ children }) => {
             mealProductName: productName,
             items,
             ingredients,
+            recipeCost: roundedRecipeCost,
+            costPrice: roundedRecipeCost,
             notes: recipeData.notes,
             updatedAt: new Date().toISOString(),
         };
         await putInStore('recipes', recipe);
+        const manufacturedProduct = products.find((p) => p.id === productId);
+        if (manufacturedProduct) {
+            const updatedUnits = (manufacturedProduct.units || []).map((u) => ({ ...u, costPrice: Number((roundedRecipeCost * Math.max(1, Number(u.conversionToBase) || 1)).toFixed(4)) }));
+            await putInStore('products', { ...manufacturedProduct, costPrice: roundedRecipeCost, units: updatedUnits, manufacturedCost: roundedRecipeCost, manufacturedCostUpdatedAt: new Date().toISOString() });
+            refreshData?.().catch?.(() => {});
+        }
         setRecipes((prev) => {
             const idx = prev.findIndex((r) => r.id === id || (productId && r.productId === productId));
             if (idx >= 0) {
@@ -885,6 +928,12 @@ export const RestaurantProvider = ({ children }) => {
         await putInStore('waste_records', newWaste);
         setWasteRecords((prev) => [newWaste, ...prev]);
         syncChannel?.postMessage({ type: 'restaurant_waste_change' });
+    };
+    const deleteWasteRecord = async (id) => {
+        await deleteFromStore('waste_records', id);
+        setWasteRecords((prev) => prev.filter((row) => row.id !== id));
+        syncChannel?.postMessage({ type: 'restaurant_waste_change' });
+        showToast?.('تم حذف سجل الهالك/الاستهلاك', 'info');
     };
     const updateReservationStatus = async (id, status) => {
         await updateReservation(id, { status });
@@ -933,6 +982,8 @@ export const RestaurantProvider = ({ children }) => {
             deleteRecipe,
             addWasteRecord,
             logWaste: addWasteRecord,
+            deleteWasteRecord,
+            deleteWaste: deleteWasteRecord,
             refreshRestaurantData,
         }, children: children }));
 };

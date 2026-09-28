@@ -1,7 +1,7 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import App from './App.js?v=7.9.4.46-profit-report';
+import App from './App.js?v=7.9.4.50-customer-p2p';
 
 class OscarErrorBoundary extends React.Component {
   constructor(props) {

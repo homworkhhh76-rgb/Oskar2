@@ -1,5 +1,5 @@
-import { getAllFromStore, getFromStore, putInStore } from './services__db.js?v=7.9.4.46-profit-report';
-import { renderInvoiceCanvas, renderVoucherCanvas, renderTableCanvas } from './utils__canvasRenderer.js?v=7.9.4.46-profit-report';
+import { getAllFromStore, getFromStore, putInStore } from './services__db.js?v=7.9.4.50-customer-p2p';
+import { renderInvoiceCanvas, renderVoucherCanvas, renderTableCanvas } from './utils__canvasRenderer.js?v=7.9.4.50-customer-p2p';
 
 // Telegram integration for Oscar Accounting.
 // The owner explicitly requested embedding this token in the app build.
@@ -156,25 +156,37 @@ async function botRequest(method, payload) {
   return data;
 }
 
-export async function resolveTelegramUsername(username) {
+export async function resolveTelegramUsername(username, { linkToken = '' } = {}) {
   const normalized = normalizeUsername(username);
   if (!/^@[A-Za-z0-9_]{5,32}$/.test(normalized)) {
     throw new Error('اكتب يوزر Telegram صحيح مثل @username');
   }
+  const wanted = normalized.slice(1).toLowerCase();
+  let lastTelegramError = '';
 
-  // المسار المفضل: الاستضافة تحفظ الربط username <-> chat_id داخلياً وتعيد المعرّف دون إظهاره للمستخدم.
+  // 0) لو كان اليوزر مربوطاً سابقاً على نفس الجهاز، استخدم الـ Chat ID المحفوظ فوراً.
+  try {
+    const settings = await getStoreSettings();
+    const cached = normalizeTelegramRecipients(settings.telegramRecipients).find((r) =>
+      String(r.username || '').replace(/^@+/, '').toLowerCase() === wanted && normalizeId(r.chatId)
+    );
+    if (cached) return { chatId:String(cached.chatId), username:normalizeUsername(cached.username || normalized), name:String(cached.label || '').trim() };
+  } catch {}
+
+  // 1) المسار المفضل: خادم أوسكار يحتفظ بقائمة مستخدمي البوت التي تم التقاطها من Telegram.
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
     const response = await fetch('./api/telegram/resolve', {
       method:'POST',
       headers:{ 'Content-Type':'application/json' },
-      body:JSON.stringify({ username:normalized }),
+      body:JSON.stringify({ username:normalized, linkToken:String(linkToken || '') }),
       cache:'no-store',
       signal:controller.signal,
     });
     clearTimeout(timer);
-    const data = await response.json().catch(() => ({}));
+    const type = String(response.headers?.get?.('content-type') || '');
+    const data = /json/i.test(type) ? await response.json().catch(() => ({})) : {};
     if (response.ok && data?.ok && data?.result?.chatId) {
       return {
         chatId:String(data.result.chatId),
@@ -182,14 +194,68 @@ export async function resolveTelegramUsername(username) {
         name:String(data.result.name || data.result.firstName || '').trim(),
       };
     }
-    if (response.status !== 404 && response.status !== 405 && data?.error) throw new Error(data.error);
+    if (data?.error) lastTelegramError = String(data.error);
   } catch (error) {
-    if (error?.name !== 'AbortError' && !/Failed to fetch|NetworkError/i.test(String(error?.message || ''))) {
-      // سنجرب fallback المباشر أدناه؛ لو لم يجد المستخدم سنعيد رسالة أوضح.
-    }
+    if (error?.name !== 'AbortError') lastTelegramError = String(error?.message || lastTelegramError || '');
   }
 
-  // Fallback للاستضافة الثابتة: نفحص تحديثات البوت الأخيرة بدون تمرير offset، وبالتالي لا نؤكد/نستهلك التحديثات.
+  // 2) حاول قراءة سجل المستخدمين من الخادم مباشرة؛ هذا يفيد عندما تم استهلاك تحديث /start مسبقاً.
+  try {
+    const response = await fetch('./api/telegram/users', { cache:'no-store' });
+    const type = String(response.headers?.get?.('content-type') || '');
+    const data = /json/i.test(type) ? await response.json().catch(() => ({})) : {};
+    const users = Array.isArray(data) ? data : (Array.isArray(data?.users) ? data.users : []);
+    const row = users.find((item) => String(item?.username || item?.user_name || item?.telegram_username || '').replace(/^@+/, '').toLowerCase() === wanted);
+    const chatId = normalizeId(row?.chatId ?? row?.chat_id ?? row?.id);
+    if (row && chatId) {
+      return { chatId, username:normalizeUsername(row.username || row.user_name || row.telegram_username || normalized), name:String(row.name || row.firstName || row.first_name || '').trim() };
+    }
+  } catch {}
+
+  // 3) لو البوت مربوط بـ Webhook خارجي، حاول الاستفادة من سجل المستخدمين في نفس استضافة الـ Webhook.
+  try {
+    const infoRes = await fetch(`${API_ROOT}/getWebhookInfo`, { method:'GET', cache:'no-store' });
+    const info = await infoRes.json().catch(() => ({}));
+    const webhookUrl = String(info?.result?.url || '').trim();
+    if (infoRes.ok && info?.ok && webhookUrl) {
+      let origin = '';
+      try { origin = new URL(webhookUrl).origin; } catch {}
+      const candidates = origin ? [
+        `${origin}/api/telegram/users`,
+        `${origin}/api/users`,
+        `${origin}/telegram/users`,
+      ] : [];
+      for (const endpoint of candidates) {
+        try {
+          const response = await fetch(endpoint, { cache:'no-store' });
+          if (!response.ok) continue;
+          const data = await response.json().catch(() => null);
+          const users = Array.isArray(data) ? data : (Array.isArray(data?.users) ? data.users : (Array.isArray(data?.result) ? data.result : []));
+          const row = users.find((item) => String(item?.username || item?.user_name || item?.telegram_username || '').replace(/^@+/, '').toLowerCase() === wanted);
+          const chatId = normalizeId(row?.chatId ?? row?.chat_id ?? row?.telegram_id ?? row?.user_id ?? row?.id);
+          if (row && chatId) {
+            return { chatId, username:normalizeUsername(row.username || row.user_name || row.telegram_username || normalized), name:String(row.name || row.firstName || row.first_name || '').trim() };
+          }
+        } catch {}
+      }
+    }
+  } catch {}
+
+  // 4) محاولة getChat كمسار إضافي لبعض أنواع محادثات Telegram.
+  try {
+    const response = await fetch(`${API_ROOT}/getChat`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ chat_id:normalized }), cache:'no-store'
+    });
+    const data = await response.json().catch(() => ({}));
+    const chat = data?.result || {};
+    const foundUsername = String(chat?.username || '').trim();
+    if (response.ok && data?.ok && chat?.id && (!foundUsername || foundUsername.toLowerCase() === wanted)) {
+      return { chatId:String(chat.id), username:normalizeUsername(foundUsername || normalized), name:String(chat.first_name || chat.title || '').trim() };
+    }
+  } catch {}
+
+  // 5) Fallback للاستضافة الثابتة: نفحص تحديثات البوت الحديثة مباشرة.
+  // عند الربط الجديد نبحث أيضاً عن كود start فريد، لذلك لا نعتمد على بقاء تحديث Start القديم.
   try {
     const response = await fetch(`${API_ROOT}/getUpdates`, {
       method:'POST',
@@ -198,8 +264,9 @@ export async function resolveTelegramUsername(username) {
       cache:'no-store',
     });
     const data = await response.json().catch(() => ({}));
-    if (response.ok && data?.ok && Array.isArray(data.result)) {
-      const wanted = normalized.slice(1).toLowerCase();
+    if (!response.ok || data?.ok === false) {
+      lastTelegramError = String(data?.description || data?.error || `Telegram HTTP ${response.status}`);
+    } else if (Array.isArray(data.result)) {
       for (let i=data.result.length-1; i>=0; i--) {
         const update = data.result[i] || {};
         const msg = update.message || update.edited_message || update.callback_query?.message;
@@ -207,18 +274,57 @@ export async function resolveTelegramUsername(username) {
         const from = update.callback_query?.from || msg?.from || {};
         const foundUsername = String(chat.username || from.username || '').trim();
         const chatId = chat.id || (chat.type === 'private' ? from.id : null);
-        if (chatId && foundUsername.toLowerCase() === wanted) {
+        const text = String(msg?.text || '').trim();
+        const tokenMatched = !!linkToken && (text === `/start ${linkToken}` || text.includes(String(linkToken)));
+        const usernameMatched = foundUsername && foundUsername.toLowerCase() === wanted;
+        if (chatId && (tokenMatched || usernameMatched)) {
           return {
             chatId:String(chatId),
-            username:`@${foundUsername}`,
+            username:normalizeUsername(foundUsername || normalized),
             name:String(chat.first_name || from.first_name || '').trim(),
           };
         }
       }
     }
-  } catch {}
+  } catch (error) {
+    lastTelegramError = String(error?.message || lastTelegramError || '');
+  }
 
-  throw new Error(`لم أجد ${normalized} ضمن مستخدمي البوت. يجب أن يكون الحساب قد فتح @${TELEGRAM_BOT_USERNAME} وضغط Start مرة واحدة على الأقل.`);
+  const webhookConflict = /webhook|conflict|409/i.test(lastTelegramError);
+  if (webhookConflict) {
+    throw new Error(`تعذر قراءة مستخدمي البوت لأن Telegram مربوط حالياً باستضافة Webhook أخرى. سنعيد محاولة الربط برسالة Start جديدة.`);
+  }
+  throw new Error(lastTelegramError || `لم أجد ${normalized} ضمن مستخدمي البوت بعد.`);
+}
+
+const telegramLinkToken = () => `oscar_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,10)}`.replace(/[^A-Za-z0-9_-]/g,'').slice(0,60);
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// ربط موثوق: إن لم يعد تحديث /start القديم موجوداً، نولّد Start جديداً بكود فريد وننتظر التقاطه.
+export async function linkTelegramUsername(username, { timeoutMs = 70000, onLinkRequired = null } = {}) {
+  const normalized = normalizeUsername(username);
+  try {
+    return await resolveTelegramUsername(normalized);
+  } catch (firstError) {
+    const linkToken = telegramLinkToken();
+    const deepLink = `${TELEGRAM_BOT_URL}?start=${encodeURIComponent(linkToken)}`;
+    try { if (typeof onLinkRequired === 'function') onLinkRequired({ deepLink, linkToken, error:firstError }); } catch {}
+    try {
+      if (typeof window !== 'undefined' && window?.open) window.open(deepLink, '_blank', 'noopener');
+    } catch {}
+
+    const deadline = Date.now() + Math.max(15000, Number(timeoutMs) || 70000);
+    let lastError = firstError;
+    while (Date.now() < deadline) {
+      await sleep(2200);
+      try {
+        const resolved = await resolveTelegramUsername(normalized, { linkToken });
+        if (resolved?.chatId) return resolved;
+      } catch (error) { lastError = error; }
+    }
+    const detail = String(lastError?.message || '').trim();
+    throw new Error(`لم يكتمل ربط ${normalized}. افتح @${TELEGRAM_BOT_USERNAME} من الرابط الذي ظهر، واضغط Start ثم ارجع للبرنامج وأعد المحاولة.${detail ? ` (${detail})` : ''}`);
+  }
 }
 
 async function sendTextToChat(chatId, text, { silent=false } = {}) {

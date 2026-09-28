@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@200;300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./app.css?v=7.9.4.46-profit-report" />
+  <link rel="stylesheet" href="./app.css?v=7.9.4.50-customer-p2p" />
   <script type="importmap">
   {
     "imports": {
@@ -29,8 +29,8 @@
     }
   }
   </script>
-  <script src="./oscar-activation-runtime.js?v=7.9.4.46-profit-report"></script>
-  <script src="./oscar-cloud-sync.js?v=7.9.4.46-profit-report"></script>
+  <script src="./oscar-activation-runtime.js?v=7.9.4.50-customer-p2p"></script>
+  <script src="./oscar-cloud-sync.js?v=7.9.4.50-customer-p2p"></script>
 </head>
 <body>
   <script>document.documentElement.classList.remove('dark');</script>
@@ -44,7 +44,7 @@
     </div>
   </div>
   <script type="module">
-    const OSCAR_BUILD = '7.9.4.46-profit-report';
+    const OSCAR_BUILD = '7.9.4.50-customer-p2p';
     const isLocal = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
 
     const clearCodeCaches = async () => {
@@ -78,20 +78,21 @@
         const markerKey = 'oscar-last-boot-build';
         const previous = localStorage.getItem(markerKey);
         if (previous !== OSCAR_BUILD) {
-          await clearCodeCaches();
+          // Do not destroy the previous PWA cache during an update. Keeping it lets
+          // the program open immediately/offline while the new worker refreshes files.
           localStorage.setItem(markerKey, OSCAR_BUILD);
         }
       } catch (_) {}
 
       try {
-        await import('./main.js?v=7.9.4.46-profit-report');
+        await import('./main.js?v=7.9.4.50-customer-p2p');
         sessionStorage.removeItem('oscar-rootfix-retry');
       } catch (error) {
         try { console.error('OSCAR_BOOT_RECOVERY', error); } catch (_) {}
         const retried = sessionStorage.getItem('oscar-rootfix-retry') === OSCAR_BUILD;
         if (!retried) {
           sessionStorage.setItem('oscar-rootfix-retry', OSCAR_BUILD);
-          await clearCodeCaches();
+          try { const registration = await navigator.serviceWorker?.getRegistration?.(); registration?.update?.(); } catch (_) {}
           const url = new URL(location.href);
           url.searchParams.set('_oscar_build', OSCAR_BUILD + '-' + Date.now());
           location.replace(url.href);
@@ -105,7 +106,7 @@
   </script>
   <script>
     if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !['localhost','127.0.0.1','::1'].includes(location.hostname)) {
-      addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=7.9.4.46-profit-report', { updateViaCache: 'none' }).then((registration) => registration.update()).catch(() => {}));
+      addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=7.9.4.50-customer-p2p', { updateViaCache: 'none' }).then((registration) => registration.update()).catch(() => {}));
     }
   </script>
 </body>

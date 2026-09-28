@@ -1,10 +1,10 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.46-profit-report';
-import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.46-profit-report';
-import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.46-profit-report';
-import { notifyTelegramInvoice } from './services__telegram.js?v=7.9.4.46-profit-report';
-import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.46-profit-report';
+import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.50-customer-p2p';
+import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.50-customer-p2p';
+import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.50-customer-p2p';
+import { notifyTelegramInvoice } from './services__telegram.js?v=7.9.4.50-customer-p2p';
+import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.50-customer-p2p';
 const AppContext = createContext(null);
 const recordTime = (item = {}) => {
     const fields = ['createdAt', 'date', 'timestamp', 'startTime', 'updatedAt'];
@@ -279,6 +279,19 @@ export const AppProvider = ({ children }) => {
                 // The marker preserves the user's later choice if they turn it off manually.
                 if (normalizedSettings.telegramBackupDefaultV45Initialized !== true) {
                     normalizedSettings = { ...normalizedSettings, telegramDailyBackupEnabled: true, telegramBackupDefaultV45Initialized: true };
+                    settingsChanged = true;
+                }
+                // v7.9.4.48: financial years are open-ended. Existing data is assigned to
+                // the initial year only when the user later opens a new year.
+                if (normalizedSettings.financialYearInitializedV48 !== true || !Array.isArray(normalizedSettings.financialYears) || !normalizedSettings.activeFinancialYearId) {
+                    const allDocumentDates = [...(invs || []), ...(purchs || [])]
+                        .map((row) => new Date(row?.date || row?.createdAt || 0).getTime())
+                        .filter((value) => Number.isFinite(value) && value > 0);
+                    const startIso = allDocumentDates.length ? new Date(Math.min(...allDocumentDates)).toISOString() : new Date().toISOString();
+                    const initialId = normalizedSettings.activeFinancialYearId || 'fy-initial';
+                    const existingYears = Array.isArray(normalizedSettings.financialYears) ? normalizedSettings.financialYears : [];
+                    const initialYear = existingYears.find((year) => year?.id === initialId) || { id: initialId, name: 'السنة المالية الحالية', startDate: startIso, endDate: null, status: 'open', createdAt: new Date().toISOString() };
+                    normalizedSettings = { ...normalizedSettings, financialYears: existingYears.length ? existingYears : [initialYear], activeFinancialYearId: initialId, financialYearInitializedV48: true };
                     settingsChanged = true;
                 }
                 setSettings(normalizedSettings);
@@ -743,7 +756,7 @@ export const AppProvider = ({ children }) => {
         const selectedLiveCustomer = selectedCustomer?.id ? (sourceCustomers.find((c) => c.id === selectedCustomer.id) || selectedCustomer) : CASH_CUSTOMER;
         const saleCustomer = payload.forceCashCustomer ? CASH_CUSTOMER : (payload.customerObject || (payload.customerId ? (sourceCustomers.find((c) => c.id === payload.customerId) || selectedLiveCustomer || CASH_CUSTOMER) : (selectedLiveCustomer || CASH_CUSTOMER)));
         if ((payload.paymentType === 'debt' || payload.paymentType === 'partial') && saleCustomer.id === CASH_CUSTOMER.id) { showToast('يجب اختيار عميل مسجل للبيع الآجل أو الدفع الجزئي!', 'error'); return null; }
-        const invoice = { id:invoiceId, invoiceNumber, type:'sale', date:invoiceDate, customerId:saleCustomer.id, customerName:saleCustomer.name, cashierId:currentUser.id, cashierName:currentUser.name, shiftId:liveActiveShift?.id, branchId:settings.activeBranchName, warehouseId, items:invoiceItems, subtotal, lineDiscountTotal, invoiceDiscountType:effectiveDiscountType, invoiceDiscountValue:rawDiscount, invoiceDiscountAmount, discountTotal, taxTotal, roundingAdjustment, grandTotal, paidAmount:Math.min(paid,grandTotal), remainingAmount:remaining, changeAmount:change, paymentType:payload.paymentType, payments, status:'completed', notes:payload.notes, syncId, isSynced:false, createdAt:payload.createdAtOverride || now, updatedAt:now, editedAt:payload.isEdit ? now : undefined };
+        const invoice = { id:invoiceId, invoiceNumber, type:'sale', date:invoiceDate, financialYearId: payload.financialYearIdOverride || settings.activeFinancialYearId || 'fy-initial', customerId:saleCustomer.id, customerName:saleCustomer.name, cashierId:currentUser.id, cashierName:currentUser.name, shiftId:liveActiveShift?.id, branchId:settings.activeBranchName, warehouseId, items:invoiceItems, subtotal, lineDiscountTotal, invoiceDiscountType:effectiveDiscountType, invoiceDiscountValue:rawDiscount, invoiceDiscountAmount, discountTotal, taxTotal, roundingAdjustment, grandTotal, paidAmount:Math.min(paid,grandTotal), remainingAmount:remaining, changeAmount:change, paymentType:payload.paymentType, payments, status:'completed', notes:payload.notes, syncId, isSynced:false, createdAt:payload.createdAtOverride || now, updatedAt:now, editedAt:payload.isEdit ? now : undefined };
         await putInStore('invoices', invoice);
         const updatedStockList=[...sourceStock], newMovements=[];
         const deductStock = (productId, productName, baseQty, movementMeta = {}) => {
@@ -973,6 +986,7 @@ export const AppProvider = ({ children }) => {
             invoiceNumber: returnNumber,
             type: 'return',
             date: now,
+            financialYearId: original.financialYearId || settings.activeFinancialYearId || 'fy-initial',
             customerId: original.customerId,
             customerName: original.customerName,
             cashierId: currentUser.id,
@@ -1039,7 +1053,7 @@ export const AppProvider = ({ children }) => {
         notifyTelegramInvoice(returnInvoice,'return').catch(()=>{});
         showToast(`تم تسجيل المرتجع وعكس المخزون والدين والدفع [${returnNumber}]`, 'success');
         return returnInvoice;
-    }, [invoices, products, customers, currentUser, activeShift, accounts, stock, warehouses, reloadData, showToast, addStockDelta, restoreFifoQuantity, appendReversalStatement]);
+    }, [invoices, products, customers, currentUser, activeShift, accounts, stock, warehouses, reloadData, showToast, addStockDelta, restoreFifoQuantity, appendReversalStatement, settings.activeFinancialYearId]);
     // Create Purchase Invoice (local-first: durable local save first, cloud sync later)
     const createPurchaseInvoice = useCallback(async (payload) => {
         const [liveProductsRaw, liveStockRaw, liveAccountsRaw, liveSuppliersRaw] = await Promise.all([getAllFromStore('products'), getAllFromStore('stock'), getAllFromStore('accounts'), getAllFromStore('suppliers')]);
@@ -1057,7 +1071,7 @@ export const AppProvider = ({ children }) => {
         const subtotal=items.reduce((x,i)=>x+(Number(i.total)||0),0);
         const discountTotal=Math.max(0,Math.min(subtotal,Number(payload.discountAmount)||0));
         const grandTotal=Math.max(0,subtotal-discountTotal); const paidAmount=Math.min(grandTotal,Math.max(0,Number(payload.paidAmount)||0)); const remaining=Math.max(0,grandTotal-paidAmount); const ratio=subtotal>0?grandTotal/subtotal:1;
-        const purchaseInvoice={id:purchaseId,invoiceNumber,supplierInvoiceNumber:payload.supplierInvoiceNumber||'',date:purchaseDate,supplierId:payload.supplierId,supplierName:payload.supplierName,warehouseId,warehouseName:targetWarehouse.name||'صالة العرض',items:items.map((it,idx)=>({id:`pur-it-${Date.now()}-${idx}`,...it})),subtotal,discountType:payload.discountType||'fixed',discountValue:Number(payload.discountValue)||0,discountTotal,taxTotal:0,grandTotal,paidAmount,remainingAmount:remaining,paymentType:payload.paymentType,payments,notes:payload.notes||'',syncId,isSynced:false,createdAt:payload.createdAtOverride || now,updatedAt:now,editedAt:payload.isEdit?now:undefined};
+        const purchaseInvoice={id:purchaseId,invoiceNumber,supplierInvoiceNumber:payload.supplierInvoiceNumber||'',date:purchaseDate,financialYearId:payload.financialYearIdOverride || settings.activeFinancialYearId || 'fy-initial',supplierId:payload.supplierId,supplierName:payload.supplierName,warehouseId,warehouseName:targetWarehouse.name||'صالة العرض',items:items.map((it,idx)=>({id:`pur-it-${Date.now()}-${idx}`,...it})),subtotal,discountType:payload.discountType||'fixed',discountValue:Number(payload.discountValue)||0,discountTotal,taxTotal:0,grandTotal,paidAmount,remainingAmount:remaining,paymentType:payload.paymentType,payments,notes:payload.notes||'',syncId,isSynced:false,createdAt:payload.createdAtOverride || now,updatedAt:now,editedAt:payload.isEdit?now:undefined};
         await putInStore('purchases',purchaseInvoice);
         const updatedProducts=sourceProducts.map(p=>({...p,fifoBatches:Array.isArray(p.fifoBatches)?p.fifoBatches.map(b=>({...b})):[]})); const updatedStockList=[...sourceStock],newMovements=[];
         for(const item of items){const pi=updatedProducts.findIndex(p=>p.id===item.productId);const si=updatedStockList.findIndex(x=>x.productId===item.productId&&x.warehouseId===warehouseId);const currentBaseStock=si>=0?Number(updatedStockList[si].baseQuantity)||0:0;const currentTotalBaseStock=updatedStockList.filter(x=>x.productId===item.productId).reduce((sum,row)=>sum+Math.max(0,Number(row.baseQuantity)||0),0);const baseQty=Math.max(0,Number(item.baseQuantity)||0);const newBaseStock=currentBaseStock+baseQty;
@@ -1073,7 +1087,7 @@ export const AppProvider = ({ children }) => {
         if(updatedSupplier)setSuppliers(prev=>prev.some(x=>x.id===updatedSupplier.id)?prev.map(x=>x.id===updatedSupplier.id?updatedSupplier:x):[updatedSupplier,...prev]);if(supplierStatement)setPartnerStatements(prev=>[supplierStatement,...prev]);
         setSyncQueue(window.OscarCloudSync?.pendingItems?.() || []);
         playSuccessSound(settings.scannerBeepEnabled);notifyTelegramInvoice(purchaseInvoice,'purchase').catch(()=>{});showToast(payload?.isEdit ? `تم تعديل فاتورة الشراء [${invoiceNumber}] مع عكس القيد القديم وإعادة احتساب الجديد` : `تم تسجيل فاتورة الشراء بنجاح [${invoiceNumber}]`,'success');return purchaseInvoice;
-    }, [warehouses,products,stock,accounts,suppliers,currentUser,showToast,settings.activeWarehouseId,settings.scannerBeepEnabled]);
+    }, [warehouses,products,stock,accounts,suppliers,currentUser,showToast,settings.activeWarehouseId,settings.activeFinancialYearId,settings.scannerBeepEnabled]);
 
     // Damaged/expired stock: deduct quantity and exact FIFO cost as a loss expense.
     const recordDamagedStock = useCallback(async (productId, warehouseId, baseQuantity, reason='تالف / منتهي الصلاحية') => {
@@ -1390,10 +1404,14 @@ export const AppProvider = ({ children }) => {
         showToast(`تم استرجاع الصنف «${prod.name}» بنجاح`, 'success');
     }, [products, reloadData, showToast]);
     const permanentDeleteProduct = useCallback(async (productId) => {
+        const relatedStock = (stock || []).filter((row) => row?.productId === productId);
+        for (const row of relatedStock) {
+            try { await deleteFromStore('stock', [productId, row.warehouseId]); } catch (_) {}
+        }
         await deleteFromStore('products', productId);
         await reloadData();
-        showToast('تم حذف الصنف نهائياً', 'info');
-    }, [reloadData, showToast]);
+        showToast('تم حذف الصنف نهائياً من قاعدة البيانات', 'info');
+    }, [stock, reloadData, showToast]);
     const saveCategory = useCallback(async (category) => {
         await putInStore('categories', category);
         await reloadData();
@@ -1456,6 +1474,11 @@ export const AppProvider = ({ children }) => {
         await reloadData();
         showToast(`تم استرجاع العميل «${cust.name}»`, 'success');
     }, [customers, reloadData, showToast]);
+    const permanentDeleteCustomer = useCallback(async (customerId) => {
+        await deleteFromStore('customers', customerId);
+        await reloadData();
+        showToast('تم حذف العميل نهائياً من قاعدة البيانات', 'info');
+    }, [reloadData, showToast]);
     const saveSupplier = useCallback(async (supplier) => {
         const existing = suppliers.find((s) => s.id === supplier.id);
         const openingBalanceAmount = Math.max(0, Number(supplier.openingBalanceAmount) || 0);
@@ -1509,6 +1532,11 @@ export const AppProvider = ({ children }) => {
         await reloadData();
         showToast(`تم استرجاع المورد «${supp.name}»`, 'success');
     }, [suppliers, reloadData, showToast]);
+    const permanentDeleteSupplier = useCallback(async (supplierId) => {
+        await deleteFromStore('suppliers', supplierId);
+        await reloadData();
+        showToast('تم حذف المورد نهائياً من قاعدة البيانات', 'info');
+    }, [reloadData, showToast]);
     const saveAccount = useCallback(async (account) => {
         // Always keep one starred/default account. The starred account is used automatically
         // in every account/cashbox dropdown across POS, vouchers, expenses and purchases.
@@ -1662,6 +1690,17 @@ export const AppProvider = ({ children }) => {
         showToast('تم نقل المصروف إلى سلة المحذوفات وإلغاء أثره المالي', 'info');
     }, [expenses, accounts, activeShift, currentUser, reloadData, showToast]);
     const softDeleteExpense = deleteExpense;
+    const permanentDeleteExpense = useCallback(async (id) => {
+        const exp = expenses.find((e) => e.id === id);
+        if (!exp?.deletedAt) {
+            showToast('يجب نقل المصروف إلى سلة المحذوفات أولاً', 'warning');
+            return false;
+        }
+        await deleteFromStore('expenses', id);
+        await reloadData();
+        showToast('تم حذف المصروف نهائياً من قاعدة البيانات', 'info');
+        return true;
+    }, [expenses, reloadData, showToast]);
     const restoreExpense = useCallback(async (id) => {
         const exp = expenses.find((e) => e.id === id);
         if (!exp || !exp.deletedAt)
@@ -2174,6 +2213,41 @@ export const AppProvider = ({ children }) => {
         await reloadData();
         showToast(`تم إغلاق الوردية. الفرق: ${diff >= 0 ? `+${diff}` : diff} ${settings.currencySymbol}`, diff === 0 ? 'success' : 'warning');
     }, [activeShift, settings.currencySymbol, reloadData, showToast]);
+    const openNewFinancialYear = useCallback(async ({ name, startDate } = {}) => {
+        const today = new Date().toISOString().slice(0, 10);
+        const chosen = String(startDate || today).slice(0, 10);
+        const start = new Date(`${chosen}T00:00:00`);
+        if (Number.isNaN(start.getTime())) { showToast('اختر تاريخ بداية صحيحاً للسنة المالية الجديدة', 'warning'); return false; }
+        const startIso = start.toISOString();
+        const years = Array.isArray(settings.financialYears) ? settings.financialYears.map((year) => ({ ...year })) : [];
+        const oldId = settings.activeFinancialYearId || years.find((year) => year?.status === 'open')?.id || 'fy-initial';
+        const oldYear = years.find((year) => year?.id === oldId);
+        if (oldYear?.startDate && start.getTime() <= new Date(oldYear.startDate).getTime()) {
+            showToast('بداية السنة الجديدة يجب أن تكون بعد بداية السنة الحالية', 'warning');
+            return false;
+        }
+        const [allInvoices, allPurchases] = await Promise.all([getAllFromStore('invoices'), getAllFromStore('purchases')]);
+        const archiveStamp = startIso;
+        const archivedInvoices = (allInvoices || []).map((row) => {
+            const rowYear = row.financialYearId || oldId;
+            return rowYear === oldId ? { ...row, financialYearId: oldId, financialYearArchivedAt: archiveStamp } : row;
+        });
+        const archivedPurchases = (allPurchases || []).map((row) => {
+            const rowYear = row.financialYearId || oldId;
+            return rowYear === oldId ? { ...row, financialYearId: oldId, financialYearArchivedAt: archiveStamp } : row;
+        });
+        if (archivedInvoices.length) await bulkPut('invoices', archivedInvoices);
+        if (archivedPurchases.length) await bulkPut('purchases', archivedPurchases);
+        const closedYears = years.length ? years.map((year) => year.id === oldId ? { ...year, status: 'closed', endDate: startIso, archivedAt: archiveStamp } : year) : [{ id: oldId, name: 'السنة المالية السابقة', startDate: startIso, endDate: startIso, status: 'closed', archivedAt: archiveStamp }];
+        const id = `fy-${Date.now()}`;
+        const newYear = { id, name: String(name || `السنة المالية ${chosen}`).trim() || `السنة المالية ${chosen}`, startDate: startIso, endDate: null, status: 'open', createdAt: new Date().toISOString() };
+        const nextSettings = { ...settings, financialYears: [...closedYears, newYear], activeFinancialYearId: id, financialYearInitializedV48: true };
+        await putInStore('settings', { key: 'store_config', ...nextSettings });
+        setSettings(nextSettings);
+        await reloadData();
+        showToast(`تم فتح ${newYear.name} وأرشفة السنة السابقة`, 'success');
+        return newYear;
+    }, [settings, reloadData, showToast]);
     const saveSettings = useCallback(async (newSettings) => {
         await putInStore('settings', { key: 'store_config', ...newSettings });
         setSettings(newSettings);
@@ -2312,11 +2386,13 @@ export const AppProvider = ({ children }) => {
         deleteCustomer,
         softDeleteCustomer,
         restoreCustomer,
+        permanentDeleteCustomer,
         recordCustomerPayment,
         saveSupplier,
         deleteSupplier,
         softDeleteSupplier,
         restoreSupplier,
+        permanentDeleteSupplier,
         recordSupplierPayment,
         saveAccount,
         deleteAccount,
@@ -2327,6 +2403,7 @@ export const AppProvider = ({ children }) => {
         deleteExpense,
         softDeleteExpense,
         restoreExpense,
+        permanentDeleteExpense,
         saveWarehouse,
         deleteWarehouse,
         refreshData,
@@ -2340,6 +2417,7 @@ export const AppProvider = ({ children }) => {
         closeShift,
         saveSettings,
         updateSettings,
+        openNewFinancialYear,
         syncPendingQueue,
         retrySyncItem,
         handleScannedBarcode,

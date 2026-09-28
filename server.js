@@ -68,9 +68,15 @@ async function refreshTelegramUsers({maxBatches=5}={}){
 async function handleTelegramResolve(req,res,origin){
   let body; try{body=await readBody(req,256*1024);}catch(e){return sendJson(res,400,{ok:false,error:e.message},origin);}
   const key=normalizeTelegramUsername(body?.username); if(!/^[a-z0-9_]{5,32}$/i.test(key)) return sendJson(res,400,{ok:false,error:'اكتب يوزر Telegram صحيح مثل @username'},origin);
-  try{await refreshTelegramUsers({maxBatches:5});}catch(e){console.error('Telegram user sync error:',e?.message||e);}
-  const row=readTelegramUsersState().users?.[key];
-  if(!row?.chatId) return sendJson(res,404,{ok:false,error:`لم يتم العثور على @${key}. يجب أن يكون المستخدم قد فتح البوت وضغط Start مرة واحدة على الأقل.`},origin);
+  let state=readTelegramUsersState(), row=state.users?.[key], syncError='';
+  if(!row?.chatId){
+    try{state=await refreshTelegramUsers({maxBatches:8}); row=state.users?.[key];}
+    catch(e){syncError=String(e?.message||e); console.error('Telegram user sync error:',syncError);}
+  }
+  if(!row?.chatId){
+    const suffix=/webhook|conflict|409/i.test(syncError)?' البوت مربوط بـ Webhook آخر؛ استخدم رابط Start الجديد من البرنامج ليتم تحديث الربط.':' افتح البوت من رابط الربط الجديد واضغط Start ثم ارجع للبرنامج.';
+    return sendJson(res,404,{ok:false,error:`لم يتم العثور على @${key}.${suffix}`,telegram_error:syncError||null},origin);
+  }
   return sendJson(res,200,{ok:true,result:{chatId:row.chatId,username:row.username||`@${key}`,name:[row.firstName,row.lastName].filter(Boolean).join(' ').trim()}},origin);
 }
 async function handleTelegramUsers(req,res,origin){

@@ -1,4 +1,4 @@
-import { renderElementTablePages, resolveExportElement } from './utils__canvasRenderer.js?v=7.9.4.46-profit-report';
+import { renderElementTablePages, resolveExportElement } from './utils__canvasRenderer.js?v=7.9.4.50-customer-p2p';
 
 const safe=v=>String(v||'export').replace(/[\\/:*?"<>|]+/g,'-').trim()||'export';
 const withExt=(name,ext)=>safe(name).toLowerCase().endsWith(ext)?safe(name):safe(name)+ext;
@@ -16,7 +16,7 @@ function paper(v){const s=String(v||'').toLowerCase();if(s.includes('58'))return
 function pageFromCanvas(canvas,options={}){
   const p=paper(options.paperSize),j=jpeg(canvas,options.jpegQuality??.9);
   if(p==='58mm'||p==='80mm'){const ptPerMm=72/25.4,pageW=(p==='58mm'?58:80)*ptPerMm,pageH=Math.max(40*ptPerMm,pageW*canvas.height/canvas.width);return{...j,pageW,pageH,x:0,y:0,drawW:pageW,drawH:pageH};}
-  const landscape=String(options.orientation||'').toLowerCase()==='landscape',pageW=landscape?841.89:595.28,pageH=landscape?595.28:841.89,margin=Number(options.marginPt??14.17),maxW=pageW-margin*2,maxH=pageH-margin*2,ratio=Math.min(maxW/canvas.width,maxH/canvas.height),drawW=canvas.width*ratio,drawH=canvas.height*ratio;return{...j,pageW,pageH,x:(pageW-drawW)/2,y:(pageH-drawH)/2,drawW,drawH};
+  const landscape=String(options.orientation||'').toLowerCase()==='landscape',pageW=landscape?841.89:595.28,pageH=landscape?595.28:841.89,margin=Number(options.marginPt??28.35),maxW=pageW-margin*2,maxH=pageH-margin*2,ratio=Math.min(maxW/canvas.width,maxH/canvas.height),drawW=canvas.width*ratio,drawH=canvas.height*ratio;return{...j,pageW,pageH,x:(pageW-drawW)/2,y:(pageH-drawH)/2,drawW,drawH};
 }
 function buildPdf(pages){
   const objects=new Map(),kids=[];objects.set(1,b('<< /Type /Catalog /Pages 2 0 R >>'));

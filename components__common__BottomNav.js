@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.46-profit-report';
-import { canAccessTab, canAccessPermission } from './utils__permissions.js?v=7.9.4.46-profit-report';
+import { useApp } from './context__AppContext.js?v=7.9.4.50-customer-p2p';
+import { canAccessTab, canAccessPermission } from './utils__permissions.js?v=7.9.4.50-customer-p2p';
 import {
   ShoppingCart, ReceiptText, Package, Warehouse, Menu, X, LayoutDashboard, Truck,
   Boxes, Users, Building2, Wallet, Receipt, Barcode, BarChart3, Trash2, Settings,

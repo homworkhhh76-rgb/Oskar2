@@ -3760,7 +3760,7 @@
   }
   body.receipt-print-mode[data-receipt-paper="80mm"] #printable-receipt { width:80mm !important; max-width:80mm !important; }
   body.receipt-print-mode[data-receipt-paper="58mm"] #printable-receipt { width:58mm !important; max-width:58mm !important; padding:2mm !important; }
-  body.receipt-print-mode[data-receipt-paper="a4"] #printable-receipt { width:210mm !important; max-width:210mm !important; padding:10mm !important; }
+  body.receipt-print-mode[data-receipt-paper="a4"] #printable-receipt { width:190mm !important; max-width:190mm !important; padding:0 !important; box-sizing:border-box !important; }
   body.receipt-print-mode #modal-receipt-backdrop,
   body.receipt-print-mode #modal-receipt-box { background:transparent !important; box-shadow:none !important; border:0 !important; }
 }

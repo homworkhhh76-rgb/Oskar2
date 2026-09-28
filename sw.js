@@ -1,7 +1,7 @@
-const BUILD='7.9.4.46-profit-report';
+const BUILD='7.9.4.50-customer-p2p';
 const CACHE=`oscar-accounting-${BUILD}`;
 const RUNTIME_CACHE=`oscar-accounting-runtime-${BUILD}`;
-const LOCAL=["./services__telegram.js?v=7.9.4.46-profit-report","./services__telegramReports.js?v=7.9.4.46-profit-report","./services__printer.js?v=7.9.4.46-profit-report","./utils__permissions.js?v=7.9.4.46-profit-report","./components__ai__OscarAI.js?v=7.9.4.46-profit-report","./components__purchases__PurchaseAIScanModal.js?v=7.9.4.46-profit-report","./services__ai.js?v=7.9.4.46-profit-report","./services__aiActions.js?v=7.9.4.46-profit-report","./utils__aiMatching.js?v=7.9.4.46-profit-report","./App.js?v=7.9.4.46-profit-report","./app-icon.png","./brand-logo.png","./app.css","./components__accounts__AccountsView.js?v=7.9.4.46-profit-report","./components__auth__LoginGate.js?v=7.9.4.46-profit-report","./components__barcodes__BarcodesView.js?v=7.9.4.46-profit-report","./components__categories__CategoriesView.js?v=7.9.4.46-profit-report","./components__common__BottomNav.js?v=7.9.4.46-profit-report","./components__common__Dropdown.js?v=7.9.4.46-profit-report","./components__common__Header.js?v=7.9.4.46-profit-report","./components__common__NotificationsModal.js?v=7.9.4.46-profit-report","./components__common__Pagination.js?v=7.9.4.46-profit-report","./components__common__PWAInstallButton.js?v=7.9.4.46-profit-report","./components__common__Sidebar.js?v=7.9.4.46-profit-report","./components__common__Toast.js?v=7.9.4.46-profit-report","./components__customers__CustomersView.js?v=7.9.4.46-profit-report","./components__dashboard__DashboardView.js?v=7.9.4.46-profit-report","./components__employees__EmployeesView.js?v=7.9.4.46-profit-report","./components__expenses__ExpensesView.js?v=7.9.4.46-profit-report","./components__inventory__InventoryView.js?v=7.9.4.46-profit-report","./components__inventory__TransferForm.js?v=7.9.4.46-profit-report","./components__pos__CameraScannerModal.js?v=7.9.4.46-profit-report","./components__pos__CartPanel.js?v=7.9.4.46-profit-report","./components__pos__FullCartView.js?v=7.9.4.46-profit-report","./components__pos__HoldInvoicesModal.js?v=7.9.4.46-profit-report","./components__pos__POSView.js?v=7.9.4.46-profit-report","./components__pos__PaymentModal.js?v=7.9.4.46-profit-report","./components__pos__ProductGrid.js?v=7.9.4.46-profit-report","./components__pos__ThermalReceiptModal.js?v=7.9.4.46-profit-report","./components__products__ProductsView.js?v=7.9.4.46-profit-report","./components__purchases__PurchasesView.js?v=7.9.4.46-profit-report","./components__reports__ReportsView.js?v=7.9.4.46-profit-report","./components__sales__SalesView.js?v=7.9.4.46-profit-report","./components__settings__SettingsView.js?v=7.9.4.46-profit-report","./components__suppliers__SuppliersView.js?v=7.9.4.46-profit-report","./components__sync__SyncModal.js?v=7.9.4.46-profit-report","./components__trash__TrashView.js?v=7.9.4.46-profit-report","./components__vouchers__VouchersView.js?v=7.9.4.46-profit-report","./context__AppContext.js?v=7.9.4.46-profit-report","./hooks__usePWAInstall.js?v=7.9.4.46-profit-report","./icon-192.png","./icon-512.png","./icon-maskable-512.png","./icon.svg","./index.html","./main.js?v=7.9.4.46-profit-report","./manifest.webmanifest","./services__audio.js?v=7.9.4.46-profit-report","./services__db.js?v=7.9.4.46-profit-report","./types__index.js?v=7.9.4.46-profit-report","./utils__export.js?v=7.9.4.46-profit-report","./utils__canvasRenderer.js?v=7.9.4.46-profit-report","./utils__imageExport.js?v=7.9.4.46-profit-report","./utils__pdfExport.js?v=7.9.4.46-profit-report","./utils__professionalExport.js?v=7.9.4.46-profit-report","./brand__logo.js?v=7.9.4.46-profit-report","./utils__unitTree.js?v=7.9.4.46-profit-report","./utils__code128.js?v=7.9.4.46-profit-report","./utils__qrcode.js?v=7.9.4.46-profit-report","./oscar-activation-runtime.js?v=7.9.4.46-profit-report","./oscar-cloud-sync.js?v=7.9.4.46-profit-report","./restaurant__context__AppContext.js?v=7.9.4.46-profit-report","./restaurant__context__RestaurantContext.js?v=7.9.4.46-profit-report","./restaurant__services__restaurantService.js?v=7.9.4.46-profit-report","./restaurant__services__db.js?v=7.9.4.46-profit-report","./restaurant__services__kitchenPrint.js?v=7.9.4.46-profit-report","./restaurant__components__RestaurantSettingsPanel.js?v=7.9.4.46-profit-report","./restaurant__components__RestaurantTablesView.js?v=7.9.4.46-profit-report","./restaurant__components__RestaurantWasteView.js?v=7.9.4.46-profit-report","./restaurant__components__RestaurantKDSView.js?v=7.9.4.46-profit-report","./restaurant__components__RestaurantWaiterView.js?v=7.9.4.46-profit-report","./restaurant__components__ItemModifierModal.js?v=7.9.4.46-profit-report","./restaurant__components__KitchenTicketModal.js?v=7.9.4.46-profit-report","./admin.html","./master-admin.js?v=7.9.4.46-profit-report","./customer.html","./customer-portal.js?v=7.9.4.46-profit-report","./customer-portal-codec.js?v=7.9.4.46-profit-report"];
+const LOCAL=["./services__telegram.js?v=7.9.4.50-customer-p2p","./services__telegramReports.js?v=7.9.4.50-customer-p2p","./services__printer.js?v=7.9.4.50-customer-p2p","./utils__permissions.js?v=7.9.4.50-customer-p2p","./components__ai__OscarAI.js?v=7.9.4.50-customer-p2p","./components__purchases__PurchaseAIScanModal.js?v=7.9.4.50-customer-p2p","./services__ai.js?v=7.9.4.50-customer-p2p","./services__aiActions.js?v=7.9.4.50-customer-p2p","./utils__aiMatching.js?v=7.9.4.50-customer-p2p","./App.js?v=7.9.4.50-customer-p2p","./app-icon.png","./brand-logo.png","./app.css","./components__accounts__AccountsView.js?v=7.9.4.50-customer-p2p","./components__auth__LoginGate.js?v=7.9.4.50-customer-p2p","./components__barcodes__BarcodesView.js?v=7.9.4.50-customer-p2p","./components__categories__CategoriesView.js?v=7.9.4.50-customer-p2p","./components__common__BottomNav.js?v=7.9.4.50-customer-p2p","./components__common__Dropdown.js?v=7.9.4.50-customer-p2p","./components__common__Header.js?v=7.9.4.50-customer-p2p","./components__common__NotificationsModal.js?v=7.9.4.50-customer-p2p","./components__common__Pagination.js?v=7.9.4.50-customer-p2p","./components__common__PWAInstallButton.js?v=7.9.4.50-customer-p2p","./components__common__Sidebar.js?v=7.9.4.50-customer-p2p","./components__common__Toast.js?v=7.9.4.50-customer-p2p","./components__customers__CustomersView.js?v=7.9.4.50-customer-p2p","./components__dashboard__DashboardView.js?v=7.9.4.50-customer-p2p","./components__employees__EmployeesView.js?v=7.9.4.50-customer-p2p","./components__expenses__ExpensesView.js?v=7.9.4.50-customer-p2p","./components__inventory__InventoryView.js?v=7.9.4.50-customer-p2p","./components__inventory__TransferForm.js?v=7.9.4.50-customer-p2p","./components__pos__CameraScannerModal.js?v=7.9.4.50-customer-p2p","./components__pos__CartPanel.js?v=7.9.4.50-customer-p2p","./components__pos__FullCartView.js?v=7.9.4.50-customer-p2p","./components__pos__HoldInvoicesModal.js?v=7.9.4.50-customer-p2p","./components__pos__POSView.js?v=7.9.4.50-customer-p2p","./components__pos__PaymentModal.js?v=7.9.4.50-customer-p2p","./components__pos__ProductGrid.js?v=7.9.4.50-customer-p2p","./components__pos__ThermalReceiptModal.js?v=7.9.4.50-customer-p2p","./components__products__ProductsView.js?v=7.9.4.50-customer-p2p","./components__purchases__PurchasesView.js?v=7.9.4.50-customer-p2p","./components__reports__ReportsView.js?v=7.9.4.50-customer-p2p","./components__sales__SalesView.js?v=7.9.4.50-customer-p2p","./components__settings__SettingsView.js?v=7.9.4.50-customer-p2p","./components__suppliers__SuppliersView.js?v=7.9.4.50-customer-p2p","./components__sync__SyncModal.js?v=7.9.4.50-customer-p2p","./components__trash__TrashView.js?v=7.9.4.50-customer-p2p","./components__vouchers__VouchersView.js?v=7.9.4.50-customer-p2p","./context__AppContext.js?v=7.9.4.50-customer-p2p","./hooks__usePWAInstall.js?v=7.9.4.50-customer-p2p","./icon-192.png","./icon-512.png","./icon-maskable-512.png","./icon.svg","./index.html","./main.js?v=7.9.4.50-customer-p2p","./manifest.webmanifest","./services__audio.js?v=7.9.4.50-customer-p2p","./services__db.js?v=7.9.4.50-customer-p2p","./types__index.js?v=7.9.4.50-customer-p2p","./utils__export.js?v=7.9.4.50-customer-p2p","./utils__canvasRenderer.js?v=7.9.4.50-customer-p2p","./utils__imageExport.js?v=7.9.4.50-customer-p2p","./utils__pdfExport.js?v=7.9.4.50-customer-p2p","./utils__professionalExport.js?v=7.9.4.50-customer-p2p","./brand__logo.js?v=7.9.4.50-customer-p2p","./utils__unitTree.js?v=7.9.4.50-customer-p2p","./utils__code128.js?v=7.9.4.50-customer-p2p","./utils__qrcode.js?v=7.9.4.50-customer-p2p","./oscar-activation-runtime.js?v=7.9.4.50-customer-p2p","./oscar-cloud-sync.js?v=7.9.4.50-customer-p2p","./restaurant__context__AppContext.js?v=7.9.4.50-customer-p2p","./restaurant__context__RestaurantContext.js?v=7.9.4.50-customer-p2p","./restaurant__services__restaurantService.js?v=7.9.4.50-customer-p2p","./restaurant__services__db.js?v=7.9.4.50-customer-p2p","./restaurant__services__kitchenPrint.js?v=7.9.4.50-customer-p2p","./restaurant__components__RestaurantSettingsPanel.js?v=7.9.4.50-customer-p2p","./restaurant__components__RestaurantTablesView.js?v=7.9.4.50-customer-p2p","./restaurant__components__RestaurantWasteView.js?v=7.9.4.50-customer-p2p","./restaurant__components__RestaurantKDSView.js?v=7.9.4.50-customer-p2p","./restaurant__components__RestaurantWaiterView.js?v=7.9.4.50-customer-p2p","./restaurant__components__ItemModifierModal.js?v=7.9.4.50-customer-p2p","./restaurant__components__KitchenTicketModal.js?v=7.9.4.50-customer-p2p","./admin.html","./master-admin.js?v=7.9.4.50-customer-p2p","./customer.html","./معتمد.html","./customer-portal.js?v=7.9.4.50-customer-p2p","./customer-portal-codec.js?v=7.9.4.50-customer-p2p"];
 const REMOTE=[
   'https://esm.sh/react@19.3.0',
   'https://esm.sh/react-dom@19.3.0?external=react',
@@ -41,32 +41,56 @@ self.addEventListener('install',event=>event.waitUntil((async()=>{
   await self.skipWaiting();
 })()));
 self.addEventListener('activate',event=>event.waitUntil((async()=>{
-  const keys=await caches.keys();
-  await Promise.all(keys.filter(k=>k.startsWith('oscar-accounting-')&&!([CACHE,RUNTIME_CACHE].includes(k))).map(k=>caches.delete(k)));
+  // Keep the previous Oscar caches as an offline safety net. Old builds used to
+  // delete them during every update, which could leave the app unable to open
+  // when the network disappeared before the new dependency tree finished caching.
   await self.clients.claim();
 })()));
 async function update(cache,request){try{const fresh=await fetch(new Request(request,{cache:'no-cache'}));if(cacheable(fresh))await cache.put(request,fresh.clone());return fresh}catch(_){return null}}
+async function matchPreviousOscarCache(request,{runtime=false,ignoreSearch=false}={}){
+  try{
+    const keys=(await caches.keys()).filter((key)=>runtime
+      ? key.startsWith('oscar-accounting-runtime-')
+      : key.startsWith('oscar-accounting-')&&!key.startsWith('oscar-accounting-runtime-'));
+    for(let i=keys.length-1;i>=0;i--){
+      const key=keys[i];
+      if(key===(runtime?RUNTIME_CACHE:CACHE))continue;
+      const oldCache=await caches.open(key);
+      const hit=await oldCache.match(request,{ignoreSearch});
+      if(hit)return hit;
+    }
+  }catch(_){}
+  return null;
+}
 async function sameOriginResponse(request,event){
   const cache=await caches.open(CACHE);
-  const url=new URL(request.url);
-  const isCode=request.mode==='navigate'||/\.(?:js|html)$/i.test(url.pathname);
-  const cached=(await cache.match(request))||(await cache.match(request,{ignoreSearch:true}));
-  // Code is network-first: a stale cached syntax error must never win while the app files are reachable.
-  if(isCode){
-    const fresh=await update(cache,request);if(fresh)return fresh;
-    if(cached)return cached;
-    if(request.mode==='navigate')return (await cache.match('./index.html',{ignoreSearch:true}))||Response.error();
-    return new Response('',{status:503,statusText:'Offline'});
-  }
-  if(cached){event.waitUntil(update(cache,request));return cached}
+  // Prefer an exact versioned hit. If this build has not been cached yet, try the
+  // network once so an old ignoreSearch entry cannot pin the app to stale code.
+  const exact=await cache.match(request);
+  if(exact)return exact;
+  const fallback=await cache.match(request,{ignoreSearch:true});
   const fresh=await update(cache,request);if(fresh)return fresh;
+  // Offline safety: when the new build has never been fetched, an older local
+  // copy is still better than a blank screen. The next online launch refreshes it.
+  if(fallback)return fallback;
+  const previous=await matchPreviousOscarCache(request,{ignoreSearch:true});
+  if(previous)return previous;
+  if(request.mode==='navigate'){
+    const localIndex=await cache.match('./index.html',{ignoreSearch:true});
+    if(localIndex)return localIndex;
+    const oldIndex=await matchPreviousOscarCache(new Request(new URL('./index.html',self.location.href)),{ignoreSearch:true});
+    if(oldIndex)return oldIndex;
+    return Response.error();
+  }
   return new Response('',{status:503,statusText:'Offline'});
 }
 async function externalResponse(request,event){
   const cache=await caches.open(RUNTIME_CACHE);
   const cached=await cache.match(request);
-  if(cached){event.waitUntil(update(cache,request));return cached}
+  if(cached)return cached;
   const fresh=await update(cache,request);if(fresh)return fresh;
+  const previous=await matchPreviousOscarCache(request,{runtime:true,ignoreSearch:false});
+  if(previous)return previous;
   return new Response('',{status:503,statusText:'Offline'});
 }
 self.addEventListener('fetch',event=>{
