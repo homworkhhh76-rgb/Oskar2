@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useApp } from './context__AppContext.js?v=7.9.4.52-draft-sections';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.52-draft-sections';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.52-draft-sections';
-import { exportToCSV, printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.52-draft-sections';
-import { downloadProfessionalTablePDF, downloadProfessionalTableImage, downloadProfessionalVoucherPDF, downloadProfessionalVoucherImage } from './utils__professionalExport.js?v=7.9.4.52-draft-sections';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl } from './brand__logo.js?v=7.9.4.52-draft-sections';
+import { useApp } from './context__AppContext.js?v=7.9.4.53-fiscal-payments';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.53-fiscal-payments';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.53-fiscal-payments';
+import { exportToCSV, printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.53-fiscal-payments';
+import { downloadProfessionalTablePDF, downloadProfessionalTableImage, downloadProfessionalVoucherPDF, downloadProfessionalVoucherImage } from './utils__professionalExport.js?v=7.9.4.53-fiscal-payments';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl } from './brand__logo.js?v=7.9.4.53-fiscal-payments';
 import { FileSpreadsheet, ArrowDownLeft, ArrowUpRight, Search, Trash2, Printer, Download, Image as ImageIcon, FileText, CreditCard, User, Building2, AlertCircle, Eye, X } from 'lucide-react';
 
 const h = React.createElement;
@@ -37,15 +37,19 @@ export const VouchersView = () => {
   useEffect(() => { if (!viewingVoucher) setVoucherPaperSize(settings.printerWidth || '80mm'); }, [settings.printerWidth, viewingVoucher]);
 
   const canManageVouchers = currentUser?.permissions?.canManageVouchers === true;
-  const filteredVouchers = vouchers.filter((v) => {
+  const years = Array.isArray(settings.financialYears) ? settings.financialYears : [];
+  const activeFY = settings.activeFinancialYearId || years.find(y=>y?.status==='open')?.id || 'fy-initial';
+  const legacyFY = years[0]?.id || activeFY;
+  const currentVouchers = vouchers.filter(v=>String(v?.financialYearId || legacyFY)===String(activeFY));
+  const filteredVouchers = currentVouchers.filter((v) => {
     if (activeTabFilter !== 'all' && v.type !== activeTabFilter) return false;
     const q = searchTerm.trim().toLowerCase();
     if (!q) return true;
     return String(v.voucherNumber || '').includes(q) || String(v.partyName || '').toLowerCase().includes(q) || String(v.notes || '').toLowerCase().includes(q);
   });
   const vouchersPager = usePagination(filteredVouchers, 50, `${activeTabFilter}|${searchTerm}`);
-  const totalReceipts = vouchers.filter(v => v.type === 'receipt').reduce((s,v) => s + (Number(v.amount)||0), 0);
-  const totalPayments = vouchers.filter(v => v.type === 'payment').reduce((s,v) => s + (Number(v.amount)||0), 0);
+  const totalReceipts = currentVouchers.filter(v => v.type === 'receipt').reduce((s,v) => s + (Number(v.amount)||0), 0);
+  const totalPayments = currentVouchers.filter(v => v.type === 'payment').reduce((s,v) => s + (Number(v.amount)||0), 0);
 
   const openNew = (type) => {
     setFormType(type);

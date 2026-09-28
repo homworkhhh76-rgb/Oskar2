@@ -1,10 +1,10 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.52-draft-sections';
-import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.52-draft-sections';
-import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.52-draft-sections';
-import { notifyTelegramInvoice } from './services__telegram.js?v=7.9.4.52-draft-sections';
-import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.52-draft-sections';
+import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.53-fiscal-payments';
+import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.53-fiscal-payments';
+import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.53-fiscal-payments';
+import { notifyTelegramInvoice } from './services__telegram.js?v=7.9.4.53-fiscal-payments';
+import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.53-fiscal-payments';
 const AppContext = createContext(null);
 const recordTime = (item = {}) => {
     const fields = ['createdAt', 'date', 'timestamp', 'startTime', 'updatedAt'];
@@ -283,6 +283,26 @@ export const AppProvider = ({ children }) => {
                 // The marker preserves the user's later choice if they turn it off manually.
                 if (normalizedSettings.telegramBackupDefaultV45Initialized !== true) {
                     normalizedSettings = { ...normalizedSettings, telegramDailyBackupEnabled: true, telegramBackupDefaultV45Initialized: true };
+                    settingsChanged = true;
+                }
+                // v7.9.4.53: P2P payment methods are manual-only. Older builds seeded three
+                // demo methods automatically; remove them only when they are still the untouched seed.
+                if (normalizedSettings.p2pMethodsManualOnlyV53Initialized !== true) {
+                    const methods = Array.isArray(normalizedSettings.p2pPaymentMethods) ? normalizedSettings.p2pPaymentMethods : [];
+                    const byId = Object.fromEntries(methods.map((m) => [String(m?.id || ''), m]));
+                    const looksLikeLegacySeed = methods.length === 3
+                        && byId.palpay && byId['jawwal-pay'] && byId['bank-palestine']
+                        && String(byId.palpay?.fields?.[0]?.value || '') === 'انور أحمد الندا'
+                        && String(byId.palpay?.fields?.[1]?.value || '') === '0597603119'
+                        && String(byId['jawwal-pay']?.fields?.[0]?.value || '') === 'انور أحمد الندا'
+                        && String(byId['jawwal-pay']?.fields?.[1]?.value || '') === '0597603119'
+                        && String(byId['bank-palestine']?.fields?.[2]?.value || '') === '3143732'
+                        && String(byId['bank-palestine']?.fields?.[3]?.value || '') === 'PS11PALS045521437320993100000';
+                    normalizedSettings = {
+                        ...normalizedSettings,
+                        p2pPaymentMethods: looksLikeLegacySeed ? [] : methods,
+                        p2pMethodsManualOnlyV53Initialized: true,
+                    };
                     settingsChanged = true;
                 }
                 // v7.9.4.48: financial years are open-ended. Existing data is assigned to
@@ -642,6 +662,7 @@ export const AppProvider = ({ children }) => {
         const held = {
             id: 'held-' + Date.now(),
             date: new Date().toISOString(),
+            financialYearId: settings.activeFinancialYearId || 'fy-initial',
             customerId: selectedCustomer?.id || CASH_CUSTOMER.id,
             customerName: selectedCustomer?.name || CASH_CUSTOMER.name,
             items: [...cart],
@@ -652,7 +673,7 @@ export const AppProvider = ({ children }) => {
         setHeldInvoices((prev) => [held, ...prev]);
         clearCart();
         showToast('تم تعليق الفاتورة بنجاح ويمكن استرجاعها في أي وقت', 'success');
-    }, [cart, selectedCustomer, clearCart, showToast]);
+    }, [cart, selectedCustomer, clearCart, showToast, settings.activeFinancialYearId]);
     const restoreHeldInvoice = useCallback(async (heldId) => {
         const held = heldInvoices.find((h) => h.id === heldId);
         if (!held)
@@ -804,7 +825,7 @@ export const AppProvider = ({ children }) => {
             const currentQty=stockIndex>=0?Number(updatedStockList[stockIndex].baseQuantity)||0:0;
             const newQty=currentQty-baseQty;
             if(stockIndex>=0) updatedStockList[stockIndex]={...updatedStockList[stockIndex],baseQuantity:newQty}; else updatedStockList.push({productId,warehouseId,baseQuantity:newQty});
-            newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:now,productId,productName,warehouseId,warehouseName:warehouse?.name||'صالة العرض',type:movementMeta.type||'sale',unitName:movementMeta.unitName||'وحدة أساسية',quantityInUnit:movementMeta.quantityInUnit??baseQty,conversionFactor:movementMeta.conversionFactor||1,baseQuantityChange:-baseQty,newBaseBalance:newQty,referenceId:invoice.id,referenceType:'INVOICE',userId:currentUser.id,userName:currentUser.name,recipeId:movementMeta.recipeId,manufacturedProductId:movementMeta.manufacturedProductId,manufacturedProductName:movementMeta.manufacturedProductName});
+            newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:now,financialYearId:settings.activeFinancialYearId||'fy-initial',productId,productName,warehouseId,warehouseName:warehouse?.name||'صالة العرض',type:movementMeta.type||'sale',unitName:movementMeta.unitName||'وحدة أساسية',quantityInUnit:movementMeta.quantityInUnit??baseQty,conversionFactor:movementMeta.conversionFactor||1,baseQuantityChange:-baseQty,newBaseBalance:newQty,referenceId:invoice.id,referenceType:'INVOICE',userId:currentUser.id,userName:currentUser.name,recipeId:movementMeta.recipeId,manufacturedProductId:movementMeta.manufacturedProductId,manufacturedProductName:movementMeta.manufacturedProductName});
         };
         for (const item of invoiceItems) {
             if (item.isManufacturedMeal && Array.isArray(item.recipeConsumption) && item.recipeConsumption.length > 0) {
@@ -828,7 +849,7 @@ export const AppProvider = ({ children }) => {
         for(const p of payments){const i=updatedAccounts.findIndex(a=>a.id===p.accountId);if(i>=0)updatedAccounts[i]={...updatedAccounts[i],balance:(Number(updatedAccounts[i].balance)||0)+(Number(p.amount)||0)};}
         await bulkPut('accounts',updatedAccounts);
         let updatedCustomer = null, customerStatement = null, updatedShift = null;
-        if(remaining>0&&saleCustomer.id!==CASH_CUSTOMER.id){const newBalance=(Number(saleCustomer.balance)||0)+remaining;updatedCustomer={...saleCustomer,balance:newBalance};customerStatement={id:'stmt-'+Date.now(),date:now,type:'sale',partnerType:'customer',partnerId:saleCustomer.id,partnerName:saleCustomer.name,referenceType:'SALE',referenceId:invoice.id,referenceNumber:invoiceNumber,description:`فاتورة مبيعات آجل رقم ${invoiceNumber}`,debit:remaining,credit:0,runningBalance:newBalance};await putInStore('customers',updatedCustomer);await putInStore('partner_statements',customerStatement);}
+        if(remaining>0&&saleCustomer.id!==CASH_CUSTOMER.id){const newBalance=(Number(saleCustomer.balance)||0)+remaining;updatedCustomer={...saleCustomer,balance:newBalance};customerStatement={id:'stmt-'+Date.now(),date:now,financialYearId:settings.activeFinancialYearId||'fy-initial',type:'sale',partnerType:'customer',partnerId:saleCustomer.id,partnerName:saleCustomer.name,referenceType:'SALE',referenceId:invoice.id,referenceNumber:invoiceNumber,description:`فاتورة مبيعات آجل رقم ${invoiceNumber}`,debit:remaining,credit:0,runningBalance:newBalance};await putInStore('customers',updatedCustomer);await putInStore('partner_statements',customerStatement);}
         if(liveActiveShift){const cashPaid=payments.filter(p=>p.method==='cash').reduce((x,p)=>x+(Number(p.amount)||0),0)-change;const otherPaid=payments.filter(p=>p.method!=='cash').reduce((x,p)=>x+(Number(p.amount)||0),0);updatedShift={...liveActiveShift,totalCashSales:(Number(liveActiveShift.totalCashSales)||0)+Math.max(0,cashPaid),totalOtherSales:(Number(liveActiveShift.totalOtherSales)||0)+otherPaid,expectedCash:(Number(liveActiveShift.expectedCash)||0)+Math.max(0,cashPaid)};await putInStore('shifts',updatedShift);}
         // Update the open screen from the already-saved local data; no full database reload and no cloud wait.
         setInvoices(prev => [invoice, ...prev.filter(x => x.id !== invoice.id)]);
@@ -857,6 +878,7 @@ export const AppProvider = ({ children }) => {
             await putInStore('stock_movements', {
                 id: movement.id || `mov-reverse-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
                 date: movement.date || new Date().toISOString(),
+                financialYearId: movement.financialYearId || settings.activeFinancialYearId || 'fy-initial',
                 productId,
                 warehouseId,
                 baseQuantityChange: qty,
@@ -867,7 +889,7 @@ export const AppProvider = ({ children }) => {
             });
         }
         return nextRows;
-    }, [currentUser]);
+    }, [currentUser, settings.activeFinancialYearId]);
 
     const appendReversalStatement = useCallback(async ({ partnerType, partner, amount, referenceType, referenceId, referenceNumber, description, direction }) => {
         const value = Math.max(0, finiteNumber(amount, 0));
@@ -1088,7 +1110,7 @@ export const AppProvider = ({ children }) => {
             const cashRefund = accountRefunds.filter((r) => r.method === 'cash' || (liveReturnAccounts || []).find((a) => a.id === r.accountId)?.type === 'cash').reduce((s, r) => s + finiteNumber(r.amount, 0), 0);
             if (cashRefund > 0) await putInStore('shifts', { ...activeShift, totalCashReturns: finiteNumber(activeShift.totalCashReturns, 0) + cashRefund, expectedCash: finiteNumber(activeShift.expectedCash, 0) - cashRefund });
         }
-        await putInStore('audit_logs', { id: `audit-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date: now, type: 'sales_return_reverse_entry', referenceId: returnInvoice.id, originalReferenceId: original.id, amount: refundTotal, debtReversed, accountRefunds, userId: currentUser.id, userName: currentUser.name });
+        await putInStore('audit_logs', { id: `audit-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date: now, financialYearId: settings.activeFinancialYearId || 'fy-initial', type: 'sales_return_reverse_entry', referenceId: returnInvoice.id, originalReferenceId: original.id, amount: refundTotal, debtReversed, accountRefunds, userId: currentUser.id, userName: currentUser.name });
         await reloadData();
         notifyTelegramInvoice(returnInvoice,'return').catch(()=>{});
         showToast(`تم تسجيل المرتجع وعكس المخزون والدين والدفع [${returnNumber}]`, 'success');
@@ -1117,11 +1139,11 @@ export const AppProvider = ({ children }) => {
         for(const item of items){const pi=updatedProducts.findIndex(p=>p.id===item.productId);const si=updatedStockList.findIndex(x=>x.productId===item.productId&&x.warehouseId===warehouseId);const currentBaseStock=si>=0?Number(updatedStockList[si].baseQuantity)||0:0;const currentTotalBaseStock=updatedStockList.filter(x=>x.productId===item.productId).reduce((sum,row)=>sum+Math.max(0,Number(row.baseQuantity)||0),0);const baseQty=Math.max(0,Number(item.baseQuantity)||0);const newBaseStock=currentBaseStock+baseQty;
           if(pi>=0){const currentCost=Number(updatedProducts[pi].costPrice)||0;const unitCost=((Number(item.unitPrice)||0)*ratio)/Math.max(0.00000001,(Number(item.conversionFactor)||1));let batches=updatedProducts[pi].fifoBatches||[];if(currentBaseStock>0&&!batches.some(b=>(b.warehouseId===warehouseId||!b.warehouseId)&&Number(b.remainingBaseQty)>0)){batches.push({id:`legacy-${item.productId}-${warehouseId}`,purchaseId:'legacy',warehouseId,receivedAt:'2000-01-01T00:00:00.000Z',expiryDate:updatedProducts[pi].expiryDate||'',unitCost:currentCost,remainingBaseQty:currentBaseStock});}batches.push({id:`batch-${purchaseInvoice.id}-${item.productId}-${Math.random().toString(36).slice(2,6)}`,purchaseId:purchaseInvoice.id,warehouseId,receivedAt:purchaseDate,expiryDate:item.expiryDate||updatedProducts[pi].expiryDate||'',unitCost,remainingBaseQty:baseQty});const oldVal=Math.max(0,currentTotalBaseStock)*currentCost,newVal=baseQty*unitCost,totalUnits=Math.max(0,currentTotalBaseStock)+baseQty,newWAC=totalUnits>0?(oldVal+newVal)/totalUnits:unitCost;updatedProducts[pi]={...updatedProducts[pi],costPrice:parseFloat(newWAC.toFixed(4)),fifoBatches:batches,updatedAt:now};}
           if(si>=0)updatedStockList[si]={...updatedStockList[si],baseQuantity:newBaseStock};else updatedStockList.push({productId:item.productId,warehouseId,baseQuantity:newBaseStock});
-          newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:purchaseDate,productId:item.productId,productName:item.productName,warehouseId,warehouseName:targetWarehouse.name||'صالة العرض',type:'purchase',unitName:item.unitName,quantityInUnit:item.quantity,conversionFactor:item.conversionFactor,baseQuantityChange:baseQty,newBaseBalance:newBaseStock,referenceId:purchaseInvoice.id,referenceType:'PURCHASE',userId:currentUser.id,userName:currentUser.name});}
+          newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:purchaseDate,financialYearId:settings.activeFinancialYearId||'fy-initial',productId:item.productId,productName:item.productName,warehouseId,warehouseName:targetWarehouse.name||'صالة العرض',type:'purchase',unitName:item.unitName,quantityInUnit:item.quantity,conversionFactor:item.conversionFactor,baseQuantityChange:baseQty,newBaseBalance:newBaseStock,referenceId:purchaseInvoice.id,referenceType:'PURCHASE',userId:currentUser.id,userName:currentUser.name});}
         await bulkPut('products',updatedProducts);await bulkPut('stock',updatedStockList);await bulkPut('stock_movements',newMovements);
         const updatedAccounts=[...sourceAccounts];for(const pay of payments){const ai=updatedAccounts.findIndex(a=>a.id===pay.accountId);if(ai>=0)updatedAccounts[ai]={...updatedAccounts[ai],balance:(Number(updatedAccounts[ai].balance)||0)-(Number(pay.amount)||0)};}await bulkPut('accounts',updatedAccounts);
         let updatedSupplier=null,supplierStatement=null;
-        if(remaining>0){const supp=sourceSuppliers.find(s=>s.id===payload.supplierId) || (payload.supplierObject?.id===payload.supplierId ? payload.supplierObject : null);if(supp){const nb=(Number(supp.balance)||0)+remaining;updatedSupplier={...supp,balance:nb};supplierStatement={id:'stmt-'+Date.now(),date:purchaseDate,type:'purchase',partnerType:'supplier',partnerId:supp.id,partnerName:supp.name,partyType:'supplier',partyId:supp.id,referenceType:'PURCHASE',referenceId:purchaseInvoice.id,referenceNumber:invoiceNumber,description:`فاتورة مشتريات رقم ${invoiceNumber}`,debit:0,credit:remaining,runningBalance:nb};await putInStore('suppliers',updatedSupplier);await putInStore('partner_statements',supplierStatement);}}
+        if(remaining>0){const supp=sourceSuppliers.find(s=>s.id===payload.supplierId) || (payload.supplierObject?.id===payload.supplierId ? payload.supplierObject : null);if(supp){const nb=(Number(supp.balance)||0)+remaining;updatedSupplier={...supp,balance:nb};supplierStatement={id:'stmt-'+Date.now(),date:purchaseDate,financialYearId:settings.activeFinancialYearId||'fy-initial',type:'purchase',partnerType:'supplier',partnerId:supp.id,partnerName:supp.name,partyType:'supplier',partyId:supp.id,referenceType:'PURCHASE',referenceId:purchaseInvoice.id,referenceNumber:invoiceNumber,description:`فاتورة مشتريات رقم ${invoiceNumber}`,debit:0,credit:remaining,runningBalance:nb};await putInStore('suppliers',updatedSupplier);await putInStore('partner_statements',supplierStatement);}}
         setPurchases(prev => [purchaseInvoice, ...prev.filter(x=>x.id!==purchaseInvoice.id)]);
         setProducts(updatedProducts);setStock(updatedStockList);setStockMovements(prev=>[...newMovements,...prev]);setAccounts(updatedAccounts);
         if(updatedSupplier)setSuppliers(prev=>prev.some(x=>x.id===updatedSupplier.id)?prev.map(x=>x.id===updatedSupplier.id?updatedSupplier:x):[updatedSupplier,...prev]);if(supplierStatement)setPartnerStatements(prev=>[supplierStatement,...prev]);
@@ -1135,7 +1157,7 @@ export const AppProvider = ({ children }) => {
         const current=getProductStock(productId,warehouseId); if(current<=0){showToast('لا يوجد رصيد متاح لهذا الصنف','warning');return false;} const actual=Math.min(current,qty); const now=new Date().toISOString();
         const pcopy={...prod,fifoBatches:Array.isArray(prod.fifoBatches)?prod.fifoBatches.map(b=>({...b})):[]}; let left=actual,cost=0;const batches=pcopy.fifoBatches.filter(b=>(b.warehouseId===warehouseId||!b.warehouseId)&&Number(b.remainingBaseQty)>0).sort((a,b)=>new Date(a.receivedAt||0)-new Date(b.receivedAt||0));for(const b of batches){if(left<=0)break;const take=Math.min(left,Number(b.remainingBaseQty)||0);cost+=take*(Number(b.unitCost)||prod.costPrice||0);b.remainingBaseQty-=take;left-=take;}if(left>0)cost+=left*(Number(prod.costPrice)||0);
         const updatedStock=[...stock];const si=updatedStock.findIndex(x=>x.productId===productId&&x.warehouseId===warehouseId);const newBalance=current-actual;if(si>=0)updatedStock[si]={...updatedStock[si],baseQuantity:newBalance};else updatedStock.push({productId,warehouseId,baseQuantity:newBalance});
-        await putInStore('products',{...pcopy,updatedAt:now});await bulkPut('stock',updatedStock);await putInStore('stock_movements',{id:'mov-damage-'+Date.now(),date:now,productId,productName:prod.name,warehouseId,warehouseName:warehouses.find(w=>w.id===warehouseId)?.name||'المخزن',type:'damage',unitName:prod.baseUnitName,quantityInUnit:actual,conversionFactor:1,baseQuantityChange:-actual,newBaseBalance,referenceType:'DAMAGE',userId:currentUser.id,userName:currentUser.name,notes:reason});await putInStore('expenses',{id:'exp-damage-'+Date.now(),date:now,category:'تالف ومخزون منتهي',amount:parseFloat(cost.toFixed(4)),accountId:null,accountName:'خسارة مخزون',notes:`${reason}: ${prod.name} × ${actual} ${prod.baseUnitName}`,userId:currentUser.id,userName:currentUser.name,createdAt:now,inventoryLoss:true,deletedAt:null});
+        await putInStore('products',{...pcopy,updatedAt:now});await bulkPut('stock',updatedStock);await putInStore('stock_movements',{id:'mov-damage-'+Date.now(),date:now,financialYearId:settings.activeFinancialYearId||'fy-initial',productId,productName:prod.name,warehouseId,warehouseName:warehouses.find(w=>w.id===warehouseId)?.name||'المخزن',type:'damage',unitName:prod.baseUnitName,quantityInUnit:actual,conversionFactor:1,baseQuantityChange:-actual,newBaseBalance,referenceType:'DAMAGE',userId:currentUser.id,userName:currentUser.name,notes:reason});await putInStore('expenses',{id:'exp-damage-'+Date.now(),date:now,financialYearId:settings.activeFinancialYearId||'fy-initial',category:'تالف ومخزون منتهي',amount:parseFloat(cost.toFixed(4)),accountId:null,accountName:'خسارة مخزون',notes:`${reason}: ${prod.name} × ${actual} ${prod.baseUnitName}`,userId:currentUser.id,userName:currentUser.name,createdAt:now,inventoryLoss:true,deletedAt:null});
         await reloadData();showToast(`تم خصم التالف من المخزون وتسجيل خسارة ${cost.toFixed(2)} ${settings.currencySymbol}`,'success');return true;
     },[products,stock,warehouses,currentUser,getProductStock,reloadData,showToast,settings.currencySymbol]);
     // Stock operations
@@ -1164,6 +1186,7 @@ export const AppProvider = ({ children }) => {
         const movement = {
             id: 'mov-' + Date.now(),
             date: now,
+            financialYearId: settings.activeFinancialYearId || 'fy-initial',
             productId,
             productName: prod.name,
             warehouseId,
@@ -1183,7 +1206,7 @@ export const AppProvider = ({ children }) => {
         await putInStore('stock_movements', movement);
         await reloadData();
         showToast(`تم تعديل رصيد ${prod.name} إلى ${newBaseQty} ${prod.baseUnitName}`, 'info');
-    }, [products, getProductStock, stock, warehouses, currentUser, reloadData, showToast]);
+    }, [products, getProductStock, stock, warehouses, currentUser, reloadData, showToast, settings.activeFinancialYearId]);
     const adjustStockCount = useCallback(async (warehouseId, adjustments, reason = 'تسوية جرد دوري') => {
         if (!warehouseId || adjustments.length === 0)
             return;
@@ -1207,6 +1230,7 @@ export const AppProvider = ({ children }) => {
             movements.push({
                 id: `mov-count-${Date.now()}-${index}`,
                 date: now,
+                financialYearId: settings.activeFinancialYearId || 'fy-initial',
                 productId: entry.productId,
                 productName: prod.name,
                 warehouseId,
@@ -1228,7 +1252,7 @@ export const AppProvider = ({ children }) => {
             await putInStore('stock_movements', movement);
         await reloadData();
         showToast(`تم اعتماد الجرد وتحديث ${movements.length} صنف بنجاح`, 'success');
-    }, [stock, products, warehouses, currentUser, reloadData, showToast]);
+    }, [stock, products, warehouses, currentUser, reloadData, showToast, settings.activeFinancialYearId]);
     const transferStock = useCallback(async (productId, fromWarehouseId, toWarehouseId, unit, quantity, notes) => {
         const prod = products.find((p) => p.id === productId);
         if (!prod)
@@ -1262,6 +1286,7 @@ export const AppProvider = ({ children }) => {
         const movOut = {
             id: 'mov-' + Date.now() + '-out',
             date: now,
+            financialYearId: settings.activeFinancialYearId || 'fy-initial',
             productId,
             productName: prod.name,
             warehouseId: fromWarehouseId,
@@ -1279,6 +1304,7 @@ export const AppProvider = ({ children }) => {
         const movIn = {
             id: 'mov-' + Date.now() + '-in',
             date: now,
+            financialYearId: settings.activeFinancialYearId || 'fy-initial',
             productId,
             productName: prod.name,
             warehouseId: toWarehouseId,
@@ -1298,7 +1324,7 @@ export const AppProvider = ({ children }) => {
         await putInStore('stock_movements', movIn);
         await reloadData();
         showToast(`تم تحويل ${quantity} ${unit.name} من ${prod.name} بنجاح`, 'success');
-    }, [products, getProductStock, settings.allowNegativeStock, stock, warehouses, currentUser, reloadData, showToast]);
+    }, [products, getProductStock, settings.allowNegativeStock, settings.activeFinancialYearId, stock, warehouses, currentUser, reloadData, showToast]);
     const transferStockBatch = useCallback(async (fromWarehouseId, toWarehouseId, items, notes = '') => {
         if (!fromWarehouseId || !toWarehouseId || fromWarehouseId === toWarehouseId) {
             showToast('يجب اختيار مخزنين مختلفين للتحويل', 'error');
@@ -1340,14 +1366,14 @@ export const AppProvider = ({ children }) => {
             else updatedStockList.push({ productId: prod.id, warehouseId: toWarehouseId, baseQuantity: newToQty });
             const stamp = `${Date.now()}-${index}`;
             movements.push({
-                id: `mov-${stamp}-out`, date: now, productId: prod.id, productName: prod.name,
+                id: `mov-${stamp}-out`, date: now, financialYearId: settings.activeFinancialYearId || 'fy-initial', productId: prod.id, productName: prod.name,
                 warehouseId: fromWarehouseId, warehouseName: fromName, type: 'transfer_out',
                 unitName: unit.name, quantityInUnit: quantity, conversionFactor: unit.conversionToBase || 1,
                 baseQuantityChange: -baseQuantity, newBaseBalance: newFromQty, userId: currentUser.id, userName: currentUser.name,
                 notes: `تحويل جماعي إلى ${toName}${notes ? ` (${notes})` : ''}`,
             });
             movements.push({
-                id: `mov-${stamp}-in`, date: now, productId: prod.id, productName: prod.name,
+                id: `mov-${stamp}-in`, date: now, financialYearId: settings.activeFinancialYearId || 'fy-initial', productId: prod.id, productName: prod.name,
                 warehouseId: toWarehouseId, warehouseName: toName, type: 'transfer_in',
                 unitName: unit.name, quantityInUnit: quantity, conversionFactor: unit.conversionToBase || 1,
                 baseQuantityChange: baseQuantity, newBaseBalance: newToQty, userId: currentUser.id, userName: currentUser.name,
@@ -1630,6 +1656,7 @@ export const AppProvider = ({ children }) => {
         const transferRecord = {
             id: 'trans-' + Date.now(),
             date: new Date().toISOString(),
+            financialYearId: settings.activeFinancialYearId || 'fy-initial',
             fromAccountId: fromId,
             fromAccountName: fromAcc.name,
             toAccountId: toId,
@@ -1642,11 +1669,12 @@ export const AppProvider = ({ children }) => {
         await putInStore('transfers', transferRecord);
         await reloadData();
         showToast(`تم تحويل ${amount} ${settings.currencySymbol} بنجاح`, 'success');
-    }, [accounts, currentUser, settings.currencySymbol, reloadData, showToast]);
+    }, [accounts, currentUser, settings.currencySymbol, settings.activeFinancialYearId, reloadData, showToast]);
     const saveExpense = useCallback(async (exp) => {
         const newExpense = {
             ...exp,
             id: 'exp-' + Date.now(),
+            financialYearId: exp.financialYearId || settings.activeFinancialYearId || 'fy-initial',
             createdAt: new Date().toISOString(),
         };
         await putInStore('expenses', newExpense);
@@ -1662,7 +1690,7 @@ export const AppProvider = ({ children }) => {
         }
         await reloadData();
         showToast('تم تسجيل المصروف بنجاح', 'success');
-    }, [accounts, activeShift, reloadData, showToast]);
+    }, [accounts, activeShift, reloadData, showToast, settings.activeFinancialYearId]);
     const recordExpense = useCallback(async (payload) => {
         const acc = accounts.find((a) => a.id === payload.accountId);
         if (!acc) {
@@ -1724,7 +1752,7 @@ export const AppProvider = ({ children }) => {
                 expectedCash: activeShift.expectedCash + exp.amount,
             });
         }
-        await putInStore('audit_logs', { id:`audit-exp-del-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date:new Date().toISOString(), type:'expense_deleted_reversal', referenceId:exp.id, originalDate:exp.date || exp.createdAt, accountId:exp.accountId, accountName:exp.accountName, amount:finiteNumber(exp.amount,0), category:exp.category, userId:currentUser.id, userName:currentUser.name });
+        await putInStore('audit_logs', { id:`audit-exp-del-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date:new Date().toISOString(), financialYearId: settings.activeFinancialYearId || 'fy-initial', type:'expense_deleted_reversal', referenceId:exp.id, originalDate:exp.date || exp.createdAt, accountId:exp.accountId, accountName:exp.accountName, amount:finiteNumber(exp.amount,0), category:exp.category, userId:currentUser.id, userName:currentUser.name });
         await putInStore('expenses', { ...exp, deletedAt: new Date().toISOString() });
         await reloadData();
         showToast('تم نقل المصروف إلى سلة المحذوفات وإلغاء أثره المالي', 'info');
@@ -1803,6 +1831,7 @@ export const AppProvider = ({ children }) => {
         const voucher = {
             id: voucherId,
             voucherNumber: nextNumber,
+            financialYearId: settings.activeFinancialYearId || 'fy-initial',
             type: payload.type,
             partyType: payload.partyType,
             partyId: payload.partyId,
@@ -1835,6 +1864,7 @@ export const AppProvider = ({ children }) => {
                 await putInStore('customers', { ...cust, balance: newCustBalance });
                 const stmt = {
                     id: 'stmt-' + Date.now(),
+                    financialYearId: settings.activeFinancialYearId || 'fy-initial',
                     partnerType: 'customer',
                     partnerId: cust.id,
                     partnerName: cust.name,
@@ -1859,6 +1889,7 @@ export const AppProvider = ({ children }) => {
                 await putInStore('suppliers', { ...supp, balance: newSuppBalance });
                 const stmt = {
                     id: 'stmt-' + Date.now(),
+                    financialYearId: settings.activeFinancialYearId || 'fy-initial',
                     partnerType: 'supplier',
                     partnerId: supp.id,
                     partnerName: supp.name,
@@ -1877,7 +1908,7 @@ export const AppProvider = ({ children }) => {
         await reloadData();
         showToast(`تم حفظ ${payload.type === 'receipt' ? 'سند القبض' : 'سند الصرف'} رقم [${nextNumber}] بنجاح`, 'success');
         return voucher;
-    }, [vouchers, accounts, customers, suppliers, currentUser, reloadData, showToast]);
+    }, [vouchers, accounts, customers, suppliers, currentUser, reloadData, showToast, settings.activeFinancialYearId]);
     const deleteVoucher = useCallback(async (id) => {
         const v = vouchers.find((item) => item.id === id);
         if (!v)
@@ -1905,11 +1936,11 @@ export const AppProvider = ({ children }) => {
                 await putInStore('suppliers', { ...supp, balance: revBalance });
             }
         }
-        await putInStore('audit_logs', { id:`audit-voucher-del-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date:new Date().toISOString(), type:'voucher_deleted_reversal', referenceId:v.id, originalDate:v.date || v.createdAt, voucherNumber:v.voucherNumber, partyName:v.partyName, voucherType:v.type, accountId:v.accountId, accountName:v.accountName, amount:finiteNumber(v.amount,0), userId:currentUser.id, userName:currentUser.name });
+        await putInStore('audit_logs', { id:`audit-voucher-del-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date:new Date().toISOString(), financialYearId: settings.activeFinancialYearId || 'fy-initial', type:'voucher_deleted_reversal', referenceId:v.id, originalDate:v.date || v.createdAt, voucherNumber:v.voucherNumber, partyName:v.partyName, voucherType:v.type, accountId:v.accountId, accountName:v.accountName, amount:finiteNumber(v.amount,0), userId:currentUser.id, userName:currentUser.name });
         await deleteFromStore('vouchers', id);
         await reloadData();
         showToast('تم حذف السند وإلغاء أثره المالي بنجاح', 'info');
-    }, [vouchers, accounts, customers, suppliers, currentUser, reloadData, showToast]);
+    }, [vouchers, accounts, customers, suppliers, currentUser, reloadData, showToast, settings.activeFinancialYearId]);
     const recordCustomerPayment = useCallback(async (payload) => {
         const customer = customers.find((c) => c.id === payload.customerId);
         if (!customer) {
@@ -1999,7 +2030,7 @@ export const AppProvider = ({ children }) => {
             const cashRefund = refunds.filter((r) => r.method === 'cash' || currentAccounts.find((a) => a.id === r.accountId)?.type === 'cash').reduce((s, r) => s + finiteNumber(r.amount, 0), 0);
             if (cashRefund > 0) await putInStore('shifts', { ...shift, totalCashReturns: finiteNumber(shift.totalCashReturns, 0) - cashRefund, expectedCash: finiteNumber(shift.expectedCash, 0) + cashRefund });
         }
-        await putInStore('audit_logs', { id: `audit-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date: new Date().toISOString(), type: 'return_deleted_reversal', referenceId: ret.id, originalReferenceId: ret.originalInvoiceId, originalDate: ret.date, referenceNumber: ret.invoiceNumber, amount: ret.grandTotal, debtReversed, refundsReversed: refunds, userId: currentUser.id, userName: currentUser.name });
+        await putInStore('audit_logs', { id: `audit-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date: new Date().toISOString(), financialYearId: settings.activeFinancialYearId || 'fy-initial', type: 'return_deleted_reversal', referenceId: ret.id, originalReferenceId: ret.originalInvoiceId, originalDate: ret.date, referenceNumber: ret.invoiceNumber, amount: ret.grandTotal, debtReversed, refundsReversed: refunds, userId: currentUser.id, userName: currentUser.name });
         if (deleteRecord) await deleteFromStore('invoices', ret.id);
         return true;
     }, [products, warehouses, currentUser, addStockDelta, removeReturnFifoBatches, appendReversalStatement]);
@@ -2055,7 +2086,7 @@ export const AppProvider = ({ children }) => {
             const otherPaid = (inv.payments || []).filter((p) => !(p.method === 'cash' || currentAccounts.find((a) => a.id === p.accountId)?.type === 'cash')).reduce((s, p) => s + finiteNumber(p.amount, 0), 0);
             await putInStore('shifts', { ...shift, totalCashSales: finiteNumber(shift.totalCashSales, 0) - Math.max(0, cashPaid), totalOtherSales: finiteNumber(shift.totalOtherSales, 0) - otherPaid, expectedCash: finiteNumber(shift.expectedCash, 0) - Math.max(0, cashPaid) });
         }
-        await putInStore('audit_logs', { id: `audit-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date: new Date().toISOString(), type: 'sale_deleted_reversal', referenceId: inv.id, referenceNumber: inv.invoiceNumber, originalDate: inv.date, debtReversed: debtAmount, paymentsReversed: inv.payments || [], userId: currentUser.id, userName: currentUser.name });
+        await putInStore('audit_logs', { id: `audit-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date: new Date().toISOString(), financialYearId: settings.activeFinancialYearId || 'fy-initial', type: 'sale_deleted_reversal', referenceId: inv.id, referenceNumber: inv.invoiceNumber, originalDate: inv.date, debtReversed: debtAmount, paymentsReversed: inv.payments || [], userId: currentUser.id, userName: currentUser.name });
         await deleteFromStore('invoices', id);
         await reloadData();
         if (!options.silent) showToast(`تم حذف الفاتورة [${inv.invoiceNumber}] وعكس المخزون والدين والدفع بالكامل`, 'success');
@@ -2098,7 +2129,7 @@ export const AppProvider = ({ children }) => {
             if (ai >= 0) updatedAccounts[ai].balance = finiteNumber(updatedAccounts[ai].balance, 0) + finiteNumber(pay.amount, 0);
         }
         if (updatedAccounts.length) await bulkPut('accounts', updatedAccounts);
-        await putInStore('audit_logs', { id: `audit-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date: new Date().toISOString(), type: 'purchase_deleted_reversal', referenceId: pur.id, referenceNumber: pur.invoiceNumber, originalDate: pur.date, debtReversed: debtAmount, paymentsReversed: pur.payments || [], userId: currentUser.id, userName: currentUser.name });
+        await putInStore('audit_logs', { id: `audit-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date: new Date().toISOString(), financialYearId: settings.activeFinancialYearId || 'fy-initial', type: 'purchase_deleted_reversal', referenceId: pur.id, referenceNumber: pur.invoiceNumber, originalDate: pur.date, debtReversed: debtAmount, paymentsReversed: pur.payments || [], userId: currentUser.id, userName: currentUser.name });
         await deleteFromStore('purchases', id);
         await reloadData();
         if (!options.silent) showToast(`تم حذف فاتورة الشراء [${pur.invoiceNumber}] وعكس المخزون وحساب المورد والدفع بالكامل`, 'success');
@@ -2159,7 +2190,7 @@ export const AppProvider = ({ children }) => {
                 warehouseIdOverride: old.warehouseId,
                 isEdit: true,
             });
-            await putInStore('audit_logs', { id:`audit-edit-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date:new Date().toISOString(), type:'sale_edited_reversal_repost', referenceId:old.id, referenceNumber:old.invoiceNumber, userId:currentUser.id, userName:currentUser.name });
+            await putInStore('audit_logs', { id:`audit-edit-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date:new Date().toISOString(), financialYearId: settings.activeFinancialYearId || 'fy-initial', type:'sale_edited_reversal_repost', referenceId:old.id, referenceNumber:old.invoiceNumber, userId:currentUser.id, userName:currentUser.name });
             setEditingSaleInvoiceId(null);
             return replacement;
         } catch (error) {
@@ -2192,7 +2223,7 @@ export const AppProvider = ({ children }) => {
                 createdAtOverride: old.createdAt || old.date,
                 isEdit: true,
             });
-            await putInStore('audit_logs', { id:`audit-edit-pur-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date:new Date().toISOString(), type:'purchase_edited_reversal_repost', referenceId:old.id, referenceNumber:old.invoiceNumber, userId:currentUser.id, userName:currentUser.name });
+            await putInStore('audit_logs', { id:`audit-edit-pur-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, date:new Date().toISOString(), financialYearId: settings.activeFinancialYearId || 'fy-initial', type:'purchase_edited_reversal_repost', referenceId:old.id, referenceNumber:old.invoiceNumber, userId:currentUser.id, userName:currentUser.name });
             return replacement;
         } catch (error) {
             let restored = false;
@@ -2220,6 +2251,7 @@ export const AppProvider = ({ children }) => {
         const newShift = normalizeShiftRecord({
             id: 'shift-' + Date.now(),
             shiftNumber: lastShiftNumber + 1,
+            financialYearId: settings.activeFinancialYearId || 'fy-initial',
             cashierId: currentUser.id,
             cashierName: currentUser.name,
             startTime: new Date().toISOString(),
@@ -2234,7 +2266,7 @@ export const AppProvider = ({ children }) => {
         await putInStore('shifts', newShift);
         await reloadData();
         showToast('تم فتح الوردية بنجاح', 'success');
-    }, [shifts, currentUser, reloadData, showToast]);
+    }, [shifts, currentUser, reloadData, showToast, settings.activeFinancialYearId]);
     const closeShift = useCallback(async (actualCash, notes) => {
         if (!activeShift)
             return;
@@ -2262,32 +2294,98 @@ export const AppProvider = ({ children }) => {
         const years = Array.isArray(settings.financialYears) ? settings.financialYears.map((year) => ({ ...year })) : [];
         const oldId = settings.activeFinancialYearId || years.find((year) => year?.status === 'open')?.id || 'fy-initial';
         const oldYear = years.find((year) => year?.id === oldId);
-        if (oldYear?.startDate && start.getTime() <= new Date(oldYear.startDate).getTime()) {
-            showToast('بداية السنة الجديدة يجب أن تكون بعد بداية السنة الحالية', 'warning');
+        if (oldYear?.startDate && start.getTime() < new Date(oldYear.startDate).getTime()) {
+            showToast('بداية السنة الجديدة لا يمكن أن تكون قبل بداية السنة الحالية', 'warning');
             return false;
         }
-        const [allInvoices, allPurchases] = await Promise.all([getAllFromStore('invoices'), getAllFromStore('purchases')]);
-        const archiveStamp = startIso;
-        const archivedInvoices = (allInvoices || []).map((row) => {
-            const rowYear = row.financialYearId || oldId;
-            return rowYear === oldId ? { ...row, financialYearId: oldId, financialYearArchivedAt: archiveStamp } : row;
-        });
-        const archivedPurchases = (allPurchases || []).map((row) => {
-            const rowYear = row.financialYearId || oldId;
-            return rowYear === oldId ? { ...row, financialYearId: oldId, financialYearArchivedAt: archiveStamp } : row;
-        });
-        if (archivedInvoices.length) await bulkPut('invoices', archivedInvoices);
-        if (archivedPurchases.length) await bulkPut('purchases', archivedPurchases);
-        const closedYears = years.length ? years.map((year) => year.id === oldId ? { ...year, status: 'closed', endDate: startIso, archivedAt: archiveStamp } : year) : [{ id: oldId, name: 'السنة المالية السابقة', startDate: startIso, endDate: startIso, status: 'closed', archivedAt: archiveStamp }];
+        const archiveStamp = new Date().toISOString();
+        const transactionalStores = ['invoices','purchases','vouchers','expenses','stock_movements','transfers','audit_logs','partner_statements','shifts','held_invoices','waste_records','restaurant_orders'];
+        for (const storeName of transactionalStores) {
+            try {
+                const rows = await getAllFromStore(storeName);
+                if (!Array.isArray(rows) || !rows.length) continue;
+                const nextRows = rows.map((row) => {
+                    const rowYear = row?.financialYearId || oldId;
+                    if (rowYear !== oldId) return row;
+                    let next = { ...row, financialYearId: oldId, financialYearArchivedAt: archiveStamp };
+                    if (storeName === 'shifts' && next.status === 'open') next = { ...next, status:'closed', endTime:archiveStamp, actualCash:finiteNumber(next.expectedCash,0), difference:0, notes:`${next.notes ? next.notes + ' • ' : ''}إغلاق تلقائي عند إقفال السنة المالية` };
+                    return next;
+                });
+                await bulkPut(storeName, nextRows);
+            } catch (error) { console.warn('Fiscal archive skipped for', storeName, error); }
+        }
+        const closedYears = years.length
+            ? years.map((year) => year.id === oldId ? { ...year, status:'closed', endDate:archiveStamp, archivedAt:archiveStamp } : year)
+            : [{ id:oldId, name:'السنة المالية السابقة', startDate:oldYear?.startDate || archiveStamp, endDate:archiveStamp, status:'closed', archivedAt:archiveStamp }];
         const id = `fy-${Date.now()}`;
-        const newYear = { id, name: String(name || `السنة المالية ${chosen}`).trim() || `السنة المالية ${chosen}`, startDate: startIso, endDate: null, status: 'open', createdAt: new Date().toISOString() };
-        const nextSettings = { ...settings, financialYears: [...closedYears, newYear], activeFinancialYearId: id, financialYearInitializedV48: true };
-        await putInStore('settings', { key: 'store_config', ...nextSettings });
+        const newYear = { id, name:String(name || `السنة المالية ${chosen}`).trim() || `السنة المالية ${chosen}`, startDate:startIso, endDate:null, status:'open', createdAt:archiveStamp };
+
+        // Carry only master balances/state into the new fiscal year. Old transactions
+        // stay tagged to the archived year; the rows below are clean opening snapshots.
+        try {
+            const openingStatements = [];
+            for (const customer of (customers || [])) {
+                if (customer?.deletedAt) continue;
+                const balance = finiteNumber(customer?.balance, 0);
+                if (!balance) continue;
+                openingStatements.push({
+                    id:`stmt-fy-open-${id}-cust-${customer.id}`, date:startIso, financialYearId:id,
+                    type:'fiscal_opening', partnerType:'customer', partnerId:customer.id, partnerName:customer.name,
+                    referenceType:'FISCAL_OPENING', referenceId:id, referenceNumber:newYear.name,
+                    description:`رصيد افتتاحي مرحل من ${oldYear?.name || 'السنة السابقة'}`,
+                    debit:balance > 0 ? balance : 0, credit:balance < 0 ? Math.abs(balance) : 0, runningBalance:balance,
+                });
+            }
+            for (const supplier of (suppliers || [])) {
+                if (supplier?.deletedAt) continue;
+                const balance = finiteNumber(supplier?.balance, 0);
+                if (!balance) continue;
+                openingStatements.push({
+                    id:`stmt-fy-open-${id}-supp-${supplier.id}`, date:startIso, financialYearId:id,
+                    type:'fiscal_opening', partnerType:'supplier', partnerId:supplier.id, partnerName:supplier.name,
+                    partyType:'supplier', partyId:supplier.id, referenceType:'FISCAL_OPENING', referenceId:id, referenceNumber:newYear.name,
+                    description:`رصيد افتتاحي مرحل من ${oldYear?.name || 'السنة السابقة'}`,
+                    debit:balance < 0 ? Math.abs(balance) : 0, credit:balance > 0 ? balance : 0, runningBalance:balance,
+                });
+            }
+            if (openingStatements.length) await bulkPut('partner_statements', openingStatements);
+
+            const openingStockMovements = [];
+            for (const row of (stock || [])) {
+                const quantity = finiteNumber(row?.baseQuantity, 0);
+                if (!quantity) continue;
+                const product = (products || []).find((item) => item?.id === row.productId);
+                const warehouse = (warehouses || []).find((item) => item?.id === row.warehouseId);
+                openingStockMovements.push({
+                    id:`mov-fy-open-${id}-${row.productId}-${row.warehouseId}`, date:startIso, financialYearId:id,
+                    productId:row.productId, productName:product?.name || 'صنف', warehouseId:row.warehouseId,
+                    warehouseName:warehouse?.name || 'المخزن', type:'opening_balance',
+                    unitName:product?.baseUnitName || 'وحدة أساسية', quantityInUnit:quantity, conversionFactor:1,
+                    baseQuantityChange:quantity, newBaseBalance:quantity, referenceId:id, referenceType:'FISCAL_OPENING',
+                    userId:currentUser?.id, userName:currentUser?.name,
+                    notes:`رصيد افتتاحي مرحل من ${oldYear?.name || 'السنة السابقة'}`,
+                });
+            }
+            if (openingStockMovements.length) await bulkPut('stock_movements', openingStockMovements);
+
+            await putInStore('audit_logs', {
+                id:`audit-fy-open-${Date.now()}`, date:archiveStamp, financialYearId:id, type:'financial_year_opened',
+                referenceId:id, referenceNumber:newYear.name, previousFinancialYearId:oldId,
+                description:`افتتاح ${newYear.name} وترحيل الأرصدة والثوابت من ${oldYear?.name || 'السنة السابقة'}`,
+                accountBalances:(accounts || []).map(a=>({id:a.id,name:a.name,balance:finiteNumber(a.balance,0)})),
+                userId:currentUser?.id, userName:currentUser?.name,
+            });
+        } catch (error) {
+            console.warn('Fiscal opening snapshots skipped', error);
+        }
+
+        const nextSettings = { ...settings, financialYears:[...closedYears, newYear], activeFinancialYearId:id, financialYearInitializedV48:true };
+        await putInStore('settings', { key:'store_config', ...nextSettings });
         setSettings(nextSettings);
         await reloadData();
-        showToast(`تم فتح ${newYear.name} وأرشفة السنة السابقة`, 'success');
+        showToast(`تم إغلاق ${oldYear?.name || 'السنة السابقة'} وأرشفت حركاتها وفتح ${newYear.name}. تم ترحيل الأرصدة والمخزون والحسابات والعملاء والموردين تلقائياً.`, 'success');
         return newYear;
-    }, [settings, reloadData, showToast]);
+    }, [settings, reloadData, showToast, customers, suppliers, stock, products, warehouses, accounts, currentUser]);
     const saveSettings = useCallback(async (newSettings) => {
         await putInStore('settings', { key: 'store_config', ...newSettings });
         setSettings(newSettings);

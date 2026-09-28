@@ -1,14 +1,14 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.52-draft-sections';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.52-draft-sections';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.52-draft-sections';
-import { BarcodeCameraModal } from './components__pos__CameraScannerModal.js?v=7.9.4.52-draft-sections';
-import { calculateUnitConversions, formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.52-draft-sections';
-import { exportToCSV } from './utils__export.js?v=7.9.4.52-draft-sections';
-import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.52-draft-sections';
-import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.52-draft-sections';
-import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.52-draft-sections';
+import { useApp } from './context__AppContext.js?v=7.9.4.53-fiscal-payments';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.53-fiscal-payments';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.53-fiscal-payments';
+import { BarcodeCameraModal } from './components__pos__CameraScannerModal.js?v=7.9.4.53-fiscal-payments';
+import { calculateUnitConversions, formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.53-fiscal-payments';
+import { exportToCSV } from './utils__export.js?v=7.9.4.53-fiscal-payments';
+import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.53-fiscal-payments';
+import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.53-fiscal-payments';
+import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.53-fiscal-payments';
 import { Plus, Search, Trash2, Edit, Layers, FolderTree, X, Download, Image as ImageIcon, FileSpreadsheet, Camera, } from 'lucide-react';
 const h = React.createElement;
 const normalizeArabicDigits = (value) => String(value ?? '')

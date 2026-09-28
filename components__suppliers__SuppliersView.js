@@ -1,12 +1,12 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.52-draft-sections';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.52-draft-sections';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.52-draft-sections';
-import { exportToCSV, printReceiptElement } from './utils__export.js?v=7.9.4.52-draft-sections';
-import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.52-draft-sections';
-import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.52-draft-sections';
-import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.52-draft-sections';
+import { useApp } from './context__AppContext.js?v=7.9.4.53-fiscal-payments';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.53-fiscal-payments';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.53-fiscal-payments';
+import { exportToCSV, printReceiptElement } from './utils__export.js?v=7.9.4.53-fiscal-payments';
+import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.53-fiscal-payments';
+import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.53-fiscal-payments';
+import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.53-fiscal-payments';
 import { Plus, Search, FileText, DollarSign, Download, Printer, Trash2, X, Edit, Image as ImageIcon, FileSpreadsheet, } from 'lucide-react';
 const normalizeOpeningBalanceInput = (value) => {
     let raw = String(value ?? '')
@@ -75,11 +75,14 @@ export const SuppliersView = () => {
         setPayAmount(0);
         setPayNotes('');
     };
-    // Purchases for this supplier
+    // Current fiscal-year purchases only. Older purchases are viewed from the fiscal archive.
+    const financialYears = Array.isArray(settings.financialYears) ? settings.financialYears : [];
+    const activeFinancialYearId = settings.activeFinancialYearId || financialYears.find((y) => y?.status === 'open')?.id || 'fy-initial';
+    const legacyFinancialYearId = financialYears[0]?.id || activeFinancialYearId;
     const supplierPurchases = statementSupplier
-        ? purchases.filter((p) => p.supplierId === statementSupplier.id)
+        ? purchases.filter((p) => p.supplierId === statementSupplier.id && String(p?.financialYearId || legacyFinancialYearId) === String(activeFinancialYearId))
         : [];
-    const supplierStatementPager = usePagination(supplierPurchases, 50, statementSupplier?.id || 'none');
+    const supplierStatementPager = usePagination(supplierPurchases, 50, `${statementSupplier?.id || 'none'}|${activeFinancialYearId}`);
     const getSuppliersExportData = () => ({
         headers:['اسم المورد','الشركة','الهاتف','المستحقات الحالية'],
         rows: filteredSuppliers.map(s => [s.name, s.company || '-', s.phone || '-', Number(s.balance || 0)])

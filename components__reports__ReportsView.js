@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.52-draft-sections';
-import { exportToCSV, downloadBlob } from './utils__export.js?v=7.9.4.52-draft-sections';
-import { generateAllReportsArtifacts } from './services__telegramReports.js?v=7.9.4.52-draft-sections';
-import { getAllFromStore } from './services__db.js?v=7.9.4.52-draft-sections';
+import { useApp } from './context__AppContext.js?v=7.9.4.53-fiscal-payments';
+import { exportToCSV, downloadBlob } from './utils__export.js?v=7.9.4.53-fiscal-payments';
+import { generateAllReportsArtifacts } from './services__telegramReports.js?v=7.9.4.53-fiscal-payments';
+import { getAllFromStore } from './services__db.js?v=7.9.4.53-fiscal-payments';
 import { Download, ReceiptText, Package, Users, Truck, WalletCards, CalendarDays, CircleDollarSign, FileText, Image as ImageIcon, TrendingUp } from 'lucide-react';
 
 const h = React.createElement;
@@ -46,6 +46,10 @@ export const ReportsView = () => {
   const warehouses = Array.isArray(app.warehouses) ? app.warehouses : [];
   const settings = app.settings || {};
   const currency = settings.currencySymbol || '';
+  const financialYears = Array.isArray(settings.financialYears) ? settings.financialYears : [];
+  const activeFinancialYearId = settings.activeFinancialYearId || financialYears.find(y=>y?.status==='open')?.id || 'fy-initial';
+  const legacyFinancialYearId = financialYears[0]?.id || activeFinancialYearId;
+  const inActiveYear = row => String(row?.financialYearId || legacyFinancialYearId) === String(activeFinancialYearId);
 
   const [period, setPeriod] = useState('month');
   const [fromDate, setFromDate] = useState('');
@@ -83,10 +87,10 @@ export const ReportsView = () => {
     return true;
   };
 
-  const sales = invoices.filter((x) => x?.type === 'sale' && inPeriod(x.date));
-  const returns = invoices.filter((x) => x?.type === 'return' && inPeriod(x.date));
-  const periodPurchases = purchases.filter((x) => inPeriod(x.date));
-  const periodExpenses = expenses.filter((x) => !x?.deletedAt && inPeriod(x.date || x.createdAt));
+  const sales = invoices.filter((x) => inActiveYear(x) && x?.type === 'sale' && inPeriod(x.date));
+  const returns = invoices.filter((x) => inActiveYear(x) && x?.type === 'return' && inPeriod(x.date));
+  const periodPurchases = purchases.filter((x) => inActiveYear(x) && inPeriod(x.date));
+  const periodExpenses = expenses.filter((x) => inActiveYear(x) && !x?.deletedAt && inPeriod(x.date || x.createdAt));
 
   const paidSales = sales.filter((x) => num(x.remainingAmount) <= EPS);
   const debtSales = sales.filter((x) => num(x.remainingAmount) > EPS);

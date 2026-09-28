@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.52-draft-sections';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.52-draft-sections';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.52-draft-sections';
-import { downloadProfessionalTablePDF, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.52-draft-sections';
+import { useApp } from './context__AppContext.js?v=7.9.4.53-fiscal-payments';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.53-fiscal-payments';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.53-fiscal-payments';
+import { downloadProfessionalTablePDF, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.53-fiscal-payments';
 import { Plus, Search, Trash2, Edit2, FileSpreadsheet, FileText, Settings2, UsersRound, Receipt, WalletCards, X } from 'lucide-react';
 
 const h = React.createElement;
@@ -44,12 +44,16 @@ export const ExpensesView = () => {
     softDeleteExpense, updateSettings, showToast, setActiveTab
   } = useApp();
 
+  const years = Array.isArray(settings.financialYears) ? settings.financialYears : [];
+  const activeFY = settings.activeFinancialYearId || years.find(y=>y?.status==='open')?.id || 'fy-initial';
+  const legacyFY = years[0]?.id || activeFY;
+  const currentExpenses = useMemo(()=> (expenses||[]).filter(e=>String(e?.financialYearId || legacyFY)===String(activeFY)), [expenses,activeFY,legacyFY]);
   const configuredCategories = useMemo(() => {
     const configured = Array.isArray(settings.expenseCategories) && settings.expenseCategories.length
       ? settings.expenseCategories : DEFAULT_EXPENSE_CATEGORIES;
     return uniq(configured);
   }, [settings.expenseCategories]);
-  const historicalCategories = useMemo(() => uniq((expenses || []).filter(e => !e.deletedAt).map(e => e.category)), [expenses]);
+  const historicalCategories = useMemo(() => uniq((currentExpenses || []).filter(e => !e.deletedAt).map(e => e.category)), [currentExpenses]);
   const filterCategories = useMemo(() => uniq([...configuredCategories, ...historicalCategories]), [configuredCategories, historicalCategories]);
 
   const [mode, setMode] = useState('expenses');

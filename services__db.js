@@ -1,4 +1,4 @@
-import { calculateUnitConversions } from './utils__unitTree.js?v=7.9.4.52-draft-sections';
+import { calculateUnitConversions } from './utils__unitTree.js?v=7.9.4.53-fiscal-payments';
 const DB_BASE_NAME = 'Oscar_Accounting_POS_DB';
 const DB_VERSION = 6;
 export const getTenantId = () => String(window.OscarActivation?.readRuntime?.()?.companyId || 'local').trim() || 'local';
@@ -334,22 +334,8 @@ export const DEFAULT_SETTINGS = {
     telegramBotToken: '',
     telegramChatIds: '',
     p2pPaymentChatId: '',
-    p2pPaymentMethods: [
-        { id:'palpay', name:'Palpay', icon:'wallet', logoUrl:'', qrImageUrl:'', note:'حوّل إلى محفظة PalPay باستخدام البيانات الموضحة ثم أرفق صورة الإيصال.', fields:[
-            { id:'name', label:'اسم المستفيد', value:'انور أحمد الندا' },
-            { id:'phone', label:'رقم الجوال', value:'0597603119' },
-        ] },
-        { id:'jawwal-pay', name:'Jawwal Pay', icon:'wallet', logoUrl:'', qrImageUrl:'', note:'حوّل إلى محفظة Jawwal Pay باستخدام البيانات الموضحة ثم أرفق صورة الإيصال.', fields:[
-            { id:'name', label:'اسم المستفيد', value:'انور أحمد الندا' },
-            { id:'phone', label:'رقم الجوال', value:'0597603119' },
-        ] },
-        { id:'bank-palestine', name:'بنك فلسطين', icon:'bank', logoUrl:'', qrImageUrl:'', note:'حوّل إلى الحساب البنكي باستخدام البيانات الموضحة ثم أرفق صورة الإيصال.', fields:[
-            { id:'name', label:'اسم المستفيد', value:'انور أحمد الندا' },
-            { id:'phone', label:'رقم الجوال', value:'0597603119' },
-            { id:'account', label:'رقم الحساب', value:'3143732' },
-            { id:'iban', label:'الآيبان', value:'PS11PALS045521437320993100000' },
-        ] },
-    ],
+    p2pPaymentMethods: [],
+    p2pMethodsManualOnlyV53Initialized: true,
     telegramDailyReportEnabled: false,
     telegramDailyBackupEnabled: true,
     telegramBackupDefaultV45Initialized: true,

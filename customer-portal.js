@@ -1,4 +1,4 @@
-import { decodeCustomerPortalAccess } from './customer-portal-codec.js?v=7.9.4.52-draft-sections';
+import { decodeCustomerPortalAccess } from './customer-portal-codec.js?v=7.9.4.53-fiscal-payments';
 
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

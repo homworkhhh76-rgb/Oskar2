@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import React, { useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.52-draft-sections';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.52-draft-sections';
+import { useApp } from './context__AppContext.js?v=7.9.4.53-fiscal-payments';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.53-fiscal-payments';
 import { Wallet, ArrowLeftRight, Plus, Lock, Unlock, Edit2, Trash2, History, X, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
 const num = (value) => { const n = Number(value); return Number.isFinite(n) ? n : 0; };
 const money = (value) => num(value).toFixed(2);
@@ -23,6 +23,10 @@ export const AccountsView = () => {
     const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
     const [ledgerAccount, setLedgerAccount] = useState(null);
     const totalBalance = accounts.reduce((sum, a) => sum + num(a?.balance), 0);
+    const financialYears = Array.isArray(settings.financialYears) ? settings.financialYears : [];
+    const activeFinancialYearId = settings.activeFinancialYearId || financialYears.find(y=>y?.status==='open')?.id || 'fy-initial';
+    const legacyFinancialYearId = financialYears[0]?.id || activeFinancialYearId;
+    const inActiveYear = row => String(row?.financialYearId || legacyFinancialYearId) === String(activeFinancialYearId);
     const getAccountOperations = (accountId) => {
         const rows = [];
         const push = (date, kind, description, incoming, outgoing, reference = '') => {
@@ -31,7 +35,7 @@ export const AccountsView = () => {
             if (inValue <= 0 && outValue <= 0) return;
             rows.push({ id: `${kind}-${reference}-${date}-${rows.length}`, date: date || new Date().toISOString(), kind, description, incoming: inValue, outgoing: outValue, reference });
         };
-        for (const inv of (invoices || [])) {
+        for (const inv of (invoices || []).filter(inActiveYear)) {
             if (inv?.type === 'sale') {
                 for (const pay of (inv.payments || [])) if (String(pay.accountId) === String(accountId)) push(inv.date, 'sale', `قبض فاتورة مبيعات ${inv.invoiceNumber || ''}`, pay.amount, 0, inv.invoiceNumber || inv.id);
             } else if (inv?.type === 'return') {
@@ -39,17 +43,17 @@ export const AccountsView = () => {
                 for (const pay of refunds) if (String(pay.accountId) === String(accountId)) push(inv.date, 'return', `صرف مرتجع مبيعات ${inv.invoiceNumber || ''}`, 0, pay.amount, inv.invoiceNumber || inv.id);
             }
         }
-        for (const pur of (purchases || [])) for (const pay of (pur?.payments || [])) if (String(pay.accountId) === String(accountId)) push(pur.date, 'purchase', `دفع فاتورة مشتريات ${pur.invoiceNumber || ''}`, 0, pay.amount, pur.invoiceNumber || pur.id);
-        for (const exp of (expenses || [])) if (String(exp?.accountId) === String(accountId)) push(exp.date || exp.createdAt, 'expense', `مصروف: ${exp.category || 'مصروف'}${exp.notes ? ` - ${exp.notes}` : ''}${exp.deletedAt ? ' (محذوف)' : ''}`, 0, exp.amount, exp.id);
-        for (const v of (vouchers || [])) if (v?.sourceType === 'account' && String(v?.accountId) === String(accountId)) {
+        for (const pur of (purchases || []).filter(inActiveYear)) for (const pay of (pur?.payments || [])) if (String(pay.accountId) === String(accountId)) push(pur.date, 'purchase', `دفع فاتورة مشتريات ${pur.invoiceNumber || ''}`, 0, pay.amount, pur.invoiceNumber || pur.id);
+        for (const exp of (expenses || []).filter(inActiveYear)) if (String(exp?.accountId) === String(accountId)) push(exp.date || exp.createdAt, 'expense', `مصروف: ${exp.category || 'مصروف'}${exp.notes ? ` - ${exp.notes}` : ''}${exp.deletedAt ? ' (محذوف)' : ''}`, 0, exp.amount, exp.id);
+        for (const v of (vouchers || []).filter(inActiveYear)) if (v?.sourceType === 'account' && String(v?.accountId) === String(accountId)) {
             if (v.type === 'receipt') push(v.date, 'receipt', `سند قبض ${v.voucherNumber || ''}${v.partyName ? ` - ${v.partyName}` : ''}`, v.amount, 0, v.voucherNumber || v.id);
             else push(v.date, 'payment', `سند صرف ${v.voucherNumber || ''}${v.partyName ? ` - ${v.partyName}` : ''}`, 0, v.amount, v.voucherNumber || v.id);
         }
-        for (const tr of (transfers || [])) {
+        for (const tr of (transfers || []).filter(inActiveYear)) {
             if (String(tr?.fromAccountId) === String(accountId)) push(tr.date, 'transfer_out', `تحويل إلى ${tr.toAccountName || 'حساب آخر'}`, 0, tr.amount, tr.id);
             if (String(tr?.toAccountId) === String(accountId)) push(tr.date, 'transfer_in', `تحويل من ${tr.fromAccountName || 'حساب آخر'}`, tr.amount, 0, tr.id);
         }
-        for (const log of (auditLogs || [])) {
+        for (const log of (auditLogs || []).filter(inActiveYear)) {
             if (log?.type === 'sale_deleted_reversal') for (const pay of (log.paymentsReversed || [])) if (String(pay.accountId) === String(accountId)) {
                 push(log.originalDate || log.date, 'sale_deleted_original', `قبض فاتورة مبيعات محذوفة ${log.referenceNumber || ''}`, pay.amount, 0, log.referenceNumber || log.referenceId);
                 push(log.date, 'sale_reverse', `قيد عكسي لحذف فاتورة مبيعات ${log.referenceNumber || ''}`, 0, pay.amount, log.referenceNumber || log.referenceId);

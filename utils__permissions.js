@@ -108,6 +108,7 @@ export function canAccessPermission(permissionKey, { runtime = null, currentUser
 
 export function canAccessTab(tab, { runtime = null, currentUser = null, activeEmployee = null, restaurantEnabled = true } = {}) {
   if (tab === 'no_access') return false;
+  if (tab === 'financial_years') return canAccessPermission('canAccessSettings', { runtime, currentUser, activeEmployee });
   const permissionKey = PAGE_PERMISSION_MAP[tab];
   if (!permissionKey) return false;
   if (String(tab).startsWith('restaurant_') && !restaurantEnabled) return false;
@@ -117,7 +118,7 @@ export function canAccessTab(tab, { runtime = null, currentUser = null, activeEm
 export const DEFAULT_TAB_ORDER = [
   'pos','dashboard','sales','purchases','products','inventory','customers','suppliers','accounts','expenses','vouchers','reports','barcodes',
   'restaurant_tables','restaurant_waiter','restaurant_kitchen','restaurant_waste',
-  'categories','employees','settings','trash'
+  'categories','employees','financial_years','settings','trash'
 ];
 
 export function firstAllowedTab(args = {}) {

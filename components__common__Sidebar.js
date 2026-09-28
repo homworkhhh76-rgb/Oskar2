@@ -1,11 +1,11 @@
 import React from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.52-draft-sections';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.52-draft-sections';
-import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.52-draft-sections';
+import { useApp } from './context__AppContext.js?v=7.9.4.53-fiscal-payments';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.53-fiscal-payments';
+import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.53-fiscal-payments';
 import {
   LayoutDashboard, ShoppingCart, ReceiptText, Truck, Package, Boxes, Warehouse,
   Users, Building2, Wallet, Receipt, FileSpreadsheet, UserCheck, Barcode, BarChart3,
-  Trash2, Settings, LayoutGrid, UtensilsCrossed, ChefHat, Scale, Sparkles
+  Trash2, Settings, LayoutGrid, UtensilsCrossed, ChefHat, Scale, Sparkles, CalendarRange
 } from 'lucide-react';
 
 const h = React.createElement;
@@ -40,6 +40,7 @@ export const Sidebar = () => {
     { id:'expenses', label:'المصروفات اليومية', icon:Receipt },
     { id:'barcodes', label:'طباعة الباركود', icon:Barcode },
     { id:'reports', label:'التقارير والأرباح', icon:BarChart3 },
+    { id:'financial_years', label:'السنة المالية والأرشيف', icon:CalendarRange },
     { id:'trash', label:'سلة المحذوفات', icon:Trash2 },
     { id:'settings', label:'إعدادات النظام', icon:Settings },
   ];
