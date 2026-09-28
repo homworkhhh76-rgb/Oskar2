@@ -1,10 +1,10 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef, useEffect } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.53-fiscal-payments';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.53-fiscal-payments';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.53-fiscal-payments';
-import { downloadProfessionalTablePDF, downloadProfessionalTableImage, downloadProfessionalTableExcel, downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel } from './utils__professionalExport.js?v=7.9.4.53-fiscal-payments';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.53-fiscal-payments';
+import { useApp } from './context__AppContext.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { downloadProfessionalTablePDF, downloadProfessionalTableImage, downloadProfessionalTableExcel, downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel } from './utils__professionalExport.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.55-payment-loader-excel-recipe';
 import { Search, Printer, RotateCcw, Download, Eye, X, AlertCircle, Trash2, Pencil, Image as ImageIcon, FileSpreadsheet, } from 'lucide-react';
 export const SalesView = () => {
     const { invoices, accounts, settings, currentUser, deleteInvoice, beginEditSaleInvoice, setShowThermalModal, createReturnInvoice, showToast, } = useApp();
@@ -52,7 +52,7 @@ export const SalesView = () => {
     });
     const salesPager = usePagination(filteredInvoices, 50, `${search}|${filterType}|${filterPayment}|${financialYearFilter}`);
     const getSalesExportData = () => {
-        const headers = ['رقم الفاتورة', 'النوع', 'التاريخ', 'العميل', 'الصنف', 'الوحدة', 'الكمية', 'السعر', 'إجمالي الصنف', 'إجمالي الفاتورة', 'المدفوع', 'المتبقي'];
+        const headers = ['رقم الفاتورة', 'النوع', 'التاريخ', 'العميل', 'الصنف', 'الوحدة', 'الكمية', 'السعر', 'إجمالي الصنف', 'طريقة الدفع / الصندوق', 'إجمالي الفاتورة', 'المدفوع', 'المتبقي'];
         const rows = [];
         filteredInvoices.forEach((inv) => {
             const items = Array.isArray(inv.items) && inv.items.length ? inv.items : [null];
@@ -66,6 +66,11 @@ export const SalesView = () => {
                 Number(item?.quantity || 0),
                 Number(item?.unitPrice || 0),
                 Number(item?.total || 0),
+                (() => {
+                    const typeLabel = inv.paymentType === 'cash' ? 'نقدي' : inv.paymentType === 'debt' ? 'آجل' : inv.paymentType === 'multi' ? 'متعدد' : inv.paymentType === 'partial' ? 'جزئي' : (inv.paymentType || '-');
+                    const names = [...new Set((Array.isArray(inv.payments) ? inv.payments : []).map((p) => p?.accountName || accounts.find((a) => a.id === p?.accountId)?.name || '').filter(Boolean))];
+                    return names.length ? `${typeLabel} - ${names.join(' + ')}` : typeLabel;
+                })(),
                 Number(inv.grandTotal || 0),
                 Number(inv.paidAmount || 0),
                 Number(inv.remainingAmount || 0),

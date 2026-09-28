@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.53-fiscal-payments';
-import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.53-fiscal-payments';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.53-fiscal-payments';
+import { useApp } from './context__AppContext.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.55-payment-loader-excel-recipe';
 import { Wifi, WifiOff, RefreshCw, Maximize2, Minimize2, Clock, Store, Camera, Menu, LogOut, Building2, Bell } from 'lucide-react';
-import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.53-fiscal-payments';
-import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.53-fiscal-payments';
-import { saveTelegramConfig, uploadTelegramSnapshot } from './services__telegramReports.js?v=7.9.4.53-fiscal-payments';
+import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { saveTelegramConfig, uploadTelegramSnapshot } from './services__telegramReports.js?v=7.9.4.55-payment-loader-excel-recipe';
 
 const h = React.createElement;
 

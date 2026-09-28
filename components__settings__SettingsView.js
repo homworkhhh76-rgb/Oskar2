@@ -1,13 +1,13 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useEffect } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.53-fiscal-payments';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.53-fiscal-payments';
-import { usePWAInstall } from './hooks__usePWAInstall.js?v=7.9.4.53-fiscal-payments';
-import { db } from './services__db.js?v=7.9.4.53-fiscal-payments';
-import { smartPrinter } from './services__printer.js?v=7.9.4.53-fiscal-payments';
-import { TELEGRAM_BOT_URL, normalizeTelegramRecipients, linkTelegramUsername, testTelegramRecipient, testAllTelegramRecipients, sendFullTelegramReport } from './services__telegram.js?v=7.9.4.53-fiscal-payments';
-import { saveTelegramConfig } from './services__telegramReports.js?v=7.9.4.53-fiscal-payments';
-import { materializeLogoSource, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.53-fiscal-payments';
+import { useApp } from './context__AppContext.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { usePWAInstall } from './hooks__usePWAInstall.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { db } from './services__db.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { smartPrinter } from './services__printer.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { TELEGRAM_BOT_URL, normalizeTelegramRecipients, linkTelegramUsername, testTelegramRecipient, testAllTelegramRecipients, sendFullTelegramReport } from './services__telegram.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { saveTelegramConfig } from './services__telegramReports.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { materializeLogoSource, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.55-payment-loader-excel-recipe';
 import { Store, Printer, ShieldCheck, Building2, Database, Download, Upload, RefreshCw, Trash2, Save, Edit2, X, Bluetooth, Cable, Bot, Send, ExternalLink, UserPlus, MessageCircle, CreditCard, WalletCards, Landmark, ArrowLeftRight, SlidersHorizontal, Warehouse, Settings2 } from 'lucide-react';
 const P2P_ICON_OPTIONS = [
     ['palpay','PalPay'],['jawwal-pay','Jawwal Pay'],['bank-palestine','بنك فلسطين'],

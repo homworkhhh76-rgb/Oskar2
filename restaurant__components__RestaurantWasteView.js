@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState } from 'react';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.53-fiscal-payments';
-import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.53-fiscal-payments';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.55-payment-loader-excel-recipe';
 import { Trash2, Plus, BookOpen, Scale, AlertTriangle, } from 'lucide-react';
 export const RestaurantWasteView = () => {
     const { recipes, wasteLogs, addRecipe, updateRecipe, deleteRecipe, logWaste, deleteWasteRecord, } = useRestaurant();
@@ -13,7 +13,7 @@ export const RestaurantWasteView = () => {
     };
     const activeProducts = (products || []).filter((p) => p && !p.deletedAt && p.status !== 'archived');
     const mealProducts = activeProducts.filter((p) => !isRawMaterial(p) && (normalizedChannel(p) === 'restaurant' || normalizedChannel(p) === 'both' || p.showInRestaurant === true || p.restaurantEnabled === true));
-    const ingredientProducts = activeProducts.filter(isRawMaterial).sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ar'));
+    const ingredientProducts = [...activeProducts].sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ar'));
     const getBaseUnit = (p) => (p?.units || []).find((u) => u.id === p.baseUnitId) || (p?.units || []).find((u) => (Number(u.conversionToBase) || 1) === 1) || (p?.units || [])[0];
     const [activeTab, setActiveTab] = useState('recipes');
     // Recipe Modal State
@@ -30,7 +30,7 @@ export const RestaurantWasteView = () => {
     const [wasteNotes, setWasteNotes] = useState('');
     // Add ingredient row
     const handleAddIngredientRow = () => {
-        if (ingredientProducts.length === 0) { showToast('لا توجد مواد خام. عرّف الصنف كمادة خام فقط من شاشة الأصناف أولاً.', 'warning'); return; }
+        if (ingredientProducts.length === 0) { showToast('لا توجد أصناف متاحة لإضافتها كمكونات للوصفة.', 'warning'); return; }
         const firstProd = ingredientProducts[0];
         const unit = getBaseUnit(firstProd);
         setRecipeIngredients((prev) => [

@@ -1,14 +1,14 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.53-fiscal-payments';
-import { ProductGrid } from './components__pos__ProductGrid.js?v=7.9.4.53-fiscal-payments';
-import { CartPanel } from './components__pos__CartPanel.js?v=7.9.4.53-fiscal-payments';
-import { FullCartView } from './components__pos__FullCartView.js?v=7.9.4.53-fiscal-payments';
-import { PaymentModal } from './components__pos__PaymentModal.js?v=7.9.4.53-fiscal-payments';
-import { CameraScannerModal } from './components__pos__CameraScannerModal.js?v=7.9.4.53-fiscal-payments';
-import { HoldInvoicesModal } from './components__pos__HoldInvoicesModal.js?v=7.9.4.53-fiscal-payments';
-import { RestaurantPendingOrdersModal } from './restaurant__components__RestaurantPendingOrdersModal.js?v=7.9.4.53-fiscal-payments';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.53-fiscal-payments';
+import { useApp } from './context__AppContext.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { ProductGrid } from './components__pos__ProductGrid.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { CartPanel } from './components__pos__CartPanel.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { FullCartView } from './components__pos__FullCartView.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { PaymentModal } from './components__pos__PaymentModal.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { CameraScannerModal } from './components__pos__CameraScannerModal.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { HoldInvoicesModal } from './components__pos__HoldInvoicesModal.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { RestaurantPendingOrdersModal } from './restaurant__components__RestaurantPendingOrdersModal.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.55-payment-loader-excel-recipe';
 import { Barcode, Camera, Maximize2, UtensilsCrossed } from 'lucide-react';
 export const POSView = () => {
     const { cart, handleScannedBarcode, setShowCameraModal, holdCurrentInvoice, posCartLayout, setPosCartLayout, settings } = useApp();

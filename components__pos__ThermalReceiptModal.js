@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.53-fiscal-payments';
-import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.53-fiscal-payments';
-import { downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel, warmProfessionalExportLibraries } from './utils__professionalExport.js?v=7.9.4.53-fiscal-payments';
-import { renderInvoiceCanvas } from './utils__canvasRenderer.js?v=7.9.4.53-fiscal-payments';
-import { smartPrinter } from './services__printer.js?v=7.9.4.53-fiscal-payments';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.53-fiscal-payments';
+import { useApp } from './context__AppContext.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel, warmProfessionalExportLibraries } from './utils__professionalExport.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { renderInvoiceCanvas } from './utils__canvasRenderer.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { smartPrinter } from './services__printer.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.55-payment-loader-excel-recipe';
 import { Printer, X, Download, Image as ImageIcon, FileSpreadsheet, Bluetooth } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 
