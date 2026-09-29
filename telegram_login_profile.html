@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#229ED9" />
+  <title>تسجيل الدخول بواسطة Telegram</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Telegram Mini App SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    :root {
+      --tg: #229ED9;
+      --tg-dark: #168ac2;
+      --bg: #f4f8fb;
+      --card: rgba(255,255,255,.92);
+      --text: #14212b;
+      --muted: #70808d;
+      --border: #e2ebf1;
+      --success: #17a673;
+      --shadow: 0 20px 60px rgba(25, 70, 95, .12);
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Cairo", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 85% 10%, rgba(34,158,217,.18), transparent 30%),
+        radial-gradient(circle at 10% 90%, rgba(34,158,217,.12), transparent 35%),
+        var(--bg);
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+
+    .app {
+      width: min(100%, 460px);
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,.9);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .hero {
+      padding: 34px 28px 25px;
+      text-align: center;
+      background: linear-gradient(145deg, #229ED9, #178cc8);
+      color: #fff;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before,
+    .hero::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255,255,255,.08);
+    }
+
+    .hero::before { width: 180px; height: 180px; top: -100px; right: -55px; }
+    .hero::after { width: 130px; height: 130px; bottom: -85px; left: -40px; }
+
+    .telegram-logo {
+      width: 68px;
+      height: 68px;
+      margin: 0 auto 14px;
+      display: grid;
+      place-items: center;
+      background: rgba(255,255,255,.16);
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 22px;
+      box-shadow: inset 0 1px rgba(255,255,255,.25);
+    }
+
+    .telegram-logo svg { width: 38px; height: 38px; }
+
+    h1 {
+      font-size: 22px;
+      margin: 0 0 7px;
+      font-weight: 800;
+    }
+
+    .hero p {
+      margin: 0;
+      opacity: .88;
+      font-size: 13px;
+      line-height: 1.9;
+    }
+
+    .content {
+      padding: 24px;
+    }
+
+    #loginView {
+      text-align: center;
+    }
+
+    .login-title {
+      font-weight: 800;
+      font-size: 18px;
+      margin-bottom: 7px;
+    }
+
+    .login-subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.9;
+      margin-bottom: 20px;
+    }
+
+    #telegram-login-container {
+      display: flex;
+      justify-content: center;
+      min-height: 44px;
+    }
+
+    .hint {
+      margin-top: 18px;
+      padding: 12px 14px;
+      border-radius: 15px;
+      background: #f6fafc;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 11.5px;
+      line-height: 1.8;
+    }
+
+    #profileView { display: none; }
+
+    .profile-head {
+      text-align: center;
+      margin-bottom: 22px;
+    }
+
+    .avatar-wrap {
+      width: 104px;
+      height: 104px;
+      padding: 4px;
+      margin: 0 auto 13px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--tg), #69c8ef);
+      box-shadow: 0 10px 26px rgba(34,158,217,.22);
+    }
+
+    .avatar {
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: 50%;
+      object-fit: cover;
+      background: #e8f1f6;
+      border: 4px solid #fff;
+    }
+
+    .avatar-fallback {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: 4px solid #fff;
+      background: #eef7fb;
+      display: grid;
+      place-items: center;
+      color: var(--tg);
+      font-size: 34px;
+      font-weight: 800;
+    }
+
+    .name {
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 3px;
+    }
+
+    .username {
+      direction: ltr;
+      color: var(--tg);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .id-focus {
+      margin: 20px 0;
+      border: 1px solid #bde3f5;
+      background: linear-gradient(180deg, #f7fcff, #edf9ff);
+      border-radius: 20px;
+      padding: 16px;
+      position: relative;
+    }
+
+    .id-label {
+      color: #4d6574;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 7px;
+    }
+
+    .arrow {
+      color: var(--tg);
+      font-size: 24px;
+      line-height: 1;
+      margin-bottom: 6px;
+      animation: bounce 1.4s infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(4px); }
+    }
+
+    .id-box {
+      display: flex;
+      gap: 9px;
+      align-items: center;
+      direction: ltr;
+    }
+
+    .id-value {
+      flex: 1;
+      min-width: 0;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 12px;
+      background: #fff;
+      border: 1px solid #cae8f6;
+      border-radius: 13px;
+      color: #102c3a;
+      font-family: Arial, sans-serif;
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: .6px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      user-select: all;
+    }
+
+    .copy-btn {
+      border: 0;
+      width: 48px;
+      height: 48px;
+      flex: 0 0 48px;
+      border-radius: 13px;
+      background: var(--tg);
+      color: #fff;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      transition: .18s ease;
+      box-shadow: 0 7px 18px rgba(34,158,217,.22);
+    }
+
+    .copy-btn:active { transform: scale(.95); }
+    .copy-btn.copied { background: var(--success); }
+    .copy-btn svg { width: 21px; height: 21px; }
+
+    .rows {
+      display: grid;
+      gap: 10px;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 13px 14px;
+      border: 1px solid var(--border);
+      border-radius: 15px;
+      background: #fff;
+    }
+
+    .row .label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .row .value {
+      text-align: left;
+      font-size: 13px;
+      font-weight: 800;
+      max-width: 65%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .logout {
+      width: 100%;
+      margin-top: 16px;
+      height: 48px;
+      border: 1px solid #d8e5eb;
+      border-radius: 14px;
+      background: #fff;
+      color: #445864;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .status {
+      margin-top: 14px;
+      min-height: 20px;
+      text-align: center;
+      color: var(--success);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    @media (max-width: 430px) {
+      body { padding: 12px; align-items: start; padding-top: max(12px, env(safe-area-inset-top)); }
+      .card { border-radius: 22px; }
+      .hero { padding: 28px 20px 22px; }
+      .content { padding: 20px 16px; }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app">
+    <section class="card">
+      <header class="hero">
+        <div class="telegram-logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path fill="#fff" d="M21.7 3.3 18.5 19c-.24 1.11-.87 1.38-1.76.86l-4.87-3.59-2.35 2.27c-.26.26-.48.48-.98.48l.35-4.96 9.02-8.15c.39-.35-.09-.55-.61-.2L6.15 12.73l-4.8-1.5c-1.04-.33-1.06-1.04.22-1.54L20.34 2.46c.87-.32 1.63.2 1.36.84Z"/>
+          </svg>
+        </div>
+        <h1>تسجيل الدخول بواسطة Telegram</h1>
+        <p>سجّل دخولك لعرض بيانات حسابك وTelegram ID الخاص بك.</p>
+      </header>
+
+      <div class="content">
+        <div id="loginView">
+          <div class="login-title">مرحباً بك 👋</div>
+          <div class="login-subtitle">
+            اضغط على زر Telegram لتسجيل الدخول بأمان.
+          </div>
+
+          <div id="telegram-login-container"></div>
+
+          <div class="hint">
+            إذا تم فتح الصفحة من داخل Telegram Mini App فسيتم قراءة بيانات الحساب تلقائياً.
+          </div>
+        </div>
+
+        <div id="profileView">
+          <div class="profile-head">
+            <div class="avatar-wrap" id="avatarWrap"></div>
+            <div class="name" id="fullName">—</div>
+            <div class="username" id="username">@—</div>
+          </div>
+
+          <div class="id-focus">
+            <div class="id-label">هذا هو Telegram ID الخاص بك</div>
+            <div class="arrow">↓</div>
+
+            <div class="id-box">
+              <div class="id-value" id="telegramId">—</div>
+
+              <button class="copy-btn" id="copyBtn" type="button" title="نسخ Telegram ID" aria-label="نسخ Telegram ID">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M9 8.5A2.5 2.5 0 0 1 11.5 6h6A2.5 2.5 0 0 1 20 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-6A2.5 2.5 0 0 1 9 17.5v-9Z" stroke="currentColor" stroke-width="1.8"/>
+                  <path d="M15 6V5.5A2.5 2.5 0 0 0 12.5 3h-6A2.5 2.5 0 0 0 4 5.5v9A2.5 2.5 0 0 0 6.5 17H9" stroke="currentColor" stroke-width="1.8"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="rows">
+            <div class="row">
+              <span class="label">الاسم</span>
+              <span class="value" id="nameRow">—</span>
+            </div>
+
+            <div class="row">
+              <span class="label">اسم المستخدم</span>
+              <span class="value" id="usernameRow">—</span>
+            </div>
+          </div>
+
+          <button class="logout" id="logoutBtn" type="button">تسجيل الخروج</button>
+          <div class="status" id="status"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    /* =========================================================
+       غيّر هذا فقط إلى USERNAME البوت بدون @
+       مثال: MyLoginBot
+       ========================================================= */
+    const BOT_USERNAME = "PUT_YOUR_BOT_USERNAME_HERE";
+
+    const loginView = document.getElementById("loginView");
+    const profileView = document.getElementById("profileView");
+    const telegramId = document.getElementById("telegramId");
+    const fullName = document.getElementById("fullName");
+    const username = document.getElementById("username");
+    const nameRow = document.getElementById("nameRow");
+    const usernameRow = document.getElementById("usernameRow");
+    const avatarWrap = document.getElementById("avatarWrap");
+    const copyBtn = document.getElementById("copyBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const status = document.getElementById("status");
+
+    function escapeHTML(value = "") {
+      return String(value).replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      }[char]));
+    }
+
+    function getInitials(user) {
+      const a = (user.first_name || "").trim().charAt(0);
+      const b = (user.last_name || "").trim().charAt(0);
+      return (a + b || "T").toUpperCase();
+    }
+
+    function normalizeUser(user) {
+      return {
+        id: String(user.id ?? ""),
+        first_name: user.first_name || "",
+        last_name: user.last_name || "",
+        username: user.username || "",
+        photo_url: user.photo_url || ""
+      };
+    }
+
+    function showProfile(rawUser, save = true) {
+      const user = normalizeUser(rawUser);
+      if (!user.id) return;
+
+      const name = [user.first_name, user.last_name].filter(Boolean).join(" ") || "مستخدم Telegram";
+      const userNameText = user.username ? "@" + user.username : "لا يوجد اسم مستخدم";
+
+      telegramId.textContent = user.id;
+      fullName.textContent = name;
+      username.textContent = userNameText;
+      nameRow.textContent = name;
+      usernameRow.textContent = userNameText;
+
+      if (user.photo_url) {
+        avatarWrap.innerHTML = `
+          <img
+            class="avatar"
+            src="${escapeHTML(user.photo_url)}"
+            alt="الصورة الشخصية"
+            referrerpolicy="no-referrer"
+            onerror="this.parentElement.innerHTML='<div class=&quot;avatar-fallback&quot;>${escapeHTML(getInitials(user))}</div>'"
+          >
+        `;
+      } else {
+        avatarWrap.innerHTML = `<div class="avatar-fallback">${escapeHTML(getInitials(user))}</div>`;
+      }
+
+      loginView.style.display = "none";
+      profileView.style.display = "block";
+
+      if (save) {
+        localStorage.setItem("telegram_profile_demo", JSON.stringify(user));
+      }
+    }
+
+    function showLogin() {
+      profileView.style.display = "none";
+      loginView.style.display = "block";
+      status.textContent = "";
+    }
+
+    /* Callback الخاص بـ Telegram Login Widget */
+    window.onTelegramAuth = function(user) {
+      showProfile(user, true);
+
+      /*
+        مهم للإنتاج:
+        أرسل user بالكامل إلى السيرفر وتحقق من hash هناك
+        قبل إنشاء جلسة دخول حقيقية.
+      */
+    };
+
+    function createTelegramLoginWidget() {
+      const container = document.getElementById("telegram-login-container");
+
+      if (BOT_USERNAME === "PUT_YOUR_BOT_USERNAME_HERE") {
+        container.innerHTML = `
+          <div style="
+            width:100%;
+            padding:12px;
+            border-radius:14px;
+            background:#fff7e8;
+            border:1px solid #ffe1a8;
+            color:#8a5a00;
+            font-size:12px;
+            line-height:1.8;
+          ">
+            ضع اسم مستخدم البوت داخل المتغير
+            <b>BOT_USERNAME</b>
+            أولاً.
+          </div>
+        `;
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.async = true;
+      script.src = "https://telegram.org/js/telegram-widget.js?22";
+      script.setAttribute("data-telegram-login", BOT_USERNAME);
+      script.setAttribute("data-size", "large");
+      script.setAttribute("data-radius", "12");
+      script.setAttribute("data-userpic", "false");
+      script.setAttribute("data-request-access", "write");
+      script.setAttribute("data-onauth", "onTelegramAuth(user)");
+
+      container.innerHTML = "";
+      container.appendChild(script);
+    }
+
+    async function copyTelegramId() {
+      const value = telegramId.textContent.trim();
+      if (!value || value === "—") return;
+
+      try {
+        await navigator.clipboard.writeText(value);
+      } catch (_) {
+        const textarea = document.createElement("textarea");
+        textarea.value = value;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        textarea.remove();
+      }
+
+      copyBtn.classList.add("copied");
+      status.textContent = "تم نسخ Telegram ID ✓";
+
+      setTimeout(() => {
+        copyBtn.classList.remove("copied");
+        status.textContent = "";
+      }, 1800);
+    }
+
+    copyBtn.addEventListener("click", copyTelegramId);
+
+    logoutBtn.addEventListener("click", () => {
+      localStorage.removeItem("telegram_profile_demo");
+      showLogin();
+      createTelegramLoginWidget();
+    });
+
+    function tryTelegramMiniAppLogin() {
+      try {
+        const tg = window.Telegram?.WebApp;
+        if (!tg) return false;
+
+        tg.ready();
+        tg.expand();
+
+        const tgUser = tg.initDataUnsafe?.user;
+        if (tgUser?.id) {
+          showProfile(tgUser, false);
+          return true;
+        }
+      } catch (error) {
+        console.warn("Telegram Mini App data unavailable:", error);
+      }
+      return false;
+    }
+
+    function init() {
+      /* إذا الصفحة مفتوحة داخل Telegram Mini App */
+      if (tryTelegramMiniAppLogin()) return;
+
+      /* وإلا اعرض تسجيل الدخول العادي */
+      const saved = localStorage.getItem("telegram_profile_demo");
+      if (saved) {
+        try {
+          showProfile(JSON.parse(saved), false);
+          return;
+        } catch (_) {
+          localStorage.removeItem("telegram_profile_demo");
+        }
+      }
+
+      createTelegramLoginWidget();
+    }
+
+    init();
+  </script>
+</body>
+</html>
