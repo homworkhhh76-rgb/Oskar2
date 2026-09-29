@@ -348,4 +348,4 @@ const server=http.createServer(async(req,res)=>{
     fs.createReadStream(filePath).pipe(res);
   });
 });
-server.listen(PORT,()=>{console.log(`Oscar Accounting + AI + Telegram: http://localhost:${PORT}`);setTimeout(()=>checkTelegramSchedules().catch(()=>{}),5000);setTimeout(()=>refreshTelegramUsers({maxBatches:5}).catch(()=>{}),1500);const timer=setInterval(()=>checkTelegramSchedules().catch(()=>{}),60000);timer.unref?.();const usersTimer=setInterval(()=>refreshTelegramUsers({maxBatches:3}).catch(()=>{}),15000);usersTimer.unref?.();});
+server.listen(PORT,()=>{console.log(`Oscar Accounting + AI + Telegram: http://localhost:${PORT}`);setTimeout(()=>checkTelegramSchedules().catch(()=>{}),5000);const timer=setInterval(()=>checkTelegramSchedules().catch(()=>{}),60000);timer.unref?.();});

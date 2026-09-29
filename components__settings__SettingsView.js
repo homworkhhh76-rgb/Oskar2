@@ -1,13 +1,13 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useEffect } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { usePWAInstall } from './hooks__usePWAInstall.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { db } from './services__db.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { smartPrinter } from './services__printer.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { TELEGRAM_BOT_URL, normalizeTelegramRecipients, linkTelegramUsername, testTelegramRecipient, testAllTelegramRecipients, sendFullTelegramReport } from './services__telegram.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { saveTelegramConfig } from './services__telegramReports.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { materializeLogoSource, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { useApp } from './context__AppContext.js?v=7.9.4.57-telegram-chatid';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.57-telegram-chatid';
+import { usePWAInstall } from './hooks__usePWAInstall.js?v=7.9.4.57-telegram-chatid';
+import { db } from './services__db.js?v=7.9.4.57-telegram-chatid';
+import { smartPrinter } from './services__printer.js?v=7.9.4.57-telegram-chatid';
+import { TELEGRAM_BOT_URL, normalizeTelegramRecipients, testTelegramRecipient, testAllTelegramRecipients, sendFullTelegramReport } from './services__telegram.js?v=7.9.4.57-telegram-chatid';
+import { saveTelegramConfig } from './services__telegramReports.js?v=7.9.4.57-telegram-chatid';
+import { materializeLogoSource, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.57-telegram-chatid';
 import { Store, Printer, ShieldCheck, Building2, Database, Download, Upload, RefreshCw, Trash2, Save, Edit2, X, Bluetooth, Cable, Bot, Send, ExternalLink, UserPlus, MessageCircle, CreditCard, WalletCards, Landmark, ArrowLeftRight, SlidersHorizontal, Warehouse, Settings2 } from 'lucide-react';
 const P2P_ICON_OPTIONS = [
     ['palpay','PalPay'],['jawwal-pay','Jawwal Pay'],['bank-palestine','بنك فلسطين'],
@@ -50,7 +50,7 @@ export const SettingsView = () => {
     const [newWarehouseName, setNewWarehouseName] = useState('');
     const [newWarehouseCode, setNewWarehouseCode] = useState('');
     const [editingWarehouse, setEditingWarehouse] = useState(null);
-    const [telegramUsernameInput, setTelegramUsernameInput] = useState('');
+    const [telegramChatIdInput, setTelegramChatIdInput] = useState('');
     const [telegramBusy, setTelegramBusy] = useState('');
     const [newFinancialYearName, setNewFinancialYearName] = useState('');
     const [newFinancialYearStart, setNewFinancialYearStart] = useState(new Date().toISOString().slice(0, 10));
@@ -257,41 +257,36 @@ export const SettingsView = () => {
     const telegramRecipients = normalizeTelegramRecipients(formSettings.telegramRecipients);
     const handleAddTelegramRecipient = async () => {
         if (!isTelegramManager) { showToast('إعدادات Telegram متاحة للمدير فقط', 'error'); return; }
-        const raw = String(telegramUsernameInput || '').trim();
-        const username = raw ? (raw.startsWith('@') ? raw : `@${raw}`) : '';
-        if (!/^@[A-Za-z0-9_]{5,32}$/.test(username)) {
-            showToast('اكتب يوزر Telegram صحيح مثل @username', 'warning');
+        const chatId = String(telegramChatIdInput || '').trim();
+        if (!/^-?\d{5,20}$/.test(chatId)) {
+            showToast('اكتب Chat ID رقمي صحيح مثل 6764610810', 'warning');
             return;
         }
-        setTelegramBusy(`add:${username.toLowerCase()}`);
+        setTelegramBusy(`add:${chatId}`);
         try {
-            const resolved = await linkTelegramUsername(username, { timeoutMs:70000, onLinkRequired:() => showToast('فتحنا بوت أوسكار تلقائياً. اضغط Start ثم ارجع للبرنامج؛ جاري الربط...', 'info') });
-            const chatId = String(resolved?.chatId || '').trim();
-            if (!chatId) throw new Error('تعذر العثور على المستخدم داخل البوت');
-            const normalizedUsername = String(resolved?.username || username).trim();
             const nextRecipients = [
-                ...telegramRecipients.filter((r) => r.chatId !== chatId && String(r.username || '').toLowerCase() !== normalizedUsername.toLowerCase()),
-                { chatId, username: normalizedUsername, label: String(resolved?.name || normalizedUsername), enabled: true },
+                ...telegramRecipients.filter((r) => String(r.chatId || '').trim() !== chatId),
+                { chatId, username:'', label:`Chat ID ${chatId}`, enabled:true },
             ];
             const nextTelegramSettings = {
                 ...formSettings,
-                telegramEnabled: true,
-                telegramBotUsername: 'Oskarteaam_bot',
-                telegramBotUrl: TELEGRAM_BOT_URL,
-                telegramRecipients: nextRecipients,
+                telegramEnabled:true,
+                telegramBotUsername:'Oskarteaam_bot',
+                telegramBotUrl:TELEGRAM_BOT_URL,
+                telegramRecipients:nextRecipients,
             };
             await updateSettings(nextTelegramSettings);
             await syncTelegramServerConfig(nextTelegramSettings);
             setFormSettings((prev) => ({ ...prev, telegramEnabled:true, telegramRecipients:nextRecipients }));
-            setTelegramUsernameInput('');
+            setTelegramChatIdInput('');
             try {
                 await testTelegramRecipient(chatId);
-                showToast(`تم ربط ${normalizedUsername} وإرسال رسالة اختبار بنجاح`, 'success');
+                showToast(`تم حفظ Chat ID ${chatId} وإرسال رسالة اختبار بنجاح`, 'success');
             } catch (error) {
-                showToast(`تم ربط ${normalizedUsername} لكن الاختبار فشل. ${error?.message || ''}`.trim(), 'warning');
+                showToast(`تم حفظ Chat ID ${chatId} لكن رسالة الاختبار فشلت: ${error?.message || 'تأكد أن الحساب فتح البوت وضغط Start'}`, 'warning');
             }
         } catch (error) {
-            showToast(error?.message || 'تعذر العثور على هذا اليوزر. تأكد أنه فتح البوت وضغط Start.', 'error');
+            showToast(error?.message || 'تعذر حفظ Chat ID', 'error');
         } finally {
             setTelegramBusy('');
         }
@@ -325,10 +320,10 @@ export const SettingsView = () => {
         setTelegramBusy('test-all');
         try {
             const result = await testAllTelegramRecipients();
-            if (result?.ok) showToast(`تم إرسال الاختبار إلى ${result.sent || telegramRecipients.length} مستخدم`, 'success');
+            if (result?.ok) showToast(`تم إرسال الاختبار إلى ${result.sent || telegramRecipients.length} معرف`, 'success');
             else throw new Error(result?.failures?.[0]?.error || 'فشل الإرسال');
         }
-        catch (error) { showToast(error?.message || 'تعذر اختبار مستخدمي Telegram', 'error'); }
+        catch (error) { showToast(error?.message || 'تعذر اختبار معرفات Telegram', 'error'); }
         finally { setTelegramBusy(''); }
     };
     const handleSendTelegramReportNow = async () => {
@@ -336,7 +331,7 @@ export const SettingsView = () => {
         setTelegramBusy('report');
         try {
             const result = await sendFullTelegramReport({ manual: true, force: true });
-            showToast(`تم إرسال جميع التقارير إلى ${result?.sent || telegramRecipients.filter(r => r.enabled !== false).length} مستخدم`, 'success');
+            showToast(`تم إرسال جميع التقارير إلى ${result?.sent || telegramRecipients.filter(r => r.enabled !== false).length} معرف`, 'success');
         }
         catch (error) { showToast(error?.message || 'تعذر إرسال تقرير Telegram', 'error'); }
         finally { setTelegramBusy(''); }
@@ -344,8 +339,8 @@ export const SettingsView = () => {
     const handleSaveP2PPaymentChatId = async () => {
         if (!isTelegramManager) { showToast('إعداد استقبال دفعات العملاء متاح للمدير فقط', 'error'); return; }
         const chatId = String(formSettings.p2pPaymentChatId || '').trim();
-        if (chatId && !/^(?:-?\d{5,20}|@[A-Za-z0-9_]{5,32})$/.test(chatId)) {
-            showToast('اكتب Chat ID صحيحاً مثل 6764610810 أو @username', 'warning');
+        if (chatId && !/^-?\d{5,20}$/.test(chatId)) {
+            showToast('اكتب Chat ID رقمي صحيحاً مثل 6764610810', 'warning');
             return;
         }
         await updateSettings({ p2pPaymentChatId: chatId });
@@ -427,7 +422,7 @@ export const SettingsView = () => {
                 _jsx("div", { className: "w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-950/50 flex items-center justify-center shrink-0", children: _jsx(Bot, { className: "w-5 h-5 text-sky-600" }) }),
                 _jsxs("div", { children: [
                     _jsx("h3", { className: "text-sm font-black text-slate-900 dark:text-white", children: "ربط Telegram والإشعارات" }),
-                    _jsx("p", { className: "text-[11px] text-slate-500 mt-0.5 leading-5", children: "اربط أكثر من مستخدم، واختر كمدير بالضبط أي حركات يرسلها البوت، مع جميع تقارير البرنامج كل 24 ساعة، وإرسال صور مصممة للفواتير والسندات والتنبيهات عند التفعيل." })
+                    _jsx("p", { className: "text-[11px] text-slate-500 mt-0.5 leading-5", children: "أضف Chat ID واحداً أو أكثر، واختر كمدير بالضبط أي حركات يرسلها البوت، مع جميع تقارير البرنامج كل 24 ساعة وإرسال صور الفواتير والسندات والتنبيهات." })
                 ] })
             ] }),
             _jsxs("label", { className: "flex items-center gap-2 text-[11px] font-bold text-slate-600", children: [
@@ -436,14 +431,14 @@ export const SettingsView = () => {
             ] })
         ] }),
         _jsxs("div", { className: "rounded-xl border border-sky-100 bg-sky-50/60 p-3 text-[11px] text-sky-900 leading-6", children: [
-            _jsx("div", { className: "font-black", children: "مهم قبل الربط" }),
-            _jsx("div", { children: "اكتب اليوزر واضغط ربط. إذا لم يكن تحديث Start القديم متاحاً، سيفتح البرنامج البوت تلقائياً برابط ربط جديد؛ اضغط Start ثم ارجع للبرنامج وسيتم التقاط الحساب وربطه بدون إدخال Chat ID." }),
+            _jsx("div", { className: "font-black", children: "الربط بالمعرف الرقمي" }),
+            _jsx("div", { children: "اكتب Chat ID الرقمي مباشرة مثل 6764610810. لا يوجد بحث باليوزر ولا ربط تلقائي. يجب فقط أن يكون صاحب الـID قد فتح البوت وضغط Start مرة واحدة حتى يستطيع البوت الإرسال إليه." }),
             _jsxs("button", { type: "button", onClick: () => window.open(TELEGRAM_BOT_URL, '_blank', 'noopener'), className: "mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 text-white font-bold", children: [_jsx(ExternalLink, { className: "w-3.5 h-3.5" }), _jsx("span", { children: "فتح @Oskarteaam_bot" })] })
         ] }),
         _jsxs("div", { className: "rounded-xl border-2 border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20 dark:border-emerald-900 p-3 space-y-2", children: [
             _jsxs("div", { children: [
                 _jsx("div", { className: "text-xs font-black text-emerald-800 dark:text-emerald-200", children: "استقبال دفعات رابط العميل (P2P)" }),
-                _jsx("div", { className: "text-[10px] text-slate-500 mt-1 leading-5", children: "هذا المعرف خاص بدفعات العملاء فقط ومختلف عن مستخدمي إشعارات السجلات والتقارير. صفحة السداد تستخدم بوت الدفع المحدد في النظام وترسل له صورة الإيصال وبيانات العميل." })
+                _jsx("div", { className: "text-[10px] text-slate-500 mt-1 leading-5", children: "هذا المعرف خاص بدفعات العملاء فقط ومختلف عن Chat ID الخاص بإشعارات المبيعات والسجلات والتقارير. صفحة السداد تستخدم بوت الدفع المحدد في النظام وترسل له صورة الإيصال وبيانات العميل." })
             ] }),
             _jsxs("div", { className: "grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2", children: [
                 _jsx("input", { type: "text", dir: "ltr", value: formSettings.p2pPaymentChatId || '', onChange: (e) => setFormSettings({ ...formSettings, p2pPaymentChatId: e.target.value }), placeholder: "Chat ID مثال: 6764610810", autoCapitalize: "none", autoCorrect: "off", spellCheck: false, className: "w-full px-3 py-2 text-xs border rounded-lg bg-white dark:bg-slate-800 font-mono" }),
@@ -451,21 +446,21 @@ export const SettingsView = () => {
             ] })
         ] }),
         _jsxs("div", { className: "grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2", children: [
-            _jsx("input", { type: "text", dir: "ltr", value: telegramUsernameInput, onChange: (e) => setTelegramUsernameInput(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddTelegramRecipient(); } }, placeholder: "@username أو username", autoCapitalize: "none", autoCorrect: "off", spellCheck: false, className: "w-full px-3 py-2 text-xs border rounded-lg bg-slate-50 dark:bg-slate-800 font-mono" }),
-            _jsxs("button", { type: "button", onClick: handleAddTelegramRecipient, disabled: !!telegramBusy, className: "inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white text-xs font-black", children: [_jsx(UserPlus, { className: "w-4 h-4" }), _jsx("span", { children: telegramBusy.startsWith('add:') ? "جاري البحث والربط..." : "ربط اليوزر" })] })
+            _jsx("input", { type: "text", dir: "ltr", value: telegramChatIdInput, onChange: (e) => setTelegramChatIdInput(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddTelegramRecipient(); } }, placeholder: "Chat ID مثال: 6764610810", autoCapitalize: "none", autoCorrect: "off", spellCheck: false, className: "w-full px-3 py-2 text-xs border rounded-lg bg-slate-50 dark:bg-slate-800 font-mono" }),
+            _jsxs("button", { type: "button", onClick: handleAddTelegramRecipient, disabled: !!telegramBusy, className: "inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white text-xs font-black", children: [_jsx(UserPlus, { className: "w-4 h-4" }), _jsx("span", { children: telegramBusy.startsWith('add:') ? "جاري الحفظ..." : "إضافة المعرف" })] })
         ] }),
-        _jsx("div", { className: "text-[10px] text-slate-500 leading-5", children: "لا تحتاج لمعرفة Chat ID. النظام يبحث أولاً في المستخدمين المحفوظين، وإن لم يجد الحساب ينشئ جلسة ربط Start جديدة حتى لا يعتمد على تحديث قديم ربما تم استهلاكه." }),
+        _jsx("div", { className: "text-[10px] text-slate-500 leading-5", children: "أدخل Chat ID فقط. النظام لا يبحث عن Username ولا يقرأ تحديثات البوت لاكتشاف المستخدمين." }),
         telegramRecipients.length ? _jsx("div", { className: "space-y-2", children: telegramRecipients.map((recipient) => _jsxs("div", { className: "flex flex-col sm:flex-row sm:items-center gap-2 p-3 rounded-xl border bg-slate-50 dark:bg-slate-800/50", children: [
             _jsxs("div", { className: "flex-1 min-w-0", children: [
-                _jsx("div", { className: "text-xs font-black text-slate-800 dark:text-slate-100 truncate", children: recipient.username || recipient.label || 'مستخدم Telegram' }),
-                _jsx("div", { className: "text-[10px] text-slate-500 truncate", children: recipient.label && recipient.label !== recipient.username ? recipient.label : 'مرتبط عبر اليوزر — المعرّف مخفي' })
+                _jsx("div", { className: "text-xs font-black text-slate-800 dark:text-slate-100 truncate", children: `Chat ID: ${recipient.chatId}` }),
+                _jsx("div", { className: "text-[10px] text-slate-500 truncate", children: 'إرسال مباشر بالمعرف الرقمي — بدون Username' })
             ] }),
             _jsxs("div", { className: "flex items-center gap-1.5", children: [
                 _jsxs("button", { type: "button", onClick: () => handleToggleTelegramRecipient(recipient.chatId), className: `px-2.5 py-1.5 rounded-lg text-[10px] font-black ${recipient.enabled !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`, children: [recipient.enabled !== false ? 'مفعّل' : 'متوقف'] }),
                 _jsxs("button", { type: "button", onClick: () => handleTestTelegramRecipient(recipient.chatId), disabled: !!telegramBusy, className: "inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white border text-sky-700 text-[10px] font-black disabled:opacity-50", children: [_jsx(MessageCircle, { className: "w-3.5 h-3.5" }), _jsx("span", { children: telegramBusy === `test:${recipient.chatId}` ? 'يرسل...' : 'اختبار' })] }),
-                _jsx("button", { type: "button", onClick: () => handleRemoveTelegramRecipient(recipient.chatId), className: "p-1.5 rounded-lg bg-white border text-rose-600", title: "حذف المستخدم", children: _jsx(Trash2, { className: "w-3.5 h-3.5" }) })
+                _jsx("button", { type: "button", onClick: () => handleRemoveTelegramRecipient(recipient.chatId), className: "p-1.5 rounded-lg bg-white border text-rose-600", title: "حذف المعرف", children: _jsx(Trash2, { className: "w-3.5 h-3.5" }) })
             ] })
-        ] }, recipient.chatId)) }) : _jsx("div", { className: "p-3 rounded-xl border border-dashed text-center text-xs text-slate-400", children: "لم تتم إضافة أي مستخدم Telegram بعد." }),
+        ] }, recipient.chatId)) }) : _jsx("div", { className: "p-3 rounded-xl border border-dashed text-center text-xs text-slate-400", children: "لم تتم إضافة أي Chat ID Telegram بعد." }),
         _jsx("div", { className: "space-y-2", children: [
             _jsx("div", { className: "text-xs font-black text-slate-700 dark:text-slate-200", children: "ما الذي يرسله البوت؟ — المدير فقط يتحكم بهذه المفاتيح" }),
             _jsx("div", { className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2", children: telegramNotificationOptions.map(([key,label]) => _jsxs("label", { className: "flex items-center justify-between gap-3 p-3 rounded-xl border bg-slate-50 dark:bg-slate-800", children: [_jsx("span", { className: "text-[11px] font-bold", children: label }), _jsx("input", { type: "checkbox", checked: formSettings[key] !== false, onChange: (e) => setFormSettings({ ...formSettings, [key]: e.target.checked }), className: "w-5 h-5 accent-sky-600" })] }, key)) }),
@@ -473,7 +468,7 @@ export const SettingsView = () => {
         ] }),
         _jsxs("div", { className: "flex flex-wrap gap-2 pt-1", children: [
             _jsxs("button", { type: "button", onClick: handleSendTelegramReportNow, disabled: !!telegramBusy || !telegramRecipients.some(r => r.enabled !== false), className: "inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white text-xs font-black", children: [_jsx(Send, { className: "w-4 h-4" }), _jsx("span", { children: telegramBusy === 'report' ? 'جاري إرسال جميع التقارير...' : 'إرسال جميع التقارير الآن' })] }),
-            _jsx("button", { type: "button", onClick: handleTestAllTelegram, disabled: !!telegramBusy || !telegramRecipients.some(r => r.enabled !== false), className: "px-4 py-2 rounded-xl border border-sky-200 text-sky-700 bg-white text-xs font-black disabled:opacity-50", children: telegramBusy === 'test-all' ? 'جاري الاختبار...' : 'اختبار جميع المستخدمين' }),
+            _jsx("button", { type: "button", onClick: handleTestAllTelegram, disabled: !!telegramBusy || !telegramRecipients.some(r => r.enabled !== false), className: "px-4 py-2 rounded-xl border border-sky-200 text-sky-700 bg-white text-xs font-black disabled:opacity-50", children: telegramBusy === 'test-all' ? 'جاري الاختبار...' : 'اختبار جميع المعرفات' }),
             _jsx("button", { type: "button", onClick: async () => { if (!isTelegramManager) return; const nextTelegramSettings = { ...formSettings, telegramEnabled: formSettings.telegramEnabled !== false, telegramReportIntervalHours: 24, telegramBotUsername: 'Oskarteaam_bot', telegramBotUrl: TELEGRAM_BOT_URL, telegramRecipients }; await updateSettings(nextTelegramSettings); await syncTelegramServerConfig(nextTelegramSettings); showToast('تم حفظ إعدادات Telegram', 'success'); }, className: "px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-xs font-black", children: "حفظ إعدادات Telegram" })
         ] })
     ] }) : null;

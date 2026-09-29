@@ -1,5 +1,5 @@
-import { getAllFromStore, getFromStore, putInStore } from './services__db.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { renderInvoiceCanvas, renderVoucherCanvas, renderTableCanvas } from './utils__canvasRenderer.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { getAllFromStore, getFromStore, putInStore } from './services__db.js?v=7.9.4.57-telegram-chatid';
+import { renderInvoiceCanvas, renderVoucherCanvas, renderTableCanvas } from './utils__canvasRenderer.js?v=7.9.4.57-telegram-chatid';
 
 // Telegram integration for Oscar Accounting.
 // The owner explicitly requested embedding this token in the app build.
@@ -68,8 +68,9 @@ export function normalizeTelegramRecipients(value) {
   for (const item of input) {
     const raw = typeof item === 'object' && item ? item : { chatId:item };
     const chatId = normalizeId(raw.chatId ?? raw.id ?? raw.userId);
-    const username = normalizeUsername(raw.username || (/^@/.test(String(raw.chatId || '')) ? raw.chatId : ''));
-    if (!chatId || seen.has(chatId)) continue;
+    const username = normalizeUsername(raw.username || '');
+    // Sales/movements/report recipients are linked by numeric Chat ID only.
+    if (!/^-?\d{5,20}$/.test(chatId) || seen.has(chatId)) continue;
     seen.add(chatId);
     rows.push({
       chatId,
@@ -824,14 +825,14 @@ export async function testTelegramRecipient(chatId) {
   if (!id) throw new Error('أدخل Chat ID أولاً');
   const settings = await getStoreSettings();
   const storeName = String(settings.storeName || 'أوسكار المحاسبي');
-  await sendTextToChat(id, `✅ تم ربط ${storeName} بنجاح مع Telegram.\nستصل هنا إشعارات الحركات التي يفعّلها المدير وجميع التقارير حسب إعدادات البرنامج.`);
+  await sendTextToChat(id, `✅ تم إعداد ${storeName} بنجاح للإرسال إلى هذا Chat ID.\nستصل هنا إشعارات الحركات التي يفعّلها المدير وجميع التقارير حسب إعدادات البرنامج.`);
   return true;
 }
 
 export async function testAllTelegramRecipients() {
   const settings = await getStoreSettings();
   const recipients = enabledRecipients(settings);
-  if (!recipients.length) throw new Error('لا يوجد أي مستخدم Telegram مضاف');
+  if (!recipients.length) throw new Error('لا يوجد أي Chat ID مضاف');
   const storeName = String(settings.storeName || 'أوسكار المحاسبي');
   return deliverToRecipients(`✅ اختبار ربط Telegram\nالنظام: ${storeName}\nالوقت: ${fmtDateTime(new Date())}`, { settings, queueOnFailure:false });
 }
@@ -1332,7 +1333,7 @@ async function syncServerReportSnapshot(settings, { force=false } = {}) {
 export async function sendFullTelegramReport({ manual=false, force=false } = {}) {
   const settings = await getStoreSettings();
   if (settings.telegramEnabled === false) throw new Error('ربط Telegram متوقف من الإعدادات');
-  if (!enabledRecipients(settings).length) throw new Error('أضف مستخدم Telegram واحداً على الأقل');
+  if (!enabledRecipients(settings).length) throw new Error('أضف Chat ID واحداً على الأقل');
   const periodHours = Math.max(1, asNumber(settings.telegramReportIntervalHours) || 24);
   const data = await collectReportData();
   const text = buildFullTelegramReportText(data, settings, periodHours);

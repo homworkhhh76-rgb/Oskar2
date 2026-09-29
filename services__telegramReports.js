@@ -1,7 +1,7 @@
-import { TELEGRAM_BOT_TOKEN, normalizeTelegramRecipients, sendTelegramTextToRecipients, sendTelegramPhotoBlobToRecipients, sendTelegramDocumentBlobToRecipients, buildFullTelegramReportText } from './services__telegram.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { renderExecutiveReportCanvas, renderTablePages } from './utils__canvasRenderer.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { canvasesToPDFBlob } from './utils__pdfExport.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { canvasToImageBlob } from './utils__imageExport.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { TELEGRAM_BOT_TOKEN, normalizeTelegramRecipients, sendTelegramTextToRecipients, sendTelegramPhotoBlobToRecipients, sendTelegramDocumentBlobToRecipients, buildFullTelegramReportText } from './services__telegram.js?v=7.9.4.57-telegram-chatid';
+import { renderExecutiveReportCanvas, renderTablePages } from './utils__canvasRenderer.js?v=7.9.4.57-telegram-chatid';
+import { canvasesToPDFBlob } from './utils__pdfExport.js?v=7.9.4.57-telegram-chatid';
+import { canvasToImageBlob } from './utils__imageExport.js?v=7.9.4.57-telegram-chatid';
 
 const num=v=>{const n=Number(v);return Number.isFinite(n)?n:0;};
 const money=v=>num(v).toFixed(2);
@@ -200,7 +200,7 @@ function enabledReportRecipients(settings){
 }
 function deliveryError(result,label){
   if(result?.ok) return null;
-  if(result?.reason==='NO_RECIPIENTS'||result?.skipped) return new Error('لا يوجد مستخدم Telegram فعّال. أضف المستخدم من إعدادات Telegram أولاً.');
+  if(result?.reason==='NO_RECIPIENTS'||result?.skipped) return new Error('لا يوجد Chat ID فعّال. أضف المعرف من إعدادات Telegram أولاً.');
   const first=result?.failures?.[0];
   return new Error(`${label} فشل${first?.error?`: ${first.error}`:''}`);
 }
@@ -234,7 +234,7 @@ export async function uploadTelegramSnapshot(app,{includeBackup=true}={}){
 
 export async function sendDailyReportNow(app){
   const settings=app.settings||{};
-  if(!enabledReportRecipients(settings).length) throw new Error('لا يوجد مستخدم Telegram فعّال. أضفه من الإعدادات وافتح البوت واضغط Start.');
+  if(!enabledReportRecipients(settings).length) throw new Error('لا يوجد Chat ID فعّال. أضفه من الإعدادات وتأكد أن صاحب المعرف فتح البوت وضغط Start.');
   const a=await generateDailyReportArtifacts(app);
   requireDelivery(await sendTelegramTextToRecipients(a.text,{settings}),'إرسال نص التقرير');
   requireDelivery(await sendTelegramPhotoBlobToRecipients(a.image,{settings,caption:`صورة التقرير اليومي — ${settings.storeName||'أوسكار المحاسبي'}`,filename:a.imageName}),'إرسال صورة التقرير');
@@ -245,7 +245,7 @@ export async function sendDailyReportNow(app){
 }
 export async function sendCustomersReportNow(app){
   const settings=app.settings||{};
-  if(!enabledReportRecipients(settings).length) throw new Error('لا يوجد مستخدم Telegram فعّال. أضفه من الإعدادات وافتح البوت واضغط Start.');
+  if(!enabledReportRecipients(settings).length) throw new Error('لا يوجد Chat ID فعّال. أضفه من الإعدادات وتأكد أن صاحب المعرف فتح البوت وضغط Start.');
   const a=await generateCustomersDebtsArtifacts(app);
   const result=requireDelivery(await sendTelegramDocumentBlobToRecipients(a.pdf,{settings,caption:`تقرير العملاء والديون — ${settings.storeName||'أوسكار المحاسبي'}`,filename:a.pdfName}),'إرسال تقرير العملاء والديون');
   await saveTelegramConfig(settings).catch(()=>{});
@@ -254,7 +254,7 @@ export async function sendCustomersReportNow(app){
 }
 export async function sendAllReportsNow(app){
   const settings=app.settings||{};
-  if(!enabledReportRecipients(settings).length) throw new Error('لا يوجد مستخدم Telegram فعّال. أضفه من الإعدادات وافتح البوت واضغط Start.');
+  if(!enabledReportRecipients(settings).length) throw new Error('لا يوجد Chat ID فعّال. أضفه من الإعدادات وتأكد أن صاحب المعرف فتح البوت وضغط Start.');
   const a=await generateAllReportsArtifacts(app);
   requireDelivery(await sendTelegramTextToRecipients(a.text,{settings}),'إرسال نص التقارير');
   requireDelivery(await sendTelegramPhotoBlobToRecipients(a.image,{settings,caption:`ملخص التقارير — ${settings.storeName||'أوسكار المحاسبي'}`,filename:a.imageName}),'إرسال صورة التقارير');
@@ -265,7 +265,7 @@ export async function sendAllReportsNow(app){
 }
 export async function sendBackupNow(app){
   const settings=app.settings||{};
-  if(!enabledReportRecipients(settings).length) throw new Error('لا يوجد مستخدم Telegram فعّال. أضفه من الإعدادات وافتح البوت واضغط Start.');
+  if(!enabledReportRecipients(settings).length) throw new Error('لا يوجد Chat ID فعّال. أضفه من الإعدادات وتأكد أن صاحب المعرف فتح البوت وضغط Start.');
   const a=await generateBackupArtifact(app);
   const result=requireDelivery(await sendTelegramDocumentBlobToRecipients(a.blob,{settings,caption:`نسخة احتياطية — ${settings.storeName||'أوسكار المحاسبي'}`,filename:a.name}),'إرسال النسخة الاحتياطية');
   await saveTelegramConfig(settings).catch(()=>{});

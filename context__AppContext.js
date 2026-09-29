@@ -1,10 +1,10 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { notifyTelegramInvoice } from './services__telegram.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.57-telegram-chatid';
+import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.57-telegram-chatid';
+import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.57-telegram-chatid';
+import { notifyTelegramInvoice } from './services__telegram.js?v=7.9.4.57-telegram-chatid';
+import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.57-telegram-chatid';
 const AppContext = createContext(null);
 const recordTime = (item = {}) => {
     const fields = ['createdAt', 'date', 'timestamp', 'startTime', 'updatedAt'];

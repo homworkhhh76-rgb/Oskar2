@@ -1,8 +1,8 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, X } from 'lucide-react';
-import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { printElementOnly } from './utils__export.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.57-telegram-chatid';
+import { printElementOnly } from './utils__export.js?v=7.9.4.57-telegram-chatid';
 
 const h = React.createElement;
 const money = (value) => Number(value || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

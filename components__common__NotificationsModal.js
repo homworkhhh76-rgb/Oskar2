@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useApp } from './context__AppContext.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { useApp } from './context__AppContext.js?v=7.9.4.57-telegram-chatid';
 import { X, Bell, CreditCard, PackageX, History, CalendarClock, Truck, AlertTriangle, Trash2, Send, FileText, DatabaseBackup, Bot, Save, RotateCcw, Clock3, Users, FileArchive, Radio, Image as ImageIcon } from 'lucide-react';
-import { saveTelegramConfig, telegramRequest, uploadTelegramSnapshot, sendDailyReportNow, sendCustomersReportNow, sendAllReportsNow, sendBackupNow } from './services__telegramReports.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { saveTelegramConfig, telegramRequest, uploadTelegramSnapshot, sendDailyReportNow, sendCustomersReportNow, sendAllReportsNow, sendBackupNow } from './services__telegramReports.js?v=7.9.4.57-telegram-chatid';
 
 const h = React.createElement;
 const DAY = 86400000;
@@ -62,13 +62,13 @@ export const NotificationsModal = ({ open, onClose }) => {
   const alerts=useMemo(()=>buildSystemNotifications(app),[app.customers,app.suppliers,app.products,app.invoices,app.stock,app.settings.activeWarehouseId,app.settings.currencySymbol,app.settings.dismissedNotificationIds]);
   const [dailyReport,setDailyReport]=useState(false),[dailyBackup,setDailyBackup]=useState(false),[busy,setBusy]=useState(''),[serverStatus,setServerStatus]=useState(null);
   const reportRecipients=(Array.isArray(app.settings.telegramRecipients)?app.settings.telegramRecipients:[]).filter(r=>r&&r.enabled!==false&&String(r.chatId||'').trim());
-  const reportRecipientLabels=reportRecipients.map(r=>String(r.username||r.label||'مستخدم Telegram').trim()).filter(Boolean);
+  const reportRecipientLabels=reportRecipients.map(r=>`Chat ID ${String(r.chatId||'').trim()}`).filter(Boolean);
   useEffect(()=>{if(!open)return;setDailyReport(app.settings.telegramAutoReportEnabled !== undefined ? !!app.settings.telegramAutoReportEnabled : !!app.settings.telegramDailyReportEnabled);setDailyBackup(!!app.settings.telegramDailyBackupEnabled);saveTelegramConfig(app.settings||{}).then(async cfg=>{if(cfg?.serverAvailable){const st=await telegramRequest({action:'status'}).catch(()=>null);setServerStatus({...cfg,...(st||{})});}else setServerStatus(cfg);}).catch(()=>setServerStatus({configured:reportRecipients.length>0,directReady:reportRecipients.length>0,serverAvailable:false}));},[open,app.settings.telegramRecipients,app.settings.telegramDailyReportEnabled,app.settings.telegramDailyBackupEnabled]);
   if(!open)return null;
   const tone=t=>({rose:'border-rose-200 bg-rose-50 text-rose-700',amber:'border-amber-200 bg-amber-50 text-amber-700',blue:'border-blue-200 bg-blue-50 text-blue-700',slate:'border-slate-200 bg-slate-50 text-slate-700'}[t]||'border-slate-200 bg-white text-slate-700');
   const currentSettings=()=>({...app.settings,telegramDailyReportEnabled:dailyReport,telegramAutoReportEnabled:dailyReport,telegramDailyBackupEnabled:dailyBackup});
   const appForSend=()=>({...app,settings:currentSettings()});
-  const run=async(key,fn,success)=>{if(busy)return;setBusy(key);try{if(!reportRecipients.length)throw new Error('أضف مستخدم Telegram من إعدادات النظام أولاً، ويجب أن يكون قد فتح البوت وضغط Start');const result=await fn();app.showToast?.(`${success}${result?.sent?` إلى ${result.sent} مستخدم`:''}`,'success');const cfg=await saveTelegramConfig(currentSettings()).catch(()=>({configured:true,directReady:true,serverAvailable:false}));setServerStatus(cfg);}catch(e){app.showToast?.(e?.message||'تعذر تنفيذ العملية','error');}finally{setBusy('');}};
+  const run=async(key,fn,success)=>{if(busy)return;setBusy(key);try{if(!reportRecipients.length)throw new Error('أضف Chat ID من إعدادات النظام أولاً، ويجب أن يكون صاحب المعرف قد فتح البوت وضغط Start');const result=await fn();app.showToast?.(`${success}${result?.sent?` إلى ${result.sent} مستخدم`:''}`,'success');const cfg=await saveTelegramConfig(currentSettings()).catch(()=>({configured:true,directReady:true,serverAvailable:false}));setServerStatus(cfg);}catch(e){app.showToast?.(e?.message||'تعذر تنفيذ العملية','error');}finally{setBusy('');}};
   const toggleAuto=async(kind,val)=>{
     if(kind==='report')setDailyReport(val);else setDailyBackup(val);
     let next={...currentSettings(),[kind==='report'?'telegramDailyReportEnabled':'telegramDailyBackupEnabled']:val,...(kind==='report'?{telegramAutoReportEnabled:val}:{})};
@@ -77,7 +77,7 @@ export const NotificationsModal = ({ open, onClose }) => {
       next={...next,[kind==='report'?'telegramDailyReportEnabled':'telegramDailyBackupEnabled']:false,...(kind==='report'?{telegramAutoReportEnabled:false}:{})};
       await saveTelegramConfig(next).catch(()=>{});
       if(kind==='report')setDailyReport(false);else setDailyBackup(false);
-      throw new Error('أضف مستخدم Telegram من إعدادات النظام أولاً، وافتح بوت إرسال الفواتير واضغط Start');
+      throw new Error('أضف Chat ID من إعدادات النظام أولاً، وتأكد أن صاحب المعرف فتح بوت إرسال الفواتير وضغط Start');
     }
     await app.updateSettings({telegramDailyReportEnabled:!!next.telegramDailyReportEnabled,telegramAutoReportEnabled:!!next.telegramAutoReportEnabled,telegramDailyBackupEnabled:!!next.telegramDailyBackupEnabled});
     if(val)await uploadTelegramSnapshot({...app,settings:next},{includeBackup:!!next.telegramDailyBackupEnabled});
@@ -96,11 +96,11 @@ export const NotificationsModal = ({ open, onClose }) => {
       ),
       h('div',{className:'flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-4 custom-scrollbar',style:{overscrollBehavior:'contain',WebkitOverflowScrolling:'touch'}},
         h('section',{className:'rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-3 space-y-3'},
-          h('div',{className:'flex items-center justify-between gap-2'},h('div',{className:'flex items-center gap-2'},h(Bot,{className:'w-5 h-5 text-emerald-700'}),h('div',null,h('div',{className:'text-xs font-black text-slate-900'},'Telegram والتقارير التلقائية'),h('div',{className:'text-[10px] text-slate-500'},'يستخدم نفس بوت إرسال الفواتير ونفس المستخدمين المسجلين في إعدادات النظام')))),
+          h('div',{className:'flex items-center justify-between gap-2'},h('div',{className:'flex items-center gap-2'},h(Bot,{className:'w-5 h-5 text-emerald-700'}),h('div',null,h('div',{className:'text-xs font-black text-slate-900'},'Telegram والتقارير التلقائية'),h('div',{className:'text-[10px] text-slate-500'},'يستخدم نفس بوت إرسال الفواتير ويرسل إلى Chat ID المسجل في إعدادات النظام')))),
           h('div',{className:'rounded-xl border border-emerald-200 bg-white px-3 py-2.5 space-y-1.5'},
             h('div',{className:'flex items-center justify-between gap-2'},h('div',{className:'text-[10px] font-black text-slate-700'},'بوت إرسال الفواتير'),h('div',{className:'text-[10px] font-black text-emerald-700',dir:'ltr'},'@Oskarteaam_bot')),
-            h('div',{className:'text-[9.5px] text-slate-500 leading-5'},reportRecipients.length?`سيتم إرسال التقارير إلى ${reportRecipients.length} مستخدم مسجل: ${reportRecipientLabels.join('، ')}`:'لا يوجد مستخدم Telegram مربوط حالياً. أضف اليوزر من إعدادات النظام ← ربط Telegram والإشعارات.'),
-            h('div',{className:'text-[9px] text-slate-400'},'لا تحتاج إلى إدخال Bot Token أو Chat ID هنا؛ يتم استخدام إعدادات إرسال الفواتير تلقائياً.')
+            h('div',{className:'text-[9.5px] text-slate-500 leading-5'},reportRecipients.length?`سيتم إرسال التقارير إلى ${reportRecipients.length} معرف: ${reportRecipientLabels.join('، ')}`:'لا يوجد Chat ID مسجل حالياً. أضف المعرف الرقمي من إعدادات النظام ← Telegram والإشعارات.'),
+            h('div',{className:'text-[9px] text-slate-400'},'لا تحتاج إلى إدخال Bot Token هنا؛ يتم استخدام بوت الفواتير وChat ID المحفوظ في إعدادات النظام تلقائياً.')
           ),
           h('div',{className:'grid sm:grid-cols-2 gap-2'},
             h('button',{type:'button',onClick:()=>run('toggle-report',()=>toggleAuto('report',!dailyReport),dailyReport?'تم إيقاف التقرير التلقائي':'تم تفعيل التقرير التلقائي'),className:`rounded-xl border p-3 flex items-center justify-between gap-3 text-right ${dailyReport?'border-emerald-300 bg-emerald-100':'border-slate-200 bg-white'}`},h('div',{className:'flex items-center gap-2'},h(Clock3,{className:'w-4 h-4 text-emerald-700'}),h('div',null,h('div',{className:'text-[11px] font-black'},'إرسال التقرير كل 24 ساعة'),h('div',{className:'text-[9px] text-slate-500'},'نص + صورة + PDF تلقائياً'))),h('span',{className:`w-10 h-5 rounded-full p-0.5 ${dailyReport?'bg-emerald-600':'bg-slate-300'}`},h('span',{className:`block w-4 h-4 rounded-full bg-white transition ${dailyReport?'translate-x-0':'translate-x-5'}`}))),
@@ -112,7 +112,7 @@ export const NotificationsModal = ({ open, onClose }) => {
             h(ActionButton,{Icon:Users,title:'PDF العملاء والديون',sub:'كل العملاء • لنا/علينا • المسدد والمديون',tone:'violet',busy:busy==='customers',onClick:()=>run('customers',()=>sendCustomersReportNow(appForSend()),'تم إرسال تقرير العملاء والديون')}),
             h(ActionButton,{Icon:FileArchive,title:'إرسال النسخة الاحتياطية الآن',sub:'نسخة JSON كاملة من قاعدة البيانات',tone:'amber',busy:busy==='backup',onClick:()=>run('backup',()=>sendBackupNow(appForSend()),'تم إرسال النسخة الاحتياطية للبوت')})
           ),
-          h('div',{className:'rounded-xl bg-white border border-slate-200 px-3 py-2 text-[9.5px] text-slate-500 leading-5 flex items-start gap-2'},h(Radio,{className:`w-3.5 h-3.5 mt-0.5 shrink-0 ${serverStatus?.configured?'text-emerald-600':'text-amber-500'}`}),serverStatus?.configured?(serverStatus?.serverAvailable?'بوت إرسال الفواتير مربوط. الإرسال اللحظي جاهز، والإرسال التلقائي كل 24 ساعة يعمل من server.js حتى لو الصفحة مغلقة.':'البوت والمستخدمون مربوطون والإرسال اللحظي يعمل مباشرة. لتشغيل إرسال 24 ساعة بعد إغلاق الصفحة شغّل server.js على الاستضافة.'):'أضف مستخدم Telegram من إعدادات النظام ثم اجعله يفتح بوت إرسال الفواتير ويضغط Start مرة واحدة.')
+          h('div',{className:'rounded-xl bg-white border border-slate-200 px-3 py-2 text-[9.5px] text-slate-500 leading-5 flex items-start gap-2'},h(Radio,{className:`w-3.5 h-3.5 mt-0.5 shrink-0 ${serverStatus?.configured?'text-emerald-600':'text-amber-500'}`}),serverStatus?.configured?(serverStatus?.serverAvailable?'بوت إرسال الفواتير مربوط. الإرسال اللحظي جاهز، والإرسال التلقائي كل 24 ساعة يعمل من server.js حتى لو الصفحة مغلقة.':'البوت ومعرفات Chat ID مربوطة والإرسال اللحظي يعمل مباشرة. لتشغيل إرسال 24 ساعة بعد إغلاق الصفحة شغّل server.js على الاستضافة.'):'أضف Chat ID من إعدادات النظام، وتأكد أن صاحب المعرف فتح بوت إرسال الفواتير وضغط Start مرة واحدة.')
         ),
         h('section',{className:'rounded-2xl border border-slate-200 p-3 space-y-2'},
           h('div',{className:'flex items-center justify-between gap-2'},h('div',null,h('div',{className:'text-xs font-black text-slate-900'},'تنبيهات النظام'),h('div',{className:'text-[10px] text-slate-500'},`${alerts.length} تنبيه يحتاج المراجعة`)),h('div',{className:'flex gap-1'},h('button',{type:'button',onClick:restoreDismissed,className:'p-2 rounded-lg border text-slate-500',title:'إعادة التنبيهات المحذوفة'},h(RotateCcw,{className:'w-3.5 h-3.5'})),alerts.length?h('button',{type:'button',onClick:dismissAll,className:'inline-flex items-center gap-1 px-2.5 py-2 rounded-lg border border-rose-200 text-rose-600 text-[10px] font-black'},h(Trash2,{className:'w-3.5 h-3.5'}),'حذف الكل'):null)),

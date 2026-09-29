@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { printReceiptElement } from './utils__export.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { useApp } from './context__AppContext.js?v=7.9.4.57-telegram-chatid';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.57-telegram-chatid';
+import { printReceiptElement } from './utils__export.js?v=7.9.4.57-telegram-chatid';
 import { Printer, Barcode as BarcodeIcon } from 'lucide-react';
-import { code128Geometry } from './utils__code128.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { code128Geometry } from './utils__code128.js?v=7.9.4.57-telegram-chatid';
 const h = React.createElement;
 
 const BarcodeSvg = ({ value, compact = false }) => {

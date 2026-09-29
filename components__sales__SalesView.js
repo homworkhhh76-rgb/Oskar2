@@ -1,10 +1,10 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef, useEffect } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { downloadProfessionalTablePDF, downloadProfessionalTableImage, downloadProfessionalTableExcel, downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel } from './utils__professionalExport.js?v=7.9.4.55-payment-loader-excel-recipe';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.55-payment-loader-excel-recipe';
+import { useApp } from './context__AppContext.js?v=7.9.4.57-telegram-chatid';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.57-telegram-chatid';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.57-telegram-chatid';
+import { downloadProfessionalTablePDF, downloadProfessionalTableImage, downloadProfessionalTableExcel, downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel } from './utils__professionalExport.js?v=7.9.4.57-telegram-chatid';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.57-telegram-chatid';
 import { Search, Printer, RotateCcw, Download, Eye, X, AlertCircle, Trash2, Pencil, Image as ImageIcon, FileSpreadsheet, } from 'lucide-react';
 export const SalesView = () => {
     const { invoices, accounts, settings, currentUser, deleteInvoice, beginEditSaleInvoice, setShowThermalModal, createReturnInvoice, showToast, } = useApp();
