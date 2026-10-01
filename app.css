@@ -5511,3 +5511,76 @@ button,a,[role="button"]{touch-action:manipulation;-webkit-tap-highlight-color:t
 @media (prefers-reduced-motion:reduce){.fixed.inset-0,.oscar-bounded-modal,#full-cart-modal-backdrop,.barcode-camera-overlay,.fixed.inset-0>form,.fixed.inset-0>div,.oscar-bounded-modal>form,.oscar-bounded-modal>div,#full-cart-modal-box,.barcode-camera-overlay>div{animation:none!important;transition:none!important}}
 /* Avoid GPU-expensive live blur on full-screen overlays; the dark scrim remains. */
 .fixed.inset-0,.oscar-bounded-modal,.barcode-camera-overlay{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+
+/* v83: immediate cashier cart + low-latency modal interaction */
+#btn-pos-camera, #full-cart-modal-backdrop, #full-cart-modal-box, button { touch-action: manipulation; }
+#full-cart-modal-backdrop, #full-cart-modal-box { animation: none !important; transition-duration: 90ms !important; }
+@media (prefers-reduced-motion: no-preference) {
+  .oscar-page-stage { transition-duration: 90ms !important; }
+}
+
+/* ===== v7.9.4.84 ultra-responsive / high-refresh profile =====
+   Prioritize input latency. Large data refreshes yield in JS; CSS only animates
+   compositor-safe properties and touch devices avoid expensive visual effects. */
+:root{
+  --oscar-motion-fast:36ms;
+  --oscar-motion-page:0ms;
+  --oscar-motion-modal:54ms;
+  --oscar-ui-fast:42ms;
+  --oscar-ui-modal:56ms;
+}
+html,body,#root{touch-action:manipulation;scroll-behavior:auto!important;}
+button,a[href],[role="button"],input[type="button"],input[type="submit"],label[for]{
+  touch-action:manipulation!important;
+  -webkit-tap-highlight-color:transparent!important;
+}
+button:not(:disabled),a[href],[role="button"]{cursor:pointer;}
+button:active:not(:disabled),a[href]:active,[role="button"]:active{
+  transform:translate3d(0,0,0) scale(.985);
+}
+/* Page navigation should never wait for an entrance animation. */
+.oscar-page-stage{
+  animation:none!important;
+  transition:none!important;
+  will-change:auto!important;
+}
+/* Full cart paints a lightweight shell first; the body arrives next frame. */
+#full-cart-modal-backdrop{
+  animation:oscar84fade var(--oscar-ui-fast) linear both!important;
+  transition:none!important;
+  contain:strict;
+}
+#full-cart-modal-box{
+  animation:oscar84pop var(--oscar-ui-modal) cubic-bezier(.2,.8,.2,1) both!important;
+  transition:none!important;
+  will-change:transform,opacity;
+  contain:layout paint style;
+}
+@keyframes oscar84fade{from{opacity:.82}to{opacity:1}}
+@keyframes oscar84pop{from{opacity:.82;transform:translate3d(0,3px,0) scale(.997)}to{opacity:1;transform:translate3d(0,0,0) scale(1)}}
+/* Avoid accidental 'transition: all' cost on frequently tapped controls. */
+button,a[href],[role="button"],.oscar-product-card,.osd-action{
+  transition-property:transform,opacity,background-color,border-color,color!important;
+  transition-duration:36ms!important;
+  transition-timing-function:linear!important;
+}
+.custom-scrollbar,.slim-scrollbar,.scroll-chain-page,.overflow-y-auto,.overflow-auto{
+  overscroll-behavior:contain;
+  scroll-behavior:auto!important;
+}
+@media (hover:none) and (pointer:coarse){
+  /* Blur/filter forces full-screen GPU repaints on many Android devices. */
+  [class*="backdrop-blur"],.modal::backdrop,.oscar-ai-overlay,.oscar-employee-modal-overlay,
+  .oscar-form-modal-overlay,.oscar-bounded-modal,.barcode-camera-overlay{
+    -webkit-backdrop-filter:none!important;
+    backdrop-filter:none!important;
+    filter:none!important;
+  }
+  .oscar-product-card:hover,.osd-action:hover{transform:none!important;box-shadow:none!important;}
+  .oscar-product-card{transition-duration:24ms!important;}
+  .fixed.inset-0>form,.fixed.inset-0>div,.oscar-bounded-modal>form,.oscar-bounded-modal>div,
+  .barcode-camera-overlay>div{animation-duration:48ms!important;}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;}
+}

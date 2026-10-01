@@ -1,43 +1,43 @@
 import React, { useEffect, useRef } from 'react';
-import { AppProvider, useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { Header } from './components__common__Header.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { Sidebar } from './components__common__Sidebar.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { BottomNav } from './components__common__BottomNav.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { Toast } from './components__common__Toast.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { SyncModal } from './components__sync__SyncModal.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { POSView } from './components__pos__POSView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { DashboardView } from './components__dashboard__DashboardView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { SalesView } from './components__sales__SalesView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { PurchasesView } from './components__purchases__PurchasesView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { ProductsView } from './components__products__ProductsView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { CategoriesView } from './components__categories__CategoriesView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { InventoryView } from './components__inventory__InventoryView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { CustomersView } from './components__customers__CustomersView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { SuppliersView } from './components__suppliers__SuppliersView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { AccountsView } from './components__accounts__AccountsView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { ExpensesView } from './components__expenses__ExpensesView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { VouchersView } from './components__vouchers__VouchersView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { EmployeesView } from './components__employees__EmployeesView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { BarcodesView } from './components__barcodes__BarcodesView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { ReportsView } from './components__reports__ReportsView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { TrashView } from './components__trash__TrashView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { SettingsView } from './components__settings__SettingsView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { FinancialYearsView } from './components__financial__FinancialYearsView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { ThermalReceiptModal } from './components__pos__ThermalReceiptModal.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { LoginGate } from './components__auth__LoginGate.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { RestaurantProvider } from './restaurant__context__RestaurantContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { RestaurantTablesView } from './restaurant__components__RestaurantTablesView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { RestaurantWaiterView } from './restaurant__components__RestaurantWaiterView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { RestaurantKDSView } from './restaurant__components__RestaurantKDSView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { RestaurantWasteView } from './restaurant__components__RestaurantWasteView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { RestaurantSettingsPanel } from './restaurant__components__RestaurantSettingsPanel.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { OscarAI } from './components__ai__OscarAI.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { MessageTemplatesView } from './components__messages__MessageTemplatesView.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { isTrialAccount } from './trial__config.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { startTelegramAutomation } from './services__telegram.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { ensureProductImageAutoSync, syncPendingProductImages } from './services__productImages.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { startDailyBackupAutomation } from './services__telegramReports.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { AppProvider, useApp } from './context__AppContext.js?v=7.9.4.84-ultra-responsive';
+import { Header } from './components__common__Header.js?v=7.9.4.84-ultra-responsive';
+import { Sidebar } from './components__common__Sidebar.js?v=7.9.4.84-ultra-responsive';
+import { BottomNav } from './components__common__BottomNav.js?v=7.9.4.84-ultra-responsive';
+import { Toast } from './components__common__Toast.js?v=7.9.4.84-ultra-responsive';
+import { SyncModal } from './components__sync__SyncModal.js?v=7.9.4.84-ultra-responsive';
+import { POSView } from './components__pos__POSView.js?v=7.9.4.84-ultra-responsive';
+import { DashboardView } from './components__dashboard__DashboardView.js?v=7.9.4.84-ultra-responsive';
+import { SalesView } from './components__sales__SalesView.js?v=7.9.4.84-ultra-responsive';
+import { PurchasesView } from './components__purchases__PurchasesView.js?v=7.9.4.84-ultra-responsive';
+import { ProductsView } from './components__products__ProductsView.js?v=7.9.4.84-ultra-responsive';
+import { CategoriesView } from './components__categories__CategoriesView.js?v=7.9.4.84-ultra-responsive';
+import { InventoryView } from './components__inventory__InventoryView.js?v=7.9.4.84-ultra-responsive';
+import { CustomersView } from './components__customers__CustomersView.js?v=7.9.4.84-ultra-responsive';
+import { SuppliersView } from './components__suppliers__SuppliersView.js?v=7.9.4.84-ultra-responsive';
+import { AccountsView } from './components__accounts__AccountsView.js?v=7.9.4.84-ultra-responsive';
+import { ExpensesView } from './components__expenses__ExpensesView.js?v=7.9.4.84-ultra-responsive';
+import { VouchersView } from './components__vouchers__VouchersView.js?v=7.9.4.84-ultra-responsive';
+import { EmployeesView } from './components__employees__EmployeesView.js?v=7.9.4.84-ultra-responsive';
+import { BarcodesView } from './components__barcodes__BarcodesView.js?v=7.9.4.84-ultra-responsive';
+import { ReportsView } from './components__reports__ReportsView.js?v=7.9.4.84-ultra-responsive';
+import { TrashView } from './components__trash__TrashView.js?v=7.9.4.84-ultra-responsive';
+import { SettingsView } from './components__settings__SettingsView.js?v=7.9.4.84-ultra-responsive';
+import { FinancialYearsView } from './components__financial__FinancialYearsView.js?v=7.9.4.84-ultra-responsive';
+import { ThermalReceiptModal } from './components__pos__ThermalReceiptModal.js?v=7.9.4.84-ultra-responsive';
+import { LoginGate } from './components__auth__LoginGate.js?v=7.9.4.84-ultra-responsive';
+import { RestaurantProvider } from './restaurant__context__RestaurantContext.js?v=7.9.4.84-ultra-responsive';
+import { RestaurantTablesView } from './restaurant__components__RestaurantTablesView.js?v=7.9.4.84-ultra-responsive';
+import { RestaurantWaiterView } from './restaurant__components__RestaurantWaiterView.js?v=7.9.4.84-ultra-responsive';
+import { RestaurantKDSView } from './restaurant__components__RestaurantKDSView.js?v=7.9.4.84-ultra-responsive';
+import { RestaurantWasteView } from './restaurant__components__RestaurantWasteView.js?v=7.9.4.84-ultra-responsive';
+import { RestaurantSettingsPanel } from './restaurant__components__RestaurantSettingsPanel.js?v=7.9.4.84-ultra-responsive';
+import { OscarAI } from './components__ai__OscarAI.js?v=7.9.4.84-ultra-responsive';
+import { MessageTemplatesView } from './components__messages__MessageTemplatesView.js?v=7.9.4.84-ultra-responsive';
+import { isTrialAccount } from './trial__config.js?v=7.9.4.84-ultra-responsive';
+import { canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.84-ultra-responsive';
+import { startTelegramAutomation } from './services__telegram.js?v=7.9.4.84-ultra-responsive';
+import { ensureProductImageAutoSync, syncPendingProductImages } from './services__productImages.js?v=7.9.4.84-ultra-responsive';
+import { startDailyBackupAutomation } from './services__telegramReports.js?v=7.9.4.84-ultra-responsive';
 
 const h = React.createElement;
 const ScrollScreen = ({ children }) => h('div', { className:'scroll-chain-page h-full min-h-0 overflow-y-auto custom-scrollbar mobile-safe-bottom lg:pb-0' }, children);
@@ -56,12 +56,42 @@ const MainLayout = () => {
   backupAppRef.current = app;
   useEffect(() => {
     if (!isLoaded) return;
+    // Keep first interaction free. Network/image/backup housekeeping begins after
+    // the UI has painted and the browser has an idle slice; cloud sync itself is
+    // still initialized by AppContext immediately.
     ensureProductImageAutoSync();
-    syncPendingProductImages({limit:24}).catch(()=>{});
     const stopTelegram = startTelegramAutomation();
-    const stopBackup = startDailyBackupAutomation(() => backupAppRef.current);
-    return () => { try{stopTelegram?.();}catch(_){} try{stopBackup?.();}catch(_){} };
+    let stopBackup = null;
+    let idleId = 0;
+    let timerId = 0;
+    const startBackground = () => {
+      if (stopBackup) return;
+      stopBackup = startDailyBackupAutomation(() => backupAppRef.current);
+    };
+    if ('requestIdleCallback' in window) {
+      idleId = window.requestIdleCallback(startBackground, { timeout: 1800 });
+    } else {
+      timerId = window.setTimeout(startBackground, 900);
+    }
+    return () => {
+      try{stopTelegram?.();}catch(_){}
+      try{stopBackup?.();}catch(_){}
+      if(idleId && 'cancelIdleCallback' in window) try{window.cancelIdleCallback(idleId);}catch(_){}
+      if(timerId) window.clearTimeout(timerId);
+    };
   }, [isLoaded]);
+
+  useEffect(() => {
+    // Tiny global timestamp only; it lets background sync refreshes yield while
+    // the user is actively touching/clicking the UI.
+    const markInteraction = () => { window.__OSCAR_LAST_INTERACTION_AT__ = performance.now(); };
+    document.addEventListener('pointerdown', markInteraction, { capture:true, passive:true });
+    document.addEventListener('keydown', markInteraction, { capture:true, passive:true });
+    return () => {
+      document.removeEventListener('pointerdown', markInteraction, true);
+      document.removeEventListener('keydown', markInteraction, true);
+    };
+  }, []);
 
   useEffect(() => {
     const isVisible = (el) => {
