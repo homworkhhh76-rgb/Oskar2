@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@200;300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./app.css?v=7.9.4.82-smooth-stock-shortlinks-report-images" />
+  <link rel="stylesheet" href="./app.css?v=7.9.4.84-ultra-responsive" />
   <script type="importmap">
   {
     "imports": {
@@ -29,7 +29,7 @@
     }
   }
   </script>
-  <script src="./oscar-activation-runtime.js?v=7.9.4.82-smooth-stock-shortlinks-report-images"></script>
+  <script src="./oscar-activation-runtime.js?v=7.9.4.84-ultra-responsive"></script>
   <script>
     try {
       const rt = window.OscarActivation?.readRuntime?.();
@@ -37,13 +37,13 @@
       if (companyTitle) document.title = companyTitle;
     } catch (_) {}
   </script>
-  <script src="./oscar-cloud-sync.js?v=7.9.4.82-smooth-stock-shortlinks-report-images"></script>
+  <script src="./oscar-cloud-sync.js?v=7.9.4.84-ultra-responsive"></script>
 </head>
 <body>
   <script>document.documentElement.classList.remove('dark');</script>
   <div id="root"></div>
   <script type="module">
-    const OSCAR_BUILD = '7.9.4.82-smooth-stock-shortlinks-report-images';
+    const OSCAR_BUILD = '7.9.4.84-ultra-responsive';
     const isLocal = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
 
     const clearCodeCaches = async () => {
@@ -73,6 +73,28 @@
     };
 
     const boot = async () => {
+      // Local editors/localhost may still be controlled by a Service Worker from an older build.
+      // Remove only code caches and the old worker once; never touch IndexedDB/company data.
+      if (isLocal && 'serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        const localHealKey = 'oscar-local-sw-heal-' + OSCAR_BUILD;
+        if (sessionStorage.getItem(localHealKey) !== '1') {
+          sessionStorage.setItem(localHealKey, '1');
+          try {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(registrations.map((registration) => registration.unregister()));
+          } catch (_) {}
+          try {
+            if ('caches' in window) {
+              const keys = await caches.keys();
+              await Promise.all(keys.filter((key) => key.startsWith('oscar-accounting-')).map((key) => caches.delete(key)));
+            }
+          } catch (_) {}
+          const url = new URL(location.href);
+          url.searchParams.set('_oscar_local', Date.now().toString());
+          location.replace(url.href);
+          return;
+        }
+      }
       try {
         const markerKey = 'oscar-last-boot-build';
         const previous = localStorage.getItem(markerKey);
@@ -84,7 +106,7 @@
       } catch (_) {}
 
       try {
-        await import('./main.js?v=7.9.4.82-smooth-stock-shortlinks-report-images');
+        await import('./main.js?v=7.9.4.84-ultra-responsive');
         sessionStorage.removeItem('oscar-rootfix-retry');
       } catch (error) {
         try { console.error('OSCAR_BOOT_RECOVERY', error); } catch (_) {}
@@ -105,7 +127,7 @@
   </script>
   <script>
     if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !['localhost','127.0.0.1','::1'].includes(location.hostname)) {
-      addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=7.9.4.82-smooth-stock-shortlinks-report-images', { updateViaCache: 'none' }).then((registration) => registration.update()).catch(() => {}));
+      addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=7.9.4.84-ultra-responsive', { updateViaCache: 'none' }).then((registration) => registration.update()).catch(() => {}));
     }
   </script>
 </body>

@@ -1,7 +1,7 @@
 import React from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { useApp } from './context__AppContext.js?v=7.9.4.84-ultra-responsive';
 import { Layers } from 'lucide-react';
-import { ProductImage } from './components__common__ProductImage.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { ProductImage } from './components__common__ProductImage.js?v=7.9.4.84-ultra-responsive';
 
 const h = React.createElement;
 
@@ -39,7 +39,7 @@ const unitStockLines = (baseStock, units=[]) => {
   return parts.length ? parts : [{ id:baseUnit?.id || 'base', name:baseUnit?.name || 'حبة', value:0, factor:1, baseEquivalent:0, baseUnitName:baseUnit?.name || 'حبة' }];
 };
 
-export const ProductGrid = () => {
+const ProductGridImpl = () => {
   const { products, categories, selectedCategory, setSelectedCategory, searchQuery, addToCart, getProductStock, settings } = useApp();
   const deferredSearch = React.useDeferredValue(searchQuery);
   const visibleProducts = React.useMemo(() => products.filter(p => !p.deletedAt && p.status !== 'archived' && isCashierVisibleProduct(p)), [products]);
@@ -102,3 +102,5 @@ export const ProductGrid = () => {
     )
   );
 };
+
+export const ProductGrid = React.memo(ProductGridImpl);

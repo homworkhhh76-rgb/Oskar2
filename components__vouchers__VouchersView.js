@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { exportToCSV, printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { downloadProfessionalTablePDF, downloadProfessionalTableImage, downloadProfessionalVoucherPDF, downloadProfessionalVoucherImage } from './utils__professionalExport.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl } from './brand__logo.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { useApp } from './context__AppContext.js?v=7.9.4.84-ultra-responsive';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.84-ultra-responsive';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.84-ultra-responsive';
+import { exportToCSV, printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.84-ultra-responsive';
+import { downloadProfessionalTablePDF, downloadProfessionalTableImage, downloadProfessionalVoucherPDF, downloadProfessionalVoucherImage } from './utils__professionalExport.js?v=7.9.4.84-ultra-responsive';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl } from './brand__logo.js?v=7.9.4.84-ultra-responsive';
 import { FileSpreadsheet, ArrowDownLeft, ArrowUpRight, Search, Trash2, Printer, Download, Image as ImageIcon, FileText, CreditCard, User, Building2, AlertCircle, Eye, X } from 'lucide-react';
 
 const h = React.createElement;

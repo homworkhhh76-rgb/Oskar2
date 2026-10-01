@@ -1,4 +1,4 @@
-import { renderElementTablePages, resolveExportElement } from './utils__canvasRenderer.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { renderElementTablePages, resolveExportElement } from './utils__canvasRenderer.js?v=7.9.4.84-ultra-responsive';
 
 const safe=v=>String(v||'export').replace(/[\\/:*?"<>|]+/g,'-').trim()||'export';
 const withExt=(name,ext)=>safe(name).toLowerCase().endsWith(ext)?safe(name):safe(name)+ext;

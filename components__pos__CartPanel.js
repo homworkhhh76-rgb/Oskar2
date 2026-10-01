@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { useApp } from './context__AppContext.js?v=7.9.4.84-ultra-responsive';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.84-ultra-responsive';
 import { Trash2, Plus, Minus, PauseCircle, CreditCard, User, UserPlus, Tag, ChevronDown, Clock, X } from 'lucide-react';
 
 const h = React.createElement;
@@ -29,7 +29,7 @@ const EditablePrice = ({ value, onCommit, currency, scaleMode=false }) => {
   );
 };
 
-export const CartPanel = ({ onOpenPayment }) => {
+const CartPanelImpl = ({ onOpenPayment }) => {
   const {
     cart, customers, selectedCustomer, setSelectedCustomer, saveCustomer,
     updateCartItemUnit, updateCartItemQuantity, updateCartItemPrice, updateCartItemScaleAmount,
@@ -66,15 +66,17 @@ export const CartPanel = ({ onOpenPayment }) => {
   const rawGrandTotal = Math.max(0, beforeInvoiceDiscount - invoiceDiscountAmount);
   const grandTotal = settings.scaleModeEnabled ? Math.round(rawGrandTotal) : rawGrandTotal;
 
-  const hasSelectedCustomerInList = !!selectedCustomer?.id && (selectedCustomer.id === 'cust-walkin' || customers.some((c) => String(c.id) === String(selectedCustomer.id)));
-  const customerOptions = [
-    { id: 'cust-walkin', label: 'عميل نقدي', subLabel: 'الافتراضي للبيع النقدي المباشر' },
-    ...(!hasSelectedCustomerInList && selectedCustomer?.name ? [{ id:selectedCustomer.id, label:selectedCustomer.name, subLabel:'عميل طلب المطعم' }] : []),
-    ...[...customers]
-      .filter((c) => c && c.id !== 'cust-walkin' && !c.deletedAt)
-      .sort((a,b) => String(a.name||'').localeCompare(String(b.name||''),'ar'))
-      .map((c) => ({ id:c.id, label:c.name, subLabel:c.phone || undefined, badge:c.balance > 0 ? `دين: ${c.balance} ${settings.currencySymbol}` : undefined }))
-  ];
+  const customerOptions = useMemo(() => {
+    const hasSelectedCustomerInList = !!selectedCustomer?.id && (selectedCustomer.id === 'cust-walkin' || customers.some((c) => String(c.id) === String(selectedCustomer.id)));
+    return [
+      { id: 'cust-walkin', label: 'عميل نقدي', subLabel: 'الافتراضي للبيع النقدي المباشر' },
+      ...(!hasSelectedCustomerInList && selectedCustomer?.name ? [{ id:selectedCustomer.id, label:selectedCustomer.name, subLabel:'عميل طلب المطعم' }] : []),
+      ...[...customers]
+        .filter((c) => c && c.id !== 'cust-walkin' && !c.deletedAt)
+        .sort((a,b) => String(a.name||'').localeCompare(String(b.name||''),'ar'))
+        .map((c) => ({ id:c.id, label:c.name, subLabel:c.phone || undefined, badge:c.balance > 0 ? `دين: ${c.balance} ${settings.currencySymbol}` : undefined }))
+    ];
+  }, [customers, selectedCustomer?.id, selectedCustomer?.name, settings.currencySymbol]);
 
   const addQuickCustomer = async (e) => {
     e.preventDefault();
@@ -171,3 +173,5 @@ export const CartPanel = ({ onOpenPayment }) => {
     ),document.body) : null;
   return h(React.Fragment, null,panel,unitPortal,customerPortal);
 };
+
+export const CartPanel = React.memo(CartPanelImpl);

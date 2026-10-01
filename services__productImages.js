@@ -4,7 +4,7 @@
  * If the device is offline, the image stays locally with the product until the
  * internet returns, then it is uploaded automatically in the background.
  */
-import { getAllFromStore, putInStore } from './services__db.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { getAllFromStore, putInStore } from './services__db.js?v=7.9.4.84-ultra-responsive';
 
 const PRODUCT_IMAGE_BOT_TOKEN = '8893463288:AAHn77qegDsR3Yu1LYGicM0Dfh1Fznw4agg';
 const LEGACY_IMAGE_BOT_TOKEN = '8901874566:AAG3TAC6xSl-YHmEnQTpvBrxZpoBwyyx6nY';
@@ -19,6 +19,7 @@ const memoryCache = new Map();
 let autoSyncStarted = false;
 let syncPromise = null;
 let syncTimer = null;
+let syncIdleId = null;
 
 const clean = v => String(v ?? '').trim();
 const isDataImage = value => /^data:image\/(png|jpe?g|webp);base64,/i.test(clean(value));
@@ -193,7 +194,13 @@ export async function syncPendingProductImages({limit=12}={}){
 function schedulePendingSync(delay=1200){
   if(typeof window === 'undefined') return;
   if(syncTimer) clearTimeout(syncTimer);
-  syncTimer = setTimeout(()=>{ syncPendingProductImages().catch(()=>{}); }, Math.max(250, Number(delay)||0));
+  if(syncIdleId && 'cancelIdleCallback' in window){ try{window.cancelIdleCallback(syncIdleId);}catch(_){} syncIdleId=null; }
+  syncTimer = setTimeout(()=>{
+    syncTimer=null;
+    const run=()=>{syncIdleId=null;syncPendingProductImages().catch(()=>{});};
+    if('requestIdleCallback' in window) syncIdleId=window.requestIdleCallback(run,{timeout:1800});
+    else run();
+  }, Math.max(500, Number(delay)||0));
 }
 
 export function ensureProductImageAutoSync(){
@@ -204,5 +211,5 @@ export function ensureProductImageAutoSync(){
   try{ window.addEventListener('focus', wake); }catch(_){ }
   try{ document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) wake(); }); }catch(_){ }
   try{ window.addEventListener('oscar:db-mutation', (event)=>{ if(event?.detail?.storeName === 'products') wake(); }); }catch(_){ }
-  schedulePendingSync(1400);
+  schedulePendingSync(1800);
 }

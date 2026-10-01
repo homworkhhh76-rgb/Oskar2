@@ -1,5 +1,5 @@
-import { getAllFromStore, getFromStore, putInStore } from './services__db.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { renderInvoiceCanvas, renderVoucherCanvas, renderTableCanvas } from './utils__canvasRenderer.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { getAllFromStore, getFromStore, putInStore } from './services__db.js?v=7.9.4.84-ultra-responsive';
+import { renderInvoiceCanvas, renderVoucherCanvas, renderTableCanvas } from './utils__canvasRenderer.js?v=7.9.4.84-ultra-responsive';
 
 // Telegram integration for Oscar Accounting.
 // The owner explicitly requested embedding this token in the app build.

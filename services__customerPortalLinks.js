@@ -1,5 +1,5 @@
-import { encodeCustomerPortalAccess } from './customer-portal-codec.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { TRIAL_DATABASE } from './trial__config.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { encodeCustomerPortalAccess } from './customer-portal-codec.js?v=7.9.4.84-ultra-responsive';
+import { TRIAL_DATABASE } from './trial__config.js?v=7.9.4.84-ultra-responsive';
 
 const ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const clean=v=>String(v??'').trim();

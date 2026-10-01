@@ -1,7 +1,7 @@
-import { TELEGRAM_BOT_TOKEN, normalizeTelegramRecipients, sendTelegramTextToRecipients, sendTelegramPhotoBlobToRecipients, sendTelegramDocumentBlobToRecipients, buildFullTelegramReportText } from './services__telegram.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { renderExecutiveReportCanvas, renderTablePages } from './utils__canvasRenderer.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { canvasesToPDFBlob } from './utils__pdfExport.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { canvasToImageBlob } from './utils__imageExport.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { TELEGRAM_BOT_TOKEN, normalizeTelegramRecipients, sendTelegramTextToRecipients, sendTelegramPhotoBlobToRecipients, sendTelegramDocumentBlobToRecipients, buildFullTelegramReportText } from './services__telegram.js?v=7.9.4.84-ultra-responsive';
+import { renderExecutiveReportCanvas, renderTablePages } from './utils__canvasRenderer.js?v=7.9.4.84-ultra-responsive';
+import { canvasesToPDFBlob } from './utils__pdfExport.js?v=7.9.4.84-ultra-responsive';
+import { canvasToImageBlob } from './utils__imageExport.js?v=7.9.4.84-ultra-responsive';
 
 const num=v=>{const n=Number(v);return Number.isFinite(n)?n:0;};
 const money=v=>num(v).toFixed(2);
@@ -240,8 +240,23 @@ export async function checkDailyBackupDue(app,{force=false}={}){
 
 export function startDailyBackupAutomation(getApp){
   if(typeof window==='undefined') return ()=>{};
-  let stopped=false;
-  const run=()=>{if(!stopped)checkDailyBackupDue(getApp).catch(()=>{});};
+  let stopped=false, queued=false, idleId=0, delayTimer=0;
+  const actuallyRun=()=>{
+    queued=false;
+    idleId=0;
+    delayTimer=0;
+    if(stopped) return;
+    checkDailyBackupDue(getApp).catch(()=>{});
+  };
+  const run=()=>{
+    if(stopped || queued) return;
+    queued=true;
+    const last=Number(window.__OSCAR_LAST_INTERACTION_AT__||0);
+    const busy=last>0 && typeof performance!=='undefined' && (performance.now()-last)<700;
+    if(busy){ delayTimer=window.setTimeout(()=>{queued=false;run();},760); return; }
+    if('requestIdleCallback' in window) idleId=window.requestIdleCallback(actuallyRun,{timeout:2200});
+    else delayTimer=window.setTimeout(actuallyRun,700);
+  };
   const onVisible=()=>{if(!document.hidden)run();};
   const onCustom=()=>run();
   const timer=window.setInterval(run,60*1000);
@@ -249,8 +264,17 @@ export function startDailyBackupAutomation(getApp){
   window.addEventListener('focus',run);
   window.addEventListener('oscar-backup-check',onCustom);
   document.addEventListener('visibilitychange',onVisible);
-  window.setTimeout(run,450);
-  return()=>{stopped=true;window.clearInterval(timer);window.removeEventListener('online',run);window.removeEventListener('focus',run);window.removeEventListener('oscar-backup-check',onCustom);document.removeEventListener('visibilitychange',onVisible);};
+  window.setTimeout(run,900);
+  return()=>{
+    stopped=true;
+    window.clearInterval(timer);
+    if(delayTimer) window.clearTimeout(delayTimer);
+    if(idleId && 'cancelIdleCallback' in window) try{window.cancelIdleCallback(idleId);}catch(_){}
+    window.removeEventListener('online',run);
+    window.removeEventListener('focus',run);
+    window.removeEventListener('oscar-backup-check',onCustom);
+    document.removeEventListener('visibilitychange',onVisible);
+  };
 }
 
 export async function saveTelegramConfig(settings){

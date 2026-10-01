@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { BrandLogoImage } from './components__common__BrandLogoImage.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { uploadProductImageToTelegram } from './services__productImages.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { useApp } from './context__AppContext.js?v=7.9.4.84-ultra-responsive';
+import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.84-ultra-responsive';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.84-ultra-responsive';
+import { BrandLogoImage } from './components__common__BrandLogoImage.js?v=7.9.4.84-ultra-responsive';
+import { uploadProductImageToTelegram } from './services__productImages.js?v=7.9.4.84-ultra-responsive';
 import { Wifi, WifiOff, RefreshCw, Maximize2, Minimize2, Clock, Store, Camera, Menu, LogOut, Building2, Bell } from 'lucide-react';
-import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { saveTelegramConfig, uploadTelegramSnapshot } from './services__telegramReports.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.84-ultra-responsive';
+import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.84-ultra-responsive';
+import { saveTelegramConfig, uploadTelegramSnapshot } from './services__telegramReports.js?v=7.9.4.84-ultra-responsive';
 
 const h = React.createElement;
 

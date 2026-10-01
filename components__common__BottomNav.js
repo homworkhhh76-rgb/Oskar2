@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { canAccessTab, canAccessPermission } from './utils__permissions.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { useApp } from './context__AppContext.js?v=7.9.4.84-ultra-responsive';
+import { canAccessTab, canAccessPermission } from './utils__permissions.js?v=7.9.4.84-ultra-responsive';
 import {
   ShoppingCart, ReceiptText, Package, Warehouse, Menu, X, LayoutDashboard, Truck,
   Boxes, Users, Building2, Wallet, Receipt, Barcode, BarChart3, Trash2, Settings,

@@ -1,11 +1,11 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, commitLocalBatch, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { notifyTelegramInvoice } from './services__telegram.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { isTrialAccount, TRIAL_LIMITS } from './trial__config.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, commitLocalBatch, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.84-ultra-responsive';
+import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.84-ultra-responsive';
+import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.84-ultra-responsive';
+import { notifyTelegramInvoice } from './services__telegram.js?v=7.9.4.84-ultra-responsive';
+import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.84-ultra-responsive';
+import { isTrialAccount, TRIAL_LIMITS } from './trial__config.js?v=7.9.4.84-ultra-responsive';
 const AppContext = createContext(null);
 const recordTime = (item = {}) => {
     const fields = ['createdAt', 'date', 'timestamp', 'startTime', 'updatedAt'];
@@ -139,6 +139,7 @@ export const AppProvider = ({ children }) => {
     // while the user is actively editing any field. This prevents disappearing text
     // across settings and all data-entry screens.
     const deferredRemoteStoresRef = useRef(new Set());
+    const deferredRemoteTimerRef = useRef(null);
     // Modals state
     const [showThermalModal, setShowThermalModal] = useState(null);
     const [showCameraModal, setShowCameraModal] = useState(false);
@@ -384,35 +385,54 @@ export const AppProvider = ({ children }) => {
         if (el.matches?.('input, textarea, select, [contenteditable="true"]')) return true;
         return !!el.closest?.('[data-oscar-draft-lock="true"]');
     }, []);
+    const isUserInteracting = useCallback(() => {
+        if (typeof window === 'undefined' || typeof performance === 'undefined') return false;
+        const last = Number(window.__OSCAR_LAST_INTERACTION_AT__ || 0);
+        return last > 0 && (performance.now() - last) < 420;
+    }, []);
+    const scheduleDeferredRemoteRefresh = useCallback(() => {
+        if (deferredRemoteTimerRef.current) clearTimeout(deferredRemoteTimerRef.current);
+        const run = async () => {
+            deferredRemoteTimerRef.current = null;
+            if (!deferredRemoteStoresRef.current.size) return;
+            if (isUserEditingField() || isUserInteracting()) {
+                deferredRemoteTimerRef.current = setTimeout(run, 260);
+                return;
+            }
+            const names = Array.from(deferredRemoteStoresRef.current);
+            deferredRemoteStoresRef.current.clear();
+            try {
+                if (names.includes('*')) await reloadData();
+                else await reloadStores(names);
+            } catch (err) { console.warn('Deferred sync UI refresh warning:', err); }
+        };
+        deferredRemoteTimerRef.current = setTimeout(run, 220);
+    }, [isUserEditingField, isUserInteracting, reloadData, reloadStores]);
     const applyRemoteRefresh = useCallback(async (storeNames = []) => {
         const names = Array.isArray(storeNames) ? storeNames.filter(Boolean) : [storeNames].filter(Boolean);
-        if (isUserEditingField()) {
+        // Remote data can land in IndexedDB immediately, but do not replace large
+        // React datasets in the middle of a tap/click/typing burst. Yield a few
+        // hundred milliseconds so controls always respond first.
+        if (isUserEditingField() || isUserInteracting()) {
             if (!names.length) deferredRemoteStoresRef.current.add('*');
             else names.forEach((name) => deferredRemoteStoresRef.current.add(name));
+            scheduleDeferredRemoteRefresh();
             return false;
         }
         if (!names.length || names.includes('*')) await reloadData();
         else await reloadStores(names);
         return true;
-    }, [isUserEditingField, reloadData, reloadStores]);
+    }, [isUserEditingField, isUserInteracting, reloadData, reloadStores, scheduleDeferredRemoteRefresh]);
     useEffect(() => {
-        let timer = null;
-        const flush = () => {
-            clearTimeout(timer);
-            timer = setTimeout(async () => {
-                if (isUserEditingField() || !deferredRemoteStoresRef.current.size) return;
-                const names = Array.from(deferredRemoteStoresRef.current);
-                deferredRemoteStoresRef.current.clear();
-                try {
-                    if (names.includes('*')) await reloadData();
-                    else await reloadStores(names);
-                } catch (err) { console.warn('Deferred sync UI refresh warning:', err); }
-            }, 450);
-        };
+        const flush = () => scheduleDeferredRemoteRefresh();
         document.addEventListener('focusout', flush, true);
         document.addEventListener('change', flush, true);
-        return () => { clearTimeout(timer); document.removeEventListener('focusout', flush, true); document.removeEventListener('change', flush, true); };
-    }, [isUserEditingField, reloadData, reloadStores]);
+        return () => {
+            if (deferredRemoteTimerRef.current) clearTimeout(deferredRemoteTimerRef.current);
+            document.removeEventListener('focusout', flush, true);
+            document.removeEventListener('change', flush, true);
+        };
+    }, [scheduleDeferredRemoteRefresh]);
     // Initial load with guaranteed fallback
     useEffect(() => {
         let isMounted = true;
@@ -508,8 +528,10 @@ export const AppProvider = ({ children }) => {
             const signature = `${syncing ? 1 : 0}|${queue.length}|${queue[0]?.id || ''}|${queue[0]?.syncId || ''}`;
             if (signature === lastSignature) return;
             lastSignature = signature;
-            setIsSyncing(syncing);
-            setSyncQueue(queue);
+            React.startTransition(() => {
+                setIsSyncing(syncing);
+                setSyncQueue(queue);
+            });
         };
         const onStatus = (event) => {
             latestDetail = event?.detail || {};
@@ -2540,18 +2562,19 @@ export const AppProvider = ({ children }) => {
         return newYear;
     }, [settings, reloadData, showToast, customers, suppliers, stock, products, warehouses, accounts, currentUser]);
     const saveSettings = useCallback(async (newSettings) => {
-        await putInStore('settings', { key: 'store_config', ...newSettings });
+        // Settings already live in React state; reloading every store here used to
+        // freeze the UI after simple toggles/buttons. Persist once and update only
+        // the settings snapshot in memory.
         setSettings(newSettings);
-        await reloadData();
+        await putInStore('settings', { key: 'store_config', ...newSettings });
         showToast('تم حفظ الإعدادات بنجاح', 'success');
-    }, [reloadData, showToast]);
+    }, [showToast]);
     const updateSettings = useCallback(async (patch) => {
         const nextSettings = { ...settings, ...patch };
-        await putInStore('settings', { key: 'store_config', ...nextSettings });
         setSettings(nextSettings);
-        await reloadData();
+        await putInStore('settings', { key: 'store_config', ...nextSettings });
         showToast('تم تحديث الإعدادات بنجاح', 'success');
-    }, [settings, reloadData, showToast]);
+    }, [settings, showToast]);
     // Professional tenant cloud sync
     const syncPendingQueue = useCallback(async () => {
         setIsSyncing(true);

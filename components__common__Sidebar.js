@@ -1,8 +1,8 @@
 import React from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { BrandLogoImage } from './components__common__BrandLogoImage.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { useApp } from './context__AppContext.js?v=7.9.4.84-ultra-responsive';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.84-ultra-responsive';
+import { BrandLogoImage } from './components__common__BrandLogoImage.js?v=7.9.4.84-ultra-responsive';
+import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.84-ultra-responsive';
 import {
   LayoutDashboard, ShoppingCart, ReceiptText, Truck, Package, Boxes, Warehouse,
   Users, Building2, Wallet, Receipt, FileSpreadsheet, UserCheck, Barcode, BarChart3,

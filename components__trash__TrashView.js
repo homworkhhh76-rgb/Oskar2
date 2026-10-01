@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { useApp } from './context__AppContext.js?v=7.9.4.84-ultra-responsive';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.84-ultra-responsive';
 import { RotateCcw, Trash2 } from 'lucide-react';
 
 const h = React.createElement;

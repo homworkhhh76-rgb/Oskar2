@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl } from './brand__logo.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
-import { isTrialAccount } from './trial__config.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { useApp } from './context__AppContext.js?v=7.9.4.84-ultra-responsive';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.84-ultra-responsive';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.84-ultra-responsive';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl } from './brand__logo.js?v=7.9.4.84-ultra-responsive';
+import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.84-ultra-responsive';
+import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.84-ultra-responsive';
+import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.84-ultra-responsive';
+import { isTrialAccount } from './trial__config.js?v=7.9.4.84-ultra-responsive';
 import { Plus, Trash2, Building2, Eye, X, Pencil, Image as ImageIcon, FileDown, FileSpreadsheet, Printer, AlertTriangle, ReceiptText, Sparkles, ScanLine } from 'lucide-react';
 
 const h = React.createElement;

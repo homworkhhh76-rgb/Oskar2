@@ -1,4 +1,4 @@
-import { getAllFromStore, getFromStore, saveToStore } from './restaurant__services__db.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { getAllFromStore, getFromStore, saveToStore } from './restaurant__services__db.js?v=7.9.4.84-ultra-responsive';
 // Default Sections
 export const DEFAULT_RESTAURANT_SECTIONS = [
     { id: 'sec-indoor', name: 'الصالة الداخلية', displayOrder: 1 },
