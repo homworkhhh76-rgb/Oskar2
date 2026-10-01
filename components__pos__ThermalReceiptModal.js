@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.57-telegram-chatid';
-import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.57-telegram-chatid';
-import { downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel, warmProfessionalExportLibraries } from './utils__professionalExport.js?v=7.9.4.57-telegram-chatid';
-import { renderInvoiceCanvas } from './utils__canvasRenderer.js?v=7.9.4.57-telegram-chatid';
-import { smartPrinter } from './services__printer.js?v=7.9.4.57-telegram-chatid';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.57-telegram-chatid';
+import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
+import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.76-company-brand-only';
+import { downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel, warmProfessionalExportLibraries } from './utils__professionalExport.js?v=7.9.4.76-company-brand-only';
+import { renderInvoiceCanvas } from './utils__canvasRenderer.js?v=7.9.4.76-company-brand-only';
+import { smartPrinter } from './services__printer.js?v=7.9.4.76-company-brand-only';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.76-company-brand-only';
 import { Printer, X, Download, Image as ImageIcon, FileSpreadsheet, Bluetooth } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 

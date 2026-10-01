@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.57-telegram-chatid';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.57-telegram-chatid';
-import { GENERAL_PAGE_PERMISSIONS, RESTAURANT_PAGE_PERMISSIONS, normalizeEmployeePermissions } from './utils__permissions.js?v=7.9.4.57-telegram-chatid';
+import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.76-company-brand-only';
+import { GENERAL_PAGE_PERMISSIONS, RESTAURANT_PAGE_PERMISSIONS, normalizeEmployeePermissions } from './utils__permissions.js?v=7.9.4.76-company-brand-only';
+import { isTrialAccount } from './trial__config.js?v=7.9.4.76-company-brand-only';
 import {
   Users, UserPlus, ShieldCheck, Trash2, Edit2, UserCheck, Download,
   UtensilsCrossed, ChefHat, LayoutGrid, Scale, X
@@ -64,6 +65,7 @@ const presetForRole = role => {
 
 export const EmployeesView = () => {
   const { employees, activeEmployee, setActiveEmployee, saveEmployee, deleteEmployee, showToast } = useApp();
+  const employeeCreationLocked = isTrialAccount();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [name, setName] = useState('');
@@ -172,7 +174,7 @@ export const EmployeesView = () => {
         ),
         h('p', { className: 'text-xs text-slate-500 mt-1' }, 'حدد الصفحات التي يستطيع الموظف دخولها وصلاحيات العمليات داخل كل صفحة.')
       ),
-      h('button', { onClick: openAdd, className: 'flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-sm' }, h(UserPlus, { className: 'w-4 h-4' }), 'إضافة موظف جديد')
+      !employeeCreationLocked && h('button', { onClick: openAdd, className: 'flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-sm' }, h(UserPlus, { className: 'w-4 h-4' }), 'إضافة موظف جديد')
     ),
 
     activeEmployee && h('div', { className: 'p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3' },

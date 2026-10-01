@@ -76,7 +76,13 @@ async function removePendingOp(id,rev=0){
 async function captureStoreChange(store,value,{deleted=false,key}={}){
   if(suppress||!STORES.has(store)||!tenant())return false;
   const k=keyString(store,value,key);if(!k)return false;
-  const rev=nextRev(),id=pk(store,k),op={store,key:k,deleted:!!deleted,value:deleted?null:clone(value),rev,deviceId:deviceId(),timestamp:Date.now(),attempts:0};
+  let outgoing=deleted?null:clone(value);
+  // Product photos selected while offline stay only in IndexedDB until Telegram upload succeeds.
+  // Never place their base64 bytes in the Turso sync queue/database.
+  if(store==='products'&&outgoing&&outgoing.imagePendingUpload&&typeof outgoing.imageData==='string'&&outgoing.imageData.startsWith('data:image/')){
+    outgoing={...outgoing,imageData:'',imagePendingUpload:false,imagePendingName:'',imageStorage:outgoing.imageTelegramFileId?'telegram-photo':''};
+  }
+  const rev=nextRev(),id=pk(store,k),op={store,key:k,deleted:!!deleted,value:outgoing,rev,deviceId:deviceId(),timestamp:Date.now(),attempts:0};
   await persistPendingOp(id,op);
   const realtime=REALTIME_STORES.has(store)||(store==='settings'&&k==='store_config');
   broadcast('local-change');
@@ -122,6 +128,16 @@ async function prepareRemoteValue(store,key,value,remoteRev,{deleted=false,lates
         return{skip:false,value:{...value,activeWarehouseId:local.activeWarehouseId}};
       }
     }catch(_){ }
+    return{skip:false,value};
+  }
+  if(store==='products'&&!deleted){
+    let local=null;try{local=await bridge.getFromStore?.('products',actualKey('products',key))}catch(_){local=null}
+    if(local?.imagePendingUpload&&typeof local.imageData==='string'&&local.imageData.startsWith('data:image/')){
+      const localImageTs=isoMs(local.imageUpdatedAt),remoteImageTs=isoMs(value?.imageUpdatedAt);
+      if(!value?.imageTelegramFileId||!remoteImageTs||localImageTs>=remoteImageTs){
+        return{skip:false,value:{...value,imageData:local.imageData,imagePendingUpload:true,imagePendingName:local.imagePendingName||'',imageStorage:'telegram-pending',imageUpdatedAt:local.imageUpdatedAt||value?.imageUpdatedAt}};
+      }
+    }
     return{skip:false,value};
   }
   if(store!=='stock')return{skip:false,value};
@@ -250,7 +266,7 @@ async function syncNow({manual=false,force=false}={}){await hydratePending().cat
 function requestSync(delay=120){if(!tenant()||navigator.onLine===false)return;clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncNow({force:false}).catch(()=>{}),Math.max(60,delay))}
 async function checkRemote({force=false}={}){if(busy||!tenant()||navigator.onLine===false||document.visibilityState==='hidden')return;const now=Date.now();if(!force&&now-lastProbe<350)return;lastProbe=now;if(pendingCount())return syncNow({force:false});try{const s=await ensureSchema(),r=await remoteBatch(s),m=readMeta();if(!m.batchInitialized||r>Number(m.remoteBatch||0))return syncNow({force:false});return pullRealtimeSnapshot({force:!!force})}catch(e){emitStatus({state:'error',message:String(e?.message||e)})}}
 function startProbe(){if(probeTimer)return;const tick=async()=>{try{await checkRemote()}catch(_){}probeTimer=setTimeout(tick,30000)};probeTimer=setTimeout(tick,1200)}
-async function initialize(opts={}){bridge=opts.bridge||bridge;if(!tenant()||!bridge)return{tenant:tenant(),unavailable:true};initialized=true;if(pendingHydrated){const early={...(pendingCache||{})};pendingHydrated=false;pendingCache=null;hydratePromise=null;await hydratePending();for(const[id,o]of Object.entries(early)){const cur=readPending()[id];if(!cur||Number(o.rev||0)>=Number(cur.rev||0))await persistPendingOp(id,o);}}else{await hydratePending();}setupBroadcast();startProbe();emitStatus({state:'ready'});if(navigator.onLine===false)return{tenant:tenant(),offline:true,remoteRows:0,remaining:pendingCount()};const pulled=await pullChanges({force:!readMeta().batchInitialized});const rt=await pullRealtimeSnapshot({force:true});if(pendingCount())requestSync(80);return{tenant:tenant(),...pulled,realtimeApplied:Number(rt.applied||0),changedStores:[...new Set([...(pulled.changedStores||[]),...(rt.changedStores||[])])],remaining:pendingCount()}}
+async function initialize(opts={}){bridge=opts.bridge||bridge;if(!tenant()||!bridge)return{tenant:tenant(),unavailable:true};initialized=true;if(pendingHydrated){const early={...(pendingCache||{})};pendingHydrated=false;pendingCache=null;hydratePromise=null;await hydratePending();for(const[id,o]of Object.entries(early)){const cur=readPending()[id];if(!cur||Number(o.rev||0)>=Number(cur.rev||0))await persistPendingOp(id,o);}}else{await hydratePending();}setupBroadcast();startProbe();if(navigator.onLine===false){emitStatus({state:'offline'});return{tenant:tenant(),offline:true,remoteRows:0,remaining:pendingCount()}}emitStatus({state:'syncing',busy:true,startup:true});const first=await syncNow({force:true});return{tenant:tenant(),...first,remaining:pendingCount()}}
 function setupBroadcast(){try{bc?.close?.();bc='BroadcastChannel'in window?new BroadcastChannel('oscar-cloud-sync-v2'):null;if(bc)bc.onmessage=e=>{const m=e.data||{};if(m.tenant!==tenant()||m.deviceId===deviceId())return;if(m.type==='local-change'||m.type==='synced')setTimeout(()=>checkRemote({force:true}),m.type==='synced'?20:120)}}catch(_){bc=null}}
 function resetForTenant(){schemaTenant='';lastProbe=0;lastRealtimePull=0;rerunRequested=false;pendingCache=null;pendingHydrated=false;hydratePromise=null;setupBroadcast();if(bridge)hydratePending().catch(()=>{});emitStatus({state:'tenant-reset'})}
 window.addEventListener('online',()=>{emitStatus({state:'online'});pendingCount()?requestSync(40):checkRemote({force:true})});

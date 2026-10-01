@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.57-telegram-chatid';
-import { canAccessTab, canAccessPermission } from './utils__permissions.js?v=7.9.4.57-telegram-chatid';
+import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
+import { canAccessTab, canAccessPermission } from './utils__permissions.js?v=7.9.4.76-company-brand-only';
 import {
   ShoppingCart, ReceiptText, Package, Warehouse, Menu, X, LayoutDashboard, Truck,
   Boxes, Users, Building2, Wallet, Receipt, Barcode, BarChart3, Trash2, Settings,
@@ -20,10 +20,10 @@ export const BottomNav = () => {
   };
 
   const mainTabs = [
+    { id:'dashboard', label:'لوحة التحكم', icon:LayoutDashboard },
     { id:'pos', label:'الكاشير', icon:ShoppingCart, badge:cart.length || undefined },
     { id:'sales', label:'المبيعات', icon:ReceiptText },
     { id:'products', label:'الأصناف', icon:Package },
-    { id:'inventory', label:'المخزون', icon:Warehouse },
   ].filter(tab => canAccessTab(tab.id, accessArgs));
 
   const restaurantTabs = settings.isRestaurantModeEnabled ? [
@@ -36,7 +36,7 @@ export const BottomNav = () => {
   const moreTabs = [
     ...(canAccessPermission('canAccessAI', accessArgs) ? [{ id:'oscar_ai', label:'أوسكار AI', icon:Sparkles }] : []),
     ...restaurantTabs,
-    { id:'dashboard', label:'لوحة التحكم', icon:LayoutDashboard },
+    { id:'inventory', label:'المخزون', icon:Warehouse },
     { id:'purchases', label:'المشتريات', icon:Truck },
     { id:'vouchers', label:'سندات القبض والصرف', icon:ReceiptText },
     { id:'employees', label:'الموظفون والصلاحيات', icon:Users },

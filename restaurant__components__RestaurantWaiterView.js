@@ -1,9 +1,9 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.57-telegram-chatid';
-import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.57-telegram-chatid';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.76-company-brand-only';
+import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.76-company-brand-only';
 import { Utensils, Search, Plus, Minus, Trash2, Send, Printer, Users, ShoppingBag, ShoppingCart, AlertTriangle, Lock, X, StickyNote, ChevronDown } from 'lucide-react';
-import { KitchenTicketModal } from './restaurant__components__KitchenTicketModal.js?v=7.9.4.57-telegram-chatid';
+import { KitchenTicketModal } from './restaurant__components__KitchenTicketModal.js?v=7.9.4.76-company-brand-only';
 
 const h = React.createElement;
 const orderNoteText = (notes) => typeof notes === 'string' ? notes : String(notes?.kitchenNotes || notes?.general || '');

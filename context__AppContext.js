@@ -1,10 +1,11 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.57-telegram-chatid';
-import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.57-telegram-chatid';
-import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.57-telegram-chatid';
-import { notifyTelegramInvoice } from './services__telegram.js?v=7.9.4.57-telegram-chatid';
-import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.57-telegram-chatid';
+import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, commitLocalBatch, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.76-company-brand-only';
+import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.76-company-brand-only';
+import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.76-company-brand-only';
+import { notifyTelegramInvoice } from './services__telegram.js?v=7.9.4.76-company-brand-only';
+import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.76-company-brand-only';
+import { isTrialAccount, TRIAL_LIMITS } from './trial__config.js?v=7.9.4.76-company-brand-only';
 const AppContext = createContext(null);
 const recordTime = (item = {}) => {
     const fields = ['createdAt', 'date', 'timestamp', 'startTime', 'updatedAt'];
@@ -22,8 +23,8 @@ const normalizeCurrencySettings = (value) => {
     if (!value) return value;
     const currency = String(value.currency || '').trim().toUpperCase();
     const symbol = String(value.currencySymbol || '').trim();
-    if (currency === 'ILS' && symbol === '₪') return value;
-    return { ...value, currency: 'ILS', currencySymbol: '₪' };
+    if (currency && symbol) return value;
+    return { ...value, currency: currency || 'ILS', currencySymbol: symbol || '₪' };
 };
 const normalizeActiveWarehouseSettings = (value, warehouseRows = []) => {
     if (!value) return value;
@@ -126,7 +127,7 @@ export const AppProvider = ({ children }) => {
     const [employees, setEmployees] = useState(DEFAULT_EMPLOYEES);
     const [activeEmployee, setActiveEmployee] = useState(DEFAULT_EMPLOYEES[0]);
     // UI state
-    const [activeTab, setActiveTabState] = useState('pos');
+    const [activeTab, setActiveTabState] = useState('dashboard');
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [posCartLayout, setPosCartLayout] = useState('split');
     const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
@@ -498,16 +499,31 @@ export const AppProvider = ({ children }) => {
         };
     }, [reloadData, reloadStores, applyRemoteRefresh]);
     useEffect(() => {
+        let frame = 0, latestDetail = {}, lastSignature = '';
+        const flushStatus = () => {
+            frame = 0;
+            const d = latestDetail || {};
+            const syncing = !!d.busy || d.state === 'syncing';
+            const queue = window.OscarCloudSync?.pendingItems?.() || [];
+            const signature = `${syncing ? 1 : 0}|${queue.length}|${queue[0]?.id || ''}|${queue[0]?.syncId || ''}`;
+            if (signature === lastSignature) return;
+            lastSignature = signature;
+            setIsSyncing(syncing);
+            setSyncQueue(queue);
+        };
         const onStatus = (event) => {
-            const d = event.detail || {};
-            setIsSyncing(!!d.busy || d.state === 'syncing');
-            setSyncQueue(window.OscarCloudSync?.pendingItems?.() || []);
+            latestDetail = event?.detail || {};
+            if (!frame) frame = requestAnimationFrame(flushStatus);
         };
         const onApplied = (event) => applyRemoteRefresh(event?.detail?.stores || []);
         window.addEventListener('oscar:sync-status', onStatus);
         window.addEventListener('oscar:sync-applied', onApplied);
         onStatus({ detail: {} });
-        return () => { window.removeEventListener('oscar:sync-status', onStatus); window.removeEventListener('oscar:sync-applied', onApplied); };
+        return () => {
+            if (frame) cancelAnimationFrame(frame);
+            window.removeEventListener('oscar:sync-status', onStatus);
+            window.removeEventListener('oscar:sync-applied', onApplied);
+        };
     }, [applyRemoteRefresh]);
     // Online / Offline monitor
     useEffect(() => {
@@ -540,20 +556,27 @@ export const AppProvider = ({ children }) => {
         const found = shifts.find((s) => s.status === 'open') || null;
         return found ? normalizeShiftRecord(found) : null;
     }, [shifts]);
-    // Get current stock for a product in a warehouse (or all warehouses)
+    // O(1) stock lookup. Product grids call this hundreds of times while scrolling;
+    // a memoized index avoids repeated Array.find/filter work on every render/frame.
+    const stockLookup = useMemo(() => {
+        const byWarehouse = new Map(), totals = new Map();
+        for (const row of stock || []) {
+            const productId = String(row?.productId || '');
+            const warehouseId = String(row?.warehouseId || '');
+            const qty = Number(row?.baseQuantity) || 0;
+            byWarehouse.set(`${productId}::${warehouseId}`, qty);
+            totals.set(productId, (totals.get(productId) || 0) + qty);
+        }
+        return { byWarehouse, totals };
+    }, [stock]);
     const getProductStock = useCallback((productId, warehouseId) => {
         const requestedWh = warehouseId || settings.activeWarehouseId;
         const targetWh = requestedWh && warehouses.some(w => String(w.id) === String(requestedWh))
             ? requestedWh
             : (warehouses.find(w => w?.isDefault)?.id || warehouses.find(w => w?.id === 'wh-main')?.id || warehouses[0]?.id || '');
-        if (warehouseId || targetWh) {
-            const item = stock.find((s) => s.productId === productId && String(s.warehouseId) === String(targetWh));
-            return item ? Number(item.baseQuantity) || 0 : 0;
-        }
-        return stock
-            .filter((s) => s.productId === productId)
-            .reduce((sum, s) => sum + (Number(s.baseQuantity) || 0), 0);
-    }, [stock, settings.activeWarehouseId, warehouses]);
+        if (warehouseId || targetWh) return stockLookup.byWarehouse.get(`${String(productId)}::${String(targetWh)}`) || 0;
+        return stockLookup.totals.get(String(productId)) || 0;
+    }, [stockLookup, settings.activeWarehouseId, warehouses]);
     // Cart operations
     const addToCart = useCallback((product, unit, quantity = 1) => {
         const targetUnit = unit || product.units.find((u) => u.isDefaultSale) || product.units[0];
@@ -716,17 +739,20 @@ export const AppProvider = ({ children }) => {
     }, [products, addToCart, showToast, settings.scannerBeepEnabled]);
     // Create Sale Invoice (invoice discount + FIFO cost consumption)
     const createSaleInvoice = useCallback(async (payload = {}) => {
+        if (isTrialAccount() && !payload.isEdit && invoices.filter((row) => row?.type === 'sale').length >= TRIAL_LIMITS.salesInvoices) {
+            showToast(`وصلت إلى الحد المتاح لفواتير المبيعات (${TRIAL_LIMITS.salesInvoices}).`, 'warning');
+            return null;
+        }
         const isDirectSale = Array.isArray(payload.items) && payload.items.length > 0;
         const saleCart = isDirectSale ? payload.items : cart;
         if (saleCart.length === 0) { showToast('السلة فارغة!', 'error'); return null; }
-        const [liveProductsRaw, liveStockRaw, liveAccountsRaw, liveCustomersRaw, liveShiftsRaw] = await Promise.all([
-            getAllFromStore('products'), getAllFromStore('stock'), getAllFromStore('accounts'), getAllFromStore('customers'), getAllFromStore('shifts')
-        ]);
-        const sourceProducts = Array.isArray(liveProductsRaw) && liveProductsRaw.length ? liveProductsRaw : products;
-        const sourceStock = Array.isArray(liveStockRaw) ? liveStockRaw : stock;
-        const sourceAccounts = Array.isArray(liveAccountsRaw) && liveAccountsRaw.length ? liveAccountsRaw : accounts;
-        const sourceCustomers = Array.isArray(liveCustomersRaw) ? liveCustomersRaw : customers;
-        const liveActiveShift = activeShift?.id ? ((liveShiftsRaw || []).find((x) => x.id === activeShift.id) || activeShift) : null;
+        // Use the already-synced in-memory snapshot for an instant local save.
+        // Remote changes update these states separately; saving never waits for fresh cloud/database reads.
+        const sourceProducts = products;
+        const sourceStock = stock;
+        const sourceAccounts = accounts;
+        const sourceCustomers = customers;
+        const liveActiveShift = activeShift || null;
         const warehouseId = payload.warehouseIdOverride || settings.activeWarehouseId;
         const warehouse = warehouses.find((w) => w.id === warehouseId) || warehouses[0];
         const now = new Date().toISOString();
@@ -737,10 +763,17 @@ export const AppProvider = ({ children }) => {
         const recipes = await getAllFromStore('recipes').catch(() => []);
         const recipeByProductId = new Map((recipes || []).map((r) => [r.productId || r.mealProductId, r]).filter((x) => x[0]));
         let subtotal = 0, lineDiscountTotal = 0, taxTotal = 0;
-        const productCopies = sourceProducts.map(p => ({...p, fifoBatches: Array.isArray(p.fifoBatches) ? p.fifoBatches.map(b=>({...b})) : []}));
+        const productCopies = [...sourceProducts];
+        const changedProductIds = new Set();
         const consumeFifo = (productId, baseQty, fallbackBaseCost) => {
-            const p = productCopies.find(x=>x.id===productId);
-            if (!p) return baseQty * fallbackBaseCost;
+            const idx = productCopies.findIndex(x=>x.id===productId);
+            if (idx < 0) return baseQty * fallbackBaseCost;
+            if (!changedProductIds.has(productId)) {
+                const original = productCopies[idx];
+                productCopies[idx] = { ...original, fifoBatches: Array.isArray(original.fifoBatches) ? original.fifoBatches.map(b=>({...b})) : [] };
+                changedProductIds.add(productId);
+            }
+            const p = productCopies[idx];
             let left = Math.max(0, baseQty), totalCost = 0;
             const candidates = p.fifoBatches.filter(b => (b.warehouseId === warehouseId || !b.warehouseId) && Number(b.remainingBaseQty)>0)
               .sort((a,b)=>new Date(a.receivedAt||0)-new Date(b.receivedAt||0));
@@ -818,13 +851,13 @@ export const AppProvider = ({ children }) => {
         const saleCustomer = payload.forceCashCustomer ? CASH_CUSTOMER : (payload.customerObject || (payload.customerId ? (sourceCustomers.find((c) => c.id === payload.customerId) || selectedLiveCustomer || CASH_CUSTOMER) : (selectedLiveCustomer || CASH_CUSTOMER)));
         if ((payload.paymentType === 'debt' || payload.paymentType === 'partial') && saleCustomer.id === CASH_CUSTOMER.id) { showToast('يجب اختيار عميل مسجل للبيع الآجل أو الدفع الجزئي!', 'error'); return null; }
         const invoice = { id:invoiceId, invoiceNumber, type:'sale', date:invoiceDate, financialYearId: payload.financialYearIdOverride || settings.activeFinancialYearId || 'fy-initial', customerId:saleCustomer.id, customerName:saleCustomer.name, cashierId:currentUser.id, cashierName:currentUser.name, shiftId:liveActiveShift?.id, branchId:settings.activeBranchName, warehouseId, items:invoiceItems, subtotal, lineDiscountTotal, invoiceDiscountType:effectiveDiscountType, invoiceDiscountValue:rawDiscount, invoiceDiscountAmount, discountTotal, taxTotal, roundingAdjustment, grandTotal, paidAmount:Math.min(paid,grandTotal), remainingAmount:remaining, changeAmount:change, paymentType:payload.paymentType, payments, status:'completed', notes:payload.notes, syncId, isSynced:false, createdAt:payload.createdAtOverride || now, updatedAt:now, editedAt:payload.isEdit ? now : undefined };
-        await putInStore('invoices', invoice);
-        const updatedStockList=[...sourceStock], newMovements=[];
+        const updatedStockList=[...sourceStock], newMovements=[], changedStockKeys=new Set();
         const deductStock = (productId, productName, baseQty, movementMeta = {}) => {
             const stockIndex=updatedStockList.findIndex(s=>s.productId===productId&&s.warehouseId===warehouseId);
             const currentQty=stockIndex>=0?Number(updatedStockList[stockIndex].baseQuantity)||0:0;
             const newQty=currentQty-baseQty;
             if(stockIndex>=0) updatedStockList[stockIndex]={...updatedStockList[stockIndex],baseQuantity:newQty}; else updatedStockList.push({productId,warehouseId,baseQuantity:newQty});
+            changedStockKeys.add(`${productId}::${warehouseId}`);
             newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:now,financialYearId:settings.activeFinancialYearId||'fy-initial',productId,productName,warehouseId,warehouseName:warehouse?.name||'صالة العرض',type:movementMeta.type||'sale',unitName:movementMeta.unitName||'وحدة أساسية',quantityInUnit:movementMeta.quantityInUnit??baseQty,conversionFactor:movementMeta.conversionFactor||1,baseQuantityChange:-baseQty,newBaseBalance:newQty,referenceId:invoice.id,referenceType:'INVOICE',userId:currentUser.id,userName:currentUser.name,recipeId:movementMeta.recipeId,manufacturedProductId:movementMeta.manufacturedProductId,manufacturedProductName:movementMeta.manufacturedProductName});
         };
         for (const item of invoiceItems) {
@@ -844,13 +877,22 @@ export const AppProvider = ({ children }) => {
                 deductStock(item.productId, item.productName, item.baseQuantity, {type:'sale',unitName:item.unitName,quantityInUnit:item.quantity,conversionFactor:item.conversionFactor});
             }
         }
-        await bulkPut('stock',updatedStockList); await bulkPut('stock_movements',newMovements); await bulkPut('products',productCopies);
-        const updatedAccounts=[...sourceAccounts];
-        for(const p of payments){const i=updatedAccounts.findIndex(a=>a.id===p.accountId);if(i>=0)updatedAccounts[i]={...updatedAccounts[i],balance:(Number(updatedAccounts[i].balance)||0)+(Number(p.amount)||0)};}
-        await bulkPut('accounts',updatedAccounts);
+        const updatedAccounts=[...sourceAccounts], changedAccountIds=new Set();
+        for(const p of payments){const i=updatedAccounts.findIndex(a=>a.id===p.accountId);if(i>=0){updatedAccounts[i]={...updatedAccounts[i],balance:(Number(updatedAccounts[i].balance)||0)+(Number(p.amount)||0)};changedAccountIds.add(p.accountId);}}
         let updatedCustomer = null, customerStatement = null, updatedShift = null;
-        if(remaining>0&&saleCustomer.id!==CASH_CUSTOMER.id){const newBalance=(Number(saleCustomer.balance)||0)+remaining;updatedCustomer={...saleCustomer,balance:newBalance};customerStatement={id:'stmt-'+Date.now(),date:now,financialYearId:settings.activeFinancialYearId||'fy-initial',type:'sale',partnerType:'customer',partnerId:saleCustomer.id,partnerName:saleCustomer.name,referenceType:'SALE',referenceId:invoice.id,referenceNumber:invoiceNumber,description:`فاتورة مبيعات آجل رقم ${invoiceNumber}`,debit:remaining,credit:0,runningBalance:newBalance};await putInStore('customers',updatedCustomer);await putInStore('partner_statements',customerStatement);}
-        if(liveActiveShift){const cashPaid=payments.filter(p=>p.method==='cash').reduce((x,p)=>x+(Number(p.amount)||0),0)-change;const otherPaid=payments.filter(p=>p.method!=='cash').reduce((x,p)=>x+(Number(p.amount)||0),0);updatedShift={...liveActiveShift,totalCashSales:(Number(liveActiveShift.totalCashSales)||0)+Math.max(0,cashPaid),totalOtherSales:(Number(liveActiveShift.totalOtherSales)||0)+otherPaid,expectedCash:(Number(liveActiveShift.expectedCash)||0)+Math.max(0,cashPaid)};await putInStore('shifts',updatedShift);}
+        if(remaining>0&&saleCustomer.id!==CASH_CUSTOMER.id){const newBalance=(Number(saleCustomer.balance)||0)+remaining;updatedCustomer={...saleCustomer,balance:newBalance};customerStatement={id:'stmt-'+Date.now(),date:now,financialYearId:settings.activeFinancialYearId||'fy-initial',type:'sale',partnerType:'customer',partnerId:saleCustomer.id,partnerName:saleCustomer.name,referenceType:'SALE',referenceId:invoice.id,referenceNumber:invoiceNumber,description:`فاتورة مبيعات آجل رقم ${invoiceNumber}`,debit:remaining,credit:0,runningBalance:newBalance};}
+        if(liveActiveShift){const cashPaid=payments.filter(p=>p.method==='cash').reduce((x,p)=>x+(Number(p.amount)||0),0)-change;const otherPaid=payments.filter(p=>p.method!=='cash').reduce((x,p)=>x+(Number(p.amount)||0),0);updatedShift={...liveActiveShift,totalCashSales:(Number(liveActiveShift.totalCashSales)||0)+Math.max(0,cashPaid),totalOtherSales:(Number(liveActiveShift.totalOtherSales)||0)+otherPaid,expectedCash:(Number(liveActiveShift.expectedCash)||0)+Math.max(0,cashPaid)};}
+        // One atomic IndexedDB commit: invoice + stock + accounts + debt + shift.
+        // This is the durability point shown to the cashier; cloud queue/network starts afterwards.
+        const localOps = [{ type:'put', storeName:'invoices', value:invoice, actionHint: payload.isEdit ? 'update' : 'add' }];
+        for (const row of updatedStockList) if (changedStockKeys.has(`${row.productId}::${row.warehouseId}`)) localOps.push({ type:'put', storeName:'stock', value:row, actionHint:'update' });
+        for (const movement of newMovements) localOps.push({ type:'put', storeName:'stock_movements', value:movement, actionHint:'add' });
+        for (const prod of productCopies) if (changedProductIds.has(prod.id)) localOps.push({ type:'put', storeName:'products', value:prod, actionHint:'update' });
+        for (const acc of updatedAccounts) if (changedAccountIds.has(acc.id)) localOps.push({ type:'put', storeName:'accounts', value:acc, actionHint:'update' });
+        if (updatedCustomer) localOps.push({ type:'put', storeName:'customers', value:updatedCustomer, actionHint:'update' });
+        if (customerStatement) localOps.push({ type:'put', storeName:'partner_statements', value:customerStatement, actionHint:'add' });
+        if (updatedShift) localOps.push({ type:'put', storeName:'shifts', value:updatedShift, actionHint:'update' });
+        await commitLocalBatch(localOps);
         // Update the open screen from the already-saved local data; no full database reload and no cloud wait.
         setInvoices(prev => [invoice, ...prev.filter(x => x.id !== invoice.id)]);
         setStock(updatedStockList);
@@ -860,9 +902,8 @@ export const AppProvider = ({ children }) => {
         if(updatedCustomer)setCustomers(prev => prev.some(c=>c.id===updatedCustomer.id) ? prev.map(c => c.id===updatedCustomer.id?updatedCustomer:c) : [updatedCustomer,...prev]);
         if(customerStatement)setPartnerStatements(prev => [customerStatement, ...prev]);
         if(updatedShift)setShifts(prev => prev.map(x => x.id===updatedShift.id?updatedShift:x));
-        setSyncQueue(window.OscarCloudSync?.pendingItems?.() || []);
         playSuccessSound(settings.scannerBeepEnabled); if(!isDirectSale) clearCart(); setEditingSaleInvoiceId(null); notifyTelegramInvoice(invoice,'sale').catch(()=>{}); showToast(payload.isEdit ? `تم تعديل الفاتورة [${invoiceNumber}] مع عكس القيد القديم وإعادة احتساب الجديد` : `تم حفظ الفاتورة بنجاح [${invoiceNumber}]`,'success'); return invoice;
-    }, [cart, invoiceDiscountType, invoiceDiscountValue, settings, warehouses, products, customers, selectedCustomer, currentUser, activeShift, stock, accounts, clearCart, showToast]);
+    }, [cart, invoiceDiscountType, invoiceDiscountValue, settings, warehouses, products, customers, selectedCustomer, currentUser, activeShift, stock, accounts, invoices, clearCart, showToast]);
     // Transaction reversal helpers: all invoice changes pass through the same accounting/stock logic.
     const addStockDelta = useCallback(async ({ rows, productId, warehouseId, delta, movement }) => {
         const qty = finiteNumber(delta, 0);
@@ -1118,11 +1159,14 @@ export const AppProvider = ({ children }) => {
     }, [invoices, products, customers, currentUser, activeShift, accounts, stock, warehouses, reloadData, showToast, addStockDelta, restoreFifoQuantity, appendReversalStatement, settings.activeFinancialYearId]);
     // Create Purchase Invoice (local-first: durable local save first, cloud sync later)
     const createPurchaseInvoice = useCallback(async (payload) => {
-        const [liveProductsRaw, liveStockRaw, liveAccountsRaw, liveSuppliersRaw] = await Promise.all([getAllFromStore('products'), getAllFromStore('stock'), getAllFromStore('accounts'), getAllFromStore('suppliers')]);
-        const sourceProducts = Array.isArray(liveProductsRaw) && liveProductsRaw.length ? liveProductsRaw : products;
-        const sourceStock = Array.isArray(liveStockRaw) ? liveStockRaw : stock;
-        const sourceAccounts = Array.isArray(liveAccountsRaw) && liveAccountsRaw.length ? liveAccountsRaw : accounts;
-        const sourceSuppliers = Array.isArray(liveSuppliersRaw) ? liveSuppliersRaw : suppliers;
+        if (isTrialAccount() && !payload?.isEdit && purchases.length >= TRIAL_LIMITS.purchaseInvoices) {
+            showToast(`وصلت إلى الحد المتاح لفواتير المشتريات (${TRIAL_LIMITS.purchaseInvoices}).`, 'warning');
+            return null;
+        }
+        const sourceProducts = products;
+        const sourceStock = stock;
+        const sourceAccounts = accounts;
+        const sourceSuppliers = suppliers;
         const now=new Date().toISOString(); const purchaseDate=payload?.date ? new Date(`${String(payload.date).slice(0,10)}T12:00:00`).toISOString() : (payload?.dateOverride || now); const invoiceNumber=payload?.invoiceNumberOverride || `PUR-${Date.now().toString().slice(-6)}`; const purchaseId=payload?.invoiceIdOverride || `pur-${Date.now()}`; const syncId=`pur-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
         const targetWarehouse = warehouses.find(w=>w.id===payload?.warehouseId) || warehouses.find(w=>w.id===settings.activeWarehouseId) || warehouses.find(w=>w.isDefault) || warehouses.find(w=>/صالة\s*العرض/.test(String(w.name||''))) || warehouses[0];
         if(!targetWarehouse) throw new Error('لا يوجد مخزن رئيسي. أضف صالة العرض من المخازن أولاً.');
@@ -1134,22 +1178,27 @@ export const AppProvider = ({ children }) => {
         const discountTotal=Math.max(0,Math.min(subtotal,Number(payload.discountAmount)||0));
         const grandTotal=Math.max(0,subtotal-discountTotal); const paidAmount=Math.min(grandTotal,Math.max(0,Number(payload.paidAmount)||0)); const remaining=Math.max(0,grandTotal-paidAmount); const ratio=subtotal>0?grandTotal/subtotal:1;
         const purchaseInvoice={id:purchaseId,invoiceNumber,supplierInvoiceNumber:payload.supplierInvoiceNumber||'',date:purchaseDate,financialYearId:payload.financialYearIdOverride || settings.activeFinancialYearId || 'fy-initial',supplierId:payload.supplierId,supplierName:payload.supplierName,warehouseId,warehouseName:targetWarehouse.name||'صالة العرض',items:items.map((it,idx)=>({id:`pur-it-${Date.now()}-${idx}`,...it})),subtotal,discountType:payload.discountType||'fixed',discountValue:Number(payload.discountValue)||0,discountTotal,taxTotal:0,grandTotal,paidAmount,remainingAmount:remaining,paymentType:payload.paymentType,payments,notes:payload.notes||'',syncId,isSynced:false,createdAt:payload.createdAtOverride || now,updatedAt:now,editedAt:payload.isEdit?now:undefined};
-        await putInStore('purchases',purchaseInvoice);
-        const updatedProducts=sourceProducts.map(p=>({...p,fifoBatches:Array.isArray(p.fifoBatches)?p.fifoBatches.map(b=>({...b})):[]})); const updatedStockList=[...sourceStock],newMovements=[];
+        const updatedProducts=[...sourceProducts]; const updatedStockList=[...sourceStock],newMovements=[],changedProductIds=new Set(),changedStockKeys=new Set();
         for(const item of items){const pi=updatedProducts.findIndex(p=>p.id===item.productId);const si=updatedStockList.findIndex(x=>x.productId===item.productId&&x.warehouseId===warehouseId);const currentBaseStock=si>=0?Number(updatedStockList[si].baseQuantity)||0:0;const currentTotalBaseStock=updatedStockList.filter(x=>x.productId===item.productId).reduce((sum,row)=>sum+Math.max(0,Number(row.baseQuantity)||0),0);const baseQty=Math.max(0,Number(item.baseQuantity)||0);const newBaseStock=currentBaseStock+baseQty;
-          if(pi>=0){const currentCost=Number(updatedProducts[pi].costPrice)||0;const unitCost=((Number(item.unitPrice)||0)*ratio)/Math.max(0.00000001,(Number(item.conversionFactor)||1));let batches=updatedProducts[pi].fifoBatches||[];if(currentBaseStock>0&&!batches.some(b=>(b.warehouseId===warehouseId||!b.warehouseId)&&Number(b.remainingBaseQty)>0)){batches.push({id:`legacy-${item.productId}-${warehouseId}`,purchaseId:'legacy',warehouseId,receivedAt:'2000-01-01T00:00:00.000Z',expiryDate:updatedProducts[pi].expiryDate||'',unitCost:currentCost,remainingBaseQty:currentBaseStock});}batches.push({id:`batch-${purchaseInvoice.id}-${item.productId}-${Math.random().toString(36).slice(2,6)}`,purchaseId:purchaseInvoice.id,warehouseId,receivedAt:purchaseDate,expiryDate:item.expiryDate||updatedProducts[pi].expiryDate||'',unitCost,remainingBaseQty:baseQty});const oldVal=Math.max(0,currentTotalBaseStock)*currentCost,newVal=baseQty*unitCost,totalUnits=Math.max(0,currentTotalBaseStock)+baseQty,newWAC=totalUnits>0?(oldVal+newVal)/totalUnits:unitCost;updatedProducts[pi]={...updatedProducts[pi],costPrice:parseFloat(newWAC.toFixed(4)),fifoBatches:batches,updatedAt:now};}
-          if(si>=0)updatedStockList[si]={...updatedStockList[si],baseQuantity:newBaseStock};else updatedStockList.push({productId:item.productId,warehouseId,baseQuantity:newBaseStock});
+          if(pi>=0){if(!changedProductIds.has(item.productId)){const original=updatedProducts[pi];updatedProducts[pi]={...original,fifoBatches:Array.isArray(original.fifoBatches)?original.fifoBatches.map(b=>({...b})):[]};changedProductIds.add(item.productId);}const currentCost=Number(updatedProducts[pi].costPrice)||0;const unitCost=((Number(item.unitPrice)||0)*ratio)/Math.max(0.00000001,(Number(item.conversionFactor)||1));let batches=updatedProducts[pi].fifoBatches||[];if(currentBaseStock>0&&!batches.some(b=>(b.warehouseId===warehouseId||!b.warehouseId)&&Number(b.remainingBaseQty)>0)){batches.push({id:`legacy-${item.productId}-${warehouseId}`,purchaseId:'legacy',warehouseId,receivedAt:'2000-01-01T00:00:00.000Z',expiryDate:updatedProducts[pi].expiryDate||'',unitCost:currentCost,remainingBaseQty:currentBaseStock});}batches.push({id:`batch-${purchaseInvoice.id}-${item.productId}-${Math.random().toString(36).slice(2,6)}`,purchaseId:purchaseInvoice.id,warehouseId,receivedAt:purchaseDate,expiryDate:item.expiryDate||updatedProducts[pi].expiryDate||'',unitCost,remainingBaseQty:baseQty});const oldVal=Math.max(0,currentTotalBaseStock)*currentCost,newVal=baseQty*unitCost,totalUnits=Math.max(0,currentTotalBaseStock)+baseQty,newWAC=totalUnits>0?(oldVal+newVal)/totalUnits:unitCost;updatedProducts[pi]={...updatedProducts[pi],costPrice:parseFloat(newWAC.toFixed(4)),fifoBatches:batches,updatedAt:now};}
+          if(si>=0)updatedStockList[si]={...updatedStockList[si],baseQuantity:newBaseStock};else updatedStockList.push({productId:item.productId,warehouseId,baseQuantity:newBaseStock});changedStockKeys.add(`${item.productId}::${warehouseId}`);
           newMovements.push({id:'mov-'+Math.random().toString(36).substring(2,9),date:purchaseDate,financialYearId:settings.activeFinancialYearId||'fy-initial',productId:item.productId,productName:item.productName,warehouseId,warehouseName:targetWarehouse.name||'صالة العرض',type:'purchase',unitName:item.unitName,quantityInUnit:item.quantity,conversionFactor:item.conversionFactor,baseQuantityChange:baseQty,newBaseBalance:newBaseStock,referenceId:purchaseInvoice.id,referenceType:'PURCHASE',userId:currentUser.id,userName:currentUser.name});}
-        await bulkPut('products',updatedProducts);await bulkPut('stock',updatedStockList);await bulkPut('stock_movements',newMovements);
-        const updatedAccounts=[...sourceAccounts];for(const pay of payments){const ai=updatedAccounts.findIndex(a=>a.id===pay.accountId);if(ai>=0)updatedAccounts[ai]={...updatedAccounts[ai],balance:(Number(updatedAccounts[ai].balance)||0)-(Number(pay.amount)||0)};}await bulkPut('accounts',updatedAccounts);
+        const updatedAccounts=[...sourceAccounts],changedAccountIds=new Set();for(const pay of payments){const ai=updatedAccounts.findIndex(a=>a.id===pay.accountId);if(ai>=0){updatedAccounts[ai]={...updatedAccounts[ai],balance:(Number(updatedAccounts[ai].balance)||0)-(Number(pay.amount)||0)};changedAccountIds.add(pay.accountId);}}
         let updatedSupplier=null,supplierStatement=null;
-        if(remaining>0){const supp=sourceSuppliers.find(s=>s.id===payload.supplierId) || (payload.supplierObject?.id===payload.supplierId ? payload.supplierObject : null);if(supp){const nb=(Number(supp.balance)||0)+remaining;updatedSupplier={...supp,balance:nb};supplierStatement={id:'stmt-'+Date.now(),date:purchaseDate,financialYearId:settings.activeFinancialYearId||'fy-initial',type:'purchase',partnerType:'supplier',partnerId:supp.id,partnerName:supp.name,partyType:'supplier',partyId:supp.id,referenceType:'PURCHASE',referenceId:purchaseInvoice.id,referenceNumber:invoiceNumber,description:`فاتورة مشتريات رقم ${invoiceNumber}`,debit:0,credit:remaining,runningBalance:nb};await putInStore('suppliers',updatedSupplier);await putInStore('partner_statements',supplierStatement);}}
+        if(remaining>0){const supp=sourceSuppliers.find(s=>s.id===payload.supplierId) || (payload.supplierObject?.id===payload.supplierId ? payload.supplierObject : null);if(supp){const nb=(Number(supp.balance)||0)+remaining;updatedSupplier={...supp,balance:nb};supplierStatement={id:'stmt-'+Date.now(),date:purchaseDate,financialYearId:settings.activeFinancialYearId||'fy-initial',type:'purchase',partnerType:'supplier',partnerId:supp.id,partnerName:supp.name,partyType:'supplier',partyId:supp.id,referenceType:'PURCHASE',referenceId:purchaseInvoice.id,referenceNumber:invoiceNumber,description:`فاتورة مشتريات رقم ${invoiceNumber}`,debit:0,credit:remaining,runningBalance:nb};}}
+        const purchaseOps=[{type:'put',storeName:'purchases',value:purchaseInvoice,actionHint:payload?.isEdit?'update':'add'}];
+        for(const prod of updatedProducts)if(changedProductIds.has(prod.id))purchaseOps.push({type:'put',storeName:'products',value:prod,actionHint:'update'});
+        for(const row of updatedStockList)if(changedStockKeys.has(`${row.productId}::${row.warehouseId}`))purchaseOps.push({type:'put',storeName:'stock',value:row,actionHint:'update'});
+        for(const movement of newMovements)purchaseOps.push({type:'put',storeName:'stock_movements',value:movement,actionHint:'add'});
+        for(const acc of updatedAccounts)if(changedAccountIds.has(acc.id))purchaseOps.push({type:'put',storeName:'accounts',value:acc,actionHint:'update'});
+        if(updatedSupplier)purchaseOps.push({type:'put',storeName:'suppliers',value:updatedSupplier,actionHint:'update'});
+        if(supplierStatement)purchaseOps.push({type:'put',storeName:'partner_statements',value:supplierStatement,actionHint:'add'});
+        await commitLocalBatch(purchaseOps);
         setPurchases(prev => [purchaseInvoice, ...prev.filter(x=>x.id!==purchaseInvoice.id)]);
         setProducts(updatedProducts);setStock(updatedStockList);setStockMovements(prev=>[...newMovements,...prev]);setAccounts(updatedAccounts);
         if(updatedSupplier)setSuppliers(prev=>prev.some(x=>x.id===updatedSupplier.id)?prev.map(x=>x.id===updatedSupplier.id?updatedSupplier:x):[updatedSupplier,...prev]);if(supplierStatement)setPartnerStatements(prev=>[supplierStatement,...prev]);
-        setSyncQueue(window.OscarCloudSync?.pendingItems?.() || []);
         playSuccessSound(settings.scannerBeepEnabled);notifyTelegramInvoice(purchaseInvoice,'purchase').catch(()=>{});showToast(payload?.isEdit ? `تم تعديل فاتورة الشراء [${invoiceNumber}] مع عكس القيد القديم وإعادة احتساب الجديد` : `تم تسجيل فاتورة الشراء بنجاح [${invoiceNumber}]`,'success');return purchaseInvoice;
-    }, [warehouses,products,stock,accounts,suppliers,currentUser,showToast,settings.activeWarehouseId,settings.activeFinancialYearId,settings.scannerBeepEnabled]);
+    }, [warehouses,products,stock,accounts,suppliers,purchases,currentUser,showToast,settings.activeWarehouseId,settings.activeFinancialYearId,settings.scannerBeepEnabled]);
 
     // Damaged/expired stock: deduct quantity and exact FIFO cost as a loss expense.
     const recordDamagedStock = useCallback(async (productId, warehouseId, baseQuantity, reason='تالف / منتهي الصلاحية') => {
@@ -1227,6 +1276,10 @@ export const AppProvider = ({ children }) => {
             else {
                 updatedStockList.push({ productId: entry.productId, warehouseId, baseQuantity: nextQty });
             }
+            const unitBreakdown = Array.isArray(entry.unitBreakdown) ? entry.unitBreakdown.filter((row) => Number(row?.quantity) >= 0) : [];
+            const breakdownText = unitBreakdown.length
+                ? unitBreakdown.map((row) => `${Number(row.quantity) || 0} ${row.unitName || ''}`).join(' + ')
+                : '';
             movements.push({
                 id: `mov-count-${Date.now()}-${index}`,
                 date: now,
@@ -1241,10 +1294,11 @@ export const AppProvider = ({ children }) => {
                 conversionFactor: 1,
                 baseQuantityChange: diff,
                 newBaseBalance: nextQty,
+                countUnitBreakdown: unitBreakdown,
                 referenceType: 'STOCK_COUNT',
                 userId: currentUser.id,
                 userName: currentUser.name,
-                notes: reason,
+                notes: breakdownText ? `${reason} — الجرد: ${breakdownText}` : reason,
             });
         });
         await bulkPut('stock', updatedStockList);
@@ -1391,6 +1445,10 @@ export const AppProvider = ({ children }) => {
         // Re-verify unit conversions and, for a brand-new product, post opening stock exactly once.
         const verifiedUnits = calculateUnitConversions(product.units, product.baseUnitId);
         const existedBefore = products.some((p) => p.id === product.id);
+        if (isTrialAccount() && !existedBefore && products.filter((row) => !row?.deletedAt).length >= TRIAL_LIMITS.products) {
+            showToast(`وصلت إلى الحد المتاح للأصناف (${TRIAL_LIMITS.products}).`, 'warning');
+            return false;
+        }
         const openingBaseQuantity = existedBefore ? 0 : Math.max(0, Number(product.openingBaseQuantity) || 0);
         const now = new Date().toISOString();
         const baseUnit = verifiedUnits.find((u) => u.id === product.baseUnitId) || verifiedUnits[0];
@@ -1400,6 +1458,12 @@ export const AppProvider = ({ children }) => {
             openingBaseQuantity,
             updatedAt: now,
         };
+        // Production accounts normally keep only Telegram's file_id in Turso.
+        // If an image was selected while offline, keep the local data URL temporarily
+        // until auto-upload finishes and replaces it with Telegram identifiers.
+        if (typeof cleanProduct.imageData === 'string' && cleanProduct.imageData.startsWith('data:image/') && !cleanProduct.imagePendingUpload) {
+            cleanProduct.imageData = '';
+        }
         if (!existedBefore && openingBaseQuantity > 0) {
             const warehouseId = settings.activeWarehouseId || warehouses[0]?.id;
             const baseCost = Math.max(0, Number(baseUnit?.costPrice ?? product.costPrice) || 0);
@@ -1444,6 +1508,7 @@ export const AppProvider = ({ children }) => {
         await putInStore('products', cleanProduct);
         await reloadData();
         showToast(`تم حفظ الصنف: ${cleanProduct.name}`, 'success');
+        return true;
     }, [products, settings.activeWarehouseId, warehouses, currentUser, reloadData, showToast]);
     const softDeleteProduct = useCallback(async (productId) => {
         const prod = products.find((p) => p.id === productId);
@@ -1459,15 +1524,16 @@ export const AppProvider = ({ children }) => {
     }, [products, reloadData, showToast]);
     const restoreProduct = useCallback(async (productId) => {
         const prod = products.find((p) => p.id === productId);
-        if (!prod)
-            return;
-        const updated = {
-            ...prod,
-            deletedAt: null,
-        };
+        if (!prod) return false;
+        if (isTrialAccount() && products.filter((row) => !row?.deletedAt).length >= TRIAL_LIMITS.products) {
+            showToast(`لا يمكن استرجاع الصنف. الحساب التجريبي يسمح بحد أقصى ${TRIAL_LIMITS.products} أصناف نشطة. احذف صنفاً حالياً أولاً.`, 'warning');
+            return false;
+        }
+        const updated = { ...prod, deletedAt: null };
         await putInStore('products', updated);
         await reloadData();
         showToast(`تم استرجاع الصنف «${prod.name}» بنجاح`, 'success');
+        return true;
     }, [products, reloadData, showToast]);
     const permanentDeleteProduct = useCallback(async (productId) => {
         const relatedStock = (stock || []).filter((row) => row?.productId === productId);
@@ -1479,10 +1545,16 @@ export const AppProvider = ({ children }) => {
         showToast('تم حذف الصنف نهائياً من قاعدة البيانات', 'info');
     }, [stock, reloadData, showToast]);
     const saveCategory = useCallback(async (category) => {
+        const existedBefore = categories.some((row) => row.id === category.id);
+        if (isTrialAccount() && !existedBefore && categories.filter((row) => !row?.deletedAt).length >= TRIAL_LIMITS.categories) {
+            showToast(`وصلت إلى الحد المتاح للتصنيفات (${TRIAL_LIMITS.categories}).`, 'warning');
+            return false;
+        }
         await putInStore('categories', category);
         await reloadData();
         showToast('تم حفظ التصنيف', 'success');
-    }, [reloadData, showToast]);
+        return true;
+    }, [categories, reloadData, showToast]);
     const deleteCategory = useCallback(async (categoryId) => {
         await deleteFromStore('categories', categoryId);
         await reloadData();
@@ -1490,6 +1562,10 @@ export const AppProvider = ({ children }) => {
     }, [reloadData, showToast]);
     const saveCustomer = useCallback(async (customer) => {
         const existing = customers.find((c) => c.id === customer.id);
+        if (isTrialAccount() && !existing && customers.filter((row) => !row?.deletedAt).length >= TRIAL_LIMITS.customers) {
+            showToast(`وصلت إلى الحد المتاح للعملاء (${TRIAL_LIMITS.customers}).`, 'warning');
+            return false;
+        }
         const openingBalanceAmount = Math.max(0, Number(customer.openingBalanceAmount) || 0);
         const openingBalanceSide = customer.openingBalanceSide === 'theirs' ? 'theirs' : 'ours';
         const oldOpeningAmount = Math.max(0, Number(existing?.openingBalanceAmount) || 0);
@@ -1522,6 +1598,7 @@ export const AppProvider = ({ children }) => {
         }
         await reloadData();
         showToast(`تم حفظ العميل: ${customer.name}`, 'success');
+        return true;
     }, [customers, reloadData, showToast]);
     const deleteCustomer = useCallback(async (customerId) => {
         const cust = customers.find((c) => c.id === customerId);
@@ -1534,11 +1611,15 @@ export const AppProvider = ({ children }) => {
     const softDeleteCustomer = deleteCustomer;
     const restoreCustomer = useCallback(async (customerId) => {
         const cust = customers.find((c) => c.id === customerId);
-        if (!cust)
-            return;
+        if (!cust) return false;
+        if (isTrialAccount() && customers.filter((row) => !row?.deletedAt).length >= TRIAL_LIMITS.customers) {
+            showToast(`لا يمكن استرجاع العميل. الحساب التجريبي يسمح بحد أقصى ${TRIAL_LIMITS.customers} عميلاً نشطاً. احذف عميلاً حالياً أولاً.`, 'warning');
+            return false;
+        }
         await putInStore('customers', { ...cust, deletedAt: null });
         await reloadData();
         showToast(`تم استرجاع العميل «${cust.name}»`, 'success');
+        return true;
     }, [customers, reloadData, showToast]);
     const permanentDeleteCustomer = useCallback(async (customerId) => {
         await deleteFromStore('customers', customerId);
@@ -1781,6 +1862,11 @@ export const AppProvider = ({ children }) => {
         showToast('تم استرجاع المصروف وإعادة تطبيق أثره المالي', 'success');
     }, [expenses, accounts, reloadData, showToast]);
     const saveWarehouse = useCallback(async (warehouse) => {
+        const existedBefore = warehouses.some((row) => row.id === warehouse.id);
+        if (isTrialAccount() && !existedBefore && warehouses.length >= TRIAL_LIMITS.warehouses) {
+            showToast('لا يمكن إضافة مخزن أو فرع آخر إلى هذا الحساب.', 'warning');
+            return false;
+        }
         if (warehouse.isDefault) {
             for (const existing of warehouses) {
                 if (existing.id !== warehouse.id && existing.isDefault) {
@@ -1791,6 +1877,7 @@ export const AppProvider = ({ children }) => {
         await putInStore('warehouses', warehouse);
         await reloadData();
         showToast('تم حفظ المخزن/الفرع بنجاح', 'success');
+        return true;
     }, [warehouses, reloadData, showToast]);
     const deleteWarehouse = useCallback(async (warehouseId) => {
         const warehouse = warehouses.find((w) => w.id === warehouseId);
@@ -1977,12 +2064,18 @@ export const AppProvider = ({ children }) => {
     }, [suppliers, createVoucher, showToast]);
     // Employees CRUD
     const saveEmployee = useCallback(async (employee) => {
+        const existedBefore = employees.some((row) => row.id === employee?.id);
+        if (isTrialAccount() && !existedBefore) {
+            showToast('إضافة موظفين جدد غير متاحة لهذا الحساب.', 'warning');
+            return false;
+        }
         const roleCode = String(employee?.role || 'custom').trim().toLowerCase();
         const nextEmployee = { ...employee, permissions: normalizeEmployeePermissions(employee?.permissions || {}, roleCode), authVersion: employee.authVersion || `AUTH-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, updatedAt: new Date().toISOString() };
         await putInStore('employees', nextEmployee);
         await reloadData();
         showToast(`تم حفظ بيانات الموظف [${nextEmployee.name}] بنجاح`, 'success');
-    }, [reloadData, showToast]);
+        return true;
+    }, [employees, reloadData, showToast]);
     const deleteEmployee = useCallback(async (id) => {
         await deleteFromStore('employees', id);
         await reloadData();

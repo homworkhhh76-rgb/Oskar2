@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.57-telegram-chatid';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.57-telegram-chatid';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.57-telegram-chatid';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl } from './brand__logo.js?v=7.9.4.57-telegram-chatid';
-import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.57-telegram-chatid';
-import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.57-telegram-chatid';
-import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.57-telegram-chatid';
+import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.76-company-brand-only';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.76-company-brand-only';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl } from './brand__logo.js?v=7.9.4.76-company-brand-only';
+import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.76-company-brand-only';
+import { downloadProfessionalPurchaseInvoicePDF, downloadProfessionalPurchaseInvoiceImage, downloadProfessionalTableExcel } from './utils__professionalExport.js?v=7.9.4.76-company-brand-only';
+import { PurchaseAIScanModal } from './components__purchases__PurchaseAIScanModal.js?v=7.9.4.76-company-brand-only';
+import { isTrialAccount } from './trial__config.js?v=7.9.4.76-company-brand-only';
 import { Plus, Trash2, Building2, Eye, X, Pencil, Image as ImageIcon, FileDown, FileSpreadsheet, Printer, AlertTriangle, ReceiptText, Sparkles, ScanLine } from 'lucide-react';
 
 const h = React.createElement;
@@ -239,7 +240,7 @@ export const PurchasesView = () => {
   const form = h('div', { className: 'rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-sm space-y-4' },
     h('div', { className:'rounded-2xl border border-emerald-200 bg-emerald-50 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3' },
       h('div', { className:'flex items-center gap-2' }, h('div',{className:'w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center'},h(ScanLine,{className:'w-5 h-5'})), h('div',null,h('div',{className:'text-xs font-black text-emerald-900'},'تعبئة ذكية من صورة الفاتورة'),h('div',{className:'text-[10px] text-emerald-700'},'ارفع صورة الفاتورة؛ يقرأ المورد والمنتج والوحدة والكمية والسعر بدقة'))),
-      h('button',{type:'button',onClick:()=>setShowAIScan(true),className:'px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-black flex items-center justify-center gap-2 shadow-sm'},h(Sparkles,{className:'w-4 h-4'}),'قراءة صورة فاتورة')
+      !isTrialAccount() ? h('button',{type:'button',onClick:()=>setShowAIScan(true),className:'px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-black flex items-center justify-center gap-2 shadow-sm'},h(Sparkles,{className:'w-4 h-4'}),'قراءة صورة فاتورة') : null
     ),
     h('div', { className: 'grid grid-cols-1 sm:grid-cols-3 gap-3' },
       h(SearchableDropdown, { id: 'purchase-supplier', label: 'المورد:', options: supplierOpts, selectedId: supplierId, onSelect: setSupplierId, onQuickAdd: () => setShowQuickSupp(true), quickAddLabel: '+ مورد جديد', icon: h(Building2, { className: 'w-4 h-4' }) }),
@@ -399,7 +400,7 @@ export const PurchasesView = () => {
     ),
     mode === 'new' ? form : list,
     purchaseStatementModal,
-    h(PurchaseAIScanModal,{open:showAIScan,onClose:()=>setShowAIScan(false),onApply:applyAIScan}),
+    !isTrialAccount() ? h(PurchaseAIScanModal,{open:showAIScan,onClose:()=>setShowAIScan(false),onApply:applyAIScan}) : null,
     viewing ? h('div', { className: 'fixed inset-x-0 oscar-bounded-modal p-2 sm:p-5 flex items-stretch sm:items-center justify-center overflow-hidden', style:{zIndex:2147482000,background:'rgba(15,23,42,.62)',backdropFilter:'blur(6px)',WebkitBackdropFilter:'blur(6px)'} },
       h('div', { className: 'w-full max-w-3xl h-full max-h-full sm:h-auto bg-slate-100 dark:bg-slate-950 rounded-2xl shadow-2xl overflow-hidden flex flex-col' },
         h('div',{className:'no-print shrink-0 flex items-center justify-between gap-2 p-3 bg-white dark:bg-slate-900 border-b dark:border-slate-800'},

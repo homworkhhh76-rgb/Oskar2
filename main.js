@@ -1,7 +1,7 @@
 import { jsx as _jsx } from "react/jsx-runtime";
-import React, { StrictMode } from 'react';
+import React from 'react';
 import { createRoot } from 'react-dom/client';
-import App from './App.js?v=7.9.4.57-telegram-chatid';
+import App from './App.js?v=7.9.4.76-company-brand-only';
 
 class OscarErrorBoundary extends React.Component {
   constructor(props) {
@@ -39,8 +39,5 @@ class OscarErrorBoundary extends React.Component {
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('ROOT_NOT_FOUND');
 
-createRoot(rootElement).render(
-  _jsx(StrictMode, {
-    children: _jsx(OscarErrorBoundary, { children: _jsx(App, {}) })
-  })
-);
+// Production kiosk/POS render: avoid StrictMode's development-only double effect cycle.
+createRoot(rootElement).render(_jsx(OscarErrorBoundary, { children: _jsx(App, {}) }));

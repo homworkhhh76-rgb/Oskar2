@@ -1,11 +1,12 @@
 import React from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.57-telegram-chatid';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.57-telegram-chatid';
-import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.57-telegram-chatid';
+import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.76-company-brand-only';
+import { BrandLogoImage } from './components__common__BrandLogoImage.js?v=7.9.4.76-company-brand-only';
+import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.76-company-brand-only';
 import {
   LayoutDashboard, ShoppingCart, ReceiptText, Truck, Package, Boxes, Warehouse,
   Users, Building2, Wallet, Receipt, FileSpreadsheet, UserCheck, Barcode, BarChart3,
-  Trash2, Settings, LayoutGrid, UtensilsCrossed, ChefHat, Scale, Sparkles, CalendarRange
+  Trash2, Settings, LayoutGrid, UtensilsCrossed, ChefHat, Scale, Sparkles, CalendarRange, MessageSquareText
 } from 'lucide-react';
 
 const h = React.createElement;
@@ -13,11 +14,25 @@ const h = React.createElement;
 export const Sidebar = () => {
   const {
     activeTab, setActiveTab, cart, vouchers, employees, mobileSidebarOpen,
-    setMobileSidebarOpen, settings, currentUser, activeEmployee
+    setMobileSidebarOpen, settings, currentUser, activeEmployee, isLoaded
   } = useApp();
 
+  const runtime = window.OscarActivation?.readRuntime?.() || null;
+  const runtimeBrandName = String(runtime?.companyName || runtime?.trialProfile?.companyName || '').trim();
+  const runtimeBrandLogo = String(runtime?.trialProfile?.logo || '').trim();
+  const legacyBrandNames = new Set(['أوسكار المحاسبي','الميزان ماركت','AlMezan Market POS']);
+  const configuredName = String(settings?.storeName || '').trim();
+  const brandName = runtimeBrandName && (!configuredName || legacyBrandNames.has(configuredName))
+    ? runtimeBrandName
+    : (configuredName || runtimeBrandName || '');
+  const configuredLogoFileId = String(settings?.logoTelegramFileId || '').trim();
+  const configuredLogoSource = String(settings?.logoSourceUrl || settings?.logoUrl || '').trim();
+  const hasCompanyLogo = !!configuredLogoFileId || (!!configuredLogoSource && !/(^|\/)brand-logo\.png(?:[?#].*)?$/i.test(configuredLogoSource));
+  const brandSettings = runtimeBrandLogo && !hasCompanyLogo
+    ? { ...settings, logoUrl:runtimeBrandLogo, logoSourceUrl:'', logoTelegramFileId:'' }
+    : settings;
   const accessArgs = {
-    runtime: window.OscarActivation?.readRuntime?.() || null,
+    runtime,
     currentUser,
     activeEmployee,
     restaurantEnabled: !!settings.isRestaurantModeEnabled,
@@ -41,6 +56,7 @@ export const Sidebar = () => {
     { id:'barcodes', label:'طباعة الباركود', icon:Barcode },
     { id:'reports', label:'التقارير والأرباح', icon:BarChart3 },
     { id:'financial_years', label:'السنة المالية والأرشيف', icon:CalendarRange },
+    { id:'message_templates', label:'قوالب الرسائل', icon:MessageSquareText },
     { id:'trash', label:'سلة المحذوفات', icon:Trash2 },
     { id:'settings', label:'إعدادات النظام', icon:Settings },
   ];
@@ -68,15 +84,16 @@ export const Sidebar = () => {
 
   const brand = (compact=false) => h('div', { className:`${compact?'p-3 pl-12':'p-3.5'} border-b border-slate-100 bg-white shrink-0` },
     h('button', { type:'button', onClick:()=>go(firstAllowedTab(accessArgs) || 'no_access'), className:'w-full flex items-center gap-2.5 text-right min-w-0' },
-      h('img', {
-        src:getBrandLogoDisplayUrl(settings),
-        onError:e=>{e.currentTarget.onerror=null;e.currentTarget.src=DEFAULT_LOGO_DATA_URL;},
-        className:'w-10 h-10 object-contain rounded-xl border border-emerald-100 bg-white shrink-0',
-        alt:settings.storeName || 'أوسكار المحاسبي'
-      }),
+      brandSettings
+        ? h(BrandLogoImage, {
+            settings:brandSettings,
+            className:'w-10 h-10 object-cover rounded-xl border border-emerald-100 bg-white shrink-0',
+            alt:brandName
+          })
+        : h('span',{className:'w-10 h-10 rounded-xl border border-slate-200 bg-slate-50 text-slate-300 shrink-0 grid place-items-center'},h(Building2,{className:'w-5 h-5'})),
       h('div', { className:'min-w-0 flex-1' },
-        h('div', { className:'text-[13px] font-black text-slate-900 truncate' }, settings.storeName || 'أوسكار المحاسبي'),
-        h('div', { className:'text-[10px] font-bold text-emerald-600 truncate' }, settings.subtitle || 'إدارة ذكية')
+        h('div', { className:'text-[13px] font-black text-slate-900 truncate min-h-[19px]' }, brandName || ''),
+        h('div', { className:'text-[10px] font-bold text-emerald-600 truncate min-h-[15px]' }, isLoaded ? (settings.subtitle || 'إدارة ذكية') : '')
       )
     )
   );

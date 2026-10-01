@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.57-telegram-chatid';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.57-telegram-chatid';
+import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.76-company-brand-only';
 import { ArrowLeftRight, Plus, Trash2 } from 'lucide-react';
-import { formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.57-telegram-chatid';
+import { formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.76-company-brand-only';
 
 const h = React.createElement;
 const makeRow = (products = []) => {

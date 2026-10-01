@@ -7,15 +7,15 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="أوسكار المحاسبي" />
-  <title>أوسكار المحاسبي</title>
+  <meta name="apple-mobile-web-app-title" content="نظام المحاسبة" />
+  <title>نظام المحاسبة</title>
   <link rel="icon" type="image/png" href="./app-icon.png" />
   <link rel="apple-touch-icon" href="./icon-192.png" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@200;300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./app.css?v=7.9.4.57-telegram-chatid" />
+  <link rel="stylesheet" href="./app.css?v=7.9.4.76-company-brand-only" />
   <script type="importmap">
   {
     "imports": {
@@ -29,22 +29,21 @@
     }
   }
   </script>
-  <script src="./oscar-activation-runtime.js?v=7.9.4.57-telegram-chatid"></script>
-  <script src="./oscar-cloud-sync.js?v=7.9.4.57-telegram-chatid"></script>
+  <script src="./oscar-activation-runtime.js?v=7.9.4.76-company-brand-only"></script>
+  <script>
+    try {
+      const rt = window.OscarActivation?.readRuntime?.();
+      const companyTitle = String(rt?.companyName || rt?.trialProfile?.companyName || '').trim();
+      if (companyTitle) document.title = companyTitle;
+    } catch (_) {}
+  </script>
+  <script src="./oscar-cloud-sync.js?v=7.9.4.76-company-brand-only"></script>
 </head>
 <body>
   <script>document.documentElement.classList.remove('dark');</script>
-  <div id="root">
-    <div dir="rtl" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f8fafc;font-family:Cairo,sans-serif;padding:24px">
-      <div style="text-align:center;color:#475569">
-        <img src="./app-icon.png" alt="" style="width:64px;height:64px;border-radius:18px;object-fit:cover;margin-bottom:12px" />
-        <div style="font-weight:900;color:#0f172a">أوسكار المحاسبي</div>
-        <div style="font-size:12px;margin-top:5px">جاري تشغيل النظام...</div>
-      </div>
-    </div>
-  </div>
+  <div id="root"></div>
   <script type="module">
-    const OSCAR_BUILD = '7.9.4.57-telegram-chatid';
+    const OSCAR_BUILD = '7.9.4.76-company-brand-only';
     const isLocal = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
 
     const clearCodeCaches = async () => {
@@ -85,7 +84,7 @@
       } catch (_) {}
 
       try {
-        await import('./main.js?v=7.9.4.57-telegram-chatid');
+        await import('./main.js?v=7.9.4.76-company-brand-only');
         sessionStorage.removeItem('oscar-rootfix-retry');
       } catch (error) {
         try { console.error('OSCAR_BOOT_RECOVERY', error); } catch (_) {}
@@ -106,7 +105,7 @@
   </script>
   <script>
     if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !['localhost','127.0.0.1','::1'].includes(location.hostname)) {
-      addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=7.9.4.57-telegram-chatid', { updateViaCache: 'none' }).then((registration) => registration.update()).catch(() => {}));
+      addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=7.9.4.76-company-brand-only', { updateViaCache: 'none' }).then((registration) => registration.update()).catch(() => {}));
     }
   </script>
 </body>

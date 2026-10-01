@@ -1,4 +1,4 @@
-import { calculateUnitConversions } from './utils__unitTree.js?v=7.9.4.57-telegram-chatid';
+import { calculateUnitConversions } from './utils__unitTree.js?v=7.9.4.76-company-brand-only';
 const DB_BASE_NAME = 'Oscar_Accounting_POS_DB';
 const DB_VERSION = 6;
 export const getTenantId = () => String(window.OscarActivation?.readRuntime?.()?.companyId || 'local').trim() || 'local';
@@ -133,28 +133,109 @@ function captureCloud(storeName, value, opts={}) {
     try { if (!window.OscarCloudSync?.suppress) return window.OscarCloudSync?.captureStoreChange?.(storeName, value, opts) || Promise.resolve(false); } catch (e) { console.warn('Cloud capture warning', e); }
     return Promise.resolve(false);
 }
-// Local saving must never be blocked by a slow/unavailable cloud queue.
-// Capture is retried briefly in the background so writes made during app bootstrap still reach sync_queue.
-function scheduleCloudCapture(storeName, value, opts={}) {
-    if (typeof window === 'undefined') return;
-    Promise.resolve().then(async () => {
-        const waits = [0, 180, 700, 1800];
+// Local-first cloud capture scheduler. IndexedDB commits always finish before any
+// queue/network work starts. Changes are coalesced and flushed during an idle slice
+// so saving invoices stays instant even on 120Hz phones.
+const cloudCaptureBuffer = new Map();
+let cloudCaptureTimer = null;
+function cloudCaptureKey(storeName, value, opts={}) {
+    let key = opts?.key;
+    if (key === undefined || key === null) {
+        if (storeName === 'stock') key = [value?.productId || '', value?.warehouseId || ''];
+        else if (storeName === 'settings') key = value?.key || 'store_config';
+        else key = value?.id || '';
+    }
+    return `${storeName}::${JSON.stringify(key)}`;
+}
+async function flushCloudCaptureBuffer() {
+    cloudCaptureTimer = null;
+    const entries = [...cloudCaptureBuffer.values()];
+    cloudCaptureBuffer.clear();
+    for (const entry of entries) {
+        const waits = [0, 220, 850, 2200];
         for (let i = 0; i < waits.length; i += 1) {
             if (waits[i]) await new Promise(resolve => setTimeout(resolve, waits[i]));
             try {
-                const captured = await captureCloud(storeName, value, opts);
-                if (captured !== false) return true;
+                const captured = await captureCloud(entry.storeName, entry.value, entry.opts);
+                if (captured !== false) break;
             } catch (e) {
                 if (i === waits.length - 1) console.warn('Cloud capture retry warning', e);
             }
         }
-        try { window.OscarCloudSync?.requestSync?.(120); } catch {}
-        return false;
-    }).catch(e => console.warn('Cloud capture schedule warning', e));
+    }
+    try { window.OscarCloudSync?.requestSync?.(180); } catch {}
+}
+function scheduleCloudCapture(storeName, value, opts={}) {
+    if (typeof window === 'undefined') return;
+    let cloudValue = value;
+    // Product image bytes selected while offline stay only in local IndexedDB.
+    // Turso receives metadata now, then the Telegram file_id on the later automatic update.
+    if (storeName === 'products' && cloudValue && typeof cloudValue === 'object' && typeof cloudValue.imageData === 'string' && cloudValue.imageData.startsWith('data:image/')) {
+        cloudValue = { ...cloudValue, imageData: '' };
+    }
+    cloudCaptureBuffer.set(cloudCaptureKey(storeName, cloudValue, opts), { storeName, value: cloudValue, opts });
+    if (cloudCaptureTimer) return;
+    const run = () => {
+        cloudCaptureTimer = setTimeout(() => {
+            const job = () => flushCloudCaptureBuffer().catch(e => console.warn('Cloud capture schedule warning', e));
+            if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(job, { timeout: 450 });
+            else job();
+        }, 24);
+    };
+    run();
 }
 function broadcastStoreUpdated(storeName) {
     try { if (syncChannel) syncChannel.postMessage({ type: 'STORE_UPDATED', storeName, tenantId: getTenantId() }); } catch {}
 }
+// Commit many local records atomically in ONE IndexedDB transaction.
+// The promise resolves as soon as the local transaction is durable; cloud capture is
+// deliberately scheduled afterwards so the UI never waits for network/sync work.
+export async function commitLocalBatch(operations = [], notifySync = true) {
+    const ops = (Array.isArray(operations) ? operations : []).filter(op => op?.storeName && (op.type === 'put' || op.type === 'delete'));
+    if (!ops.length) return { committed: 0, stores: [] };
+    const db = await openDB();
+    const stores = [...new Set(ops.map(op => op.storeName))];
+    const stamp = new Date().toISOString();
+    const prepared = ops.map(op => {
+        if (op.type !== 'put') return op;
+        const value = (op.storeName === 'stock' && notifySync && op.value && typeof op.value === 'object')
+            ? { ...op.value, updatedAt: stamp }
+            : op.value;
+        return { ...op, value };
+    });
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(stores, 'readwrite');
+        for (const op of prepared) {
+            const store = tx.objectStore(op.storeName);
+            if (op.type === 'delete') store.delete(op.key);
+            else store.put(op.value);
+        }
+        tx.oncomplete = () => {
+            // Resolve local save FIRST. Everything below runs later in the event loop.
+            resolve({ committed: prepared.length, stores });
+            if (!notifySync) return;
+            setTimeout(() => {
+                const touched = new Set();
+                for (const op of prepared) {
+                    touched.add(op.storeName);
+                    if (op.type === 'delete') scheduleCloudCapture(op.storeName, null, { deleted:true, key:op.key });
+                    else scheduleCloudCapture(op.storeName, op.value);
+                    try {
+                        window.dispatchEvent(new CustomEvent('oscar:db-mutation', { detail: {
+                            action: op.actionHint || (op.type === 'delete' ? 'delete' : 'update'),
+                            storeName: op.storeName, value: op.type === 'delete' ? (op.before || null) : op.value,
+                            before: op.before || null, key: op.key, localBatch:true, at: new Date().toISOString()
+                        } }));
+                    } catch {}
+                }
+                touched.forEach(broadcastStoreUpdated);
+            }, 0);
+        };
+        tx.onerror = () => reject(tx.error || new Error('تعذر الحفظ المحلي'));
+        tx.onabort = () => reject(tx.error || new Error('تعذر إكمال الحفظ المحلي'));
+    });
+}
+
 // Generic CRUD operations
 function recordKey(storeName, value) {
     if (storeName === 'stock') return [value?.productId, value?.warehouseId];
@@ -192,34 +273,40 @@ export async function getFromStore(storeName, key) {
 }
 export async function putInStore(storeName, value, notifySync = true) {
     const db = await openDB();
-    let changed = true;
-    let beforeValue = null;
-    if (notifySync) {
-        try {
-            beforeValue = await getFromStore(storeName, recordKey(storeName, value));
-            changed = !sameRecord(beforeValue, value);
-        } catch { changed = true; beforeValue = null; }
-    }
-    if (!changed) return;
-    // Stock rows carry their own local modification time. This lets cloud sync reject
-    // an older balance instead of letting a stale remote zero overwrite a newer local balance.
-    const storedValue = (storeName === 'stock' && notifySync && value && typeof value === 'object')
-        ? { ...value, updatedAt: new Date().toISOString() }
-        : value;
+    const key = recordKey(storeName, value);
+    const stockStamp = new Date().toISOString();
+    let beforeValue = null, changed = true, action = 'add';
+    let storedValue = value;
     return new Promise((resolve, reject) => {
         const tx = db.transaction(storeName, 'readwrite');
-        tx.objectStore(storeName).put(storedValue);
+        const store = tx.objectStore(storeName);
+        const write = () => {
+            storedValue = (storeName === 'stock' && notifySync && value && typeof value === 'object')
+                ? { ...value, updatedAt: stockStamp }
+                : value;
+            store.put(storedValue);
+        };
+        if (notifySync) {
+            const req = store.get(key);
+            req.onsuccess = () => {
+                beforeValue = req.result ?? null;
+                changed = !sameRecord(beforeValue, value);
+                action = beforeValue ? 'update' : 'add';
+                if (changed) write();
+            };
+            req.onerror = (event) => { try { event.preventDefault(); event.stopPropagation(); } catch {} beforeValue = null; changed = true; action = 'add'; write(); };
+        } else write();
         tx.oncomplete = () => {
-            if (notifySync) {
+            resolve();
+            if (notifySync && changed) setTimeout(() => {
                 scheduleCloudCapture(storeName, storedValue);
                 broadcastStoreUpdated(storeName);
                 try {
                     window.dispatchEvent(new CustomEvent('oscar:db-mutation', { detail: {
-                        action: beforeValue ? 'update' : 'add', storeName, value: storedValue, before: beforeValue, at: new Date().toISOString()
+                        action, storeName, value: storedValue, before: beforeValue, at: new Date().toISOString()
                     } }));
                 } catch {}
-            }
-            resolve();
+            }, 0);
         };
         tx.onerror = () => reject(tx.error);
         tx.onabort = () => reject(tx.error || new Error(`تعذر حفظ ${storeName}`));
@@ -228,12 +315,17 @@ export async function putInStore(storeName, value, notifySync = true) {
 export async function deleteFromStore(storeName, key, notifySync = true) {
     const db = await openDB();
     let beforeValue = null;
-    if (notifySync) { try { beforeValue = await getFromStore(storeName, key); } catch {} }
     return new Promise((resolve, reject) => {
         const tx = db.transaction(storeName, 'readwrite');
-        tx.objectStore(storeName).delete(key);
+        const store = tx.objectStore(storeName);
+        if (notifySync) {
+            const req = store.get(key);
+            req.onsuccess = () => { beforeValue = req.result ?? null; store.delete(key); };
+            req.onerror = (event) => { try { event.preventDefault(); event.stopPropagation(); } catch {} store.delete(key); };
+        } else store.delete(key);
         tx.oncomplete = () => {
-            if (notifySync) {
+            resolve();
+            if (notifySync) setTimeout(() => {
                 scheduleCloudCapture(storeName, null, { deleted: true, key });
                 broadcastStoreUpdated(storeName);
                 try {
@@ -241,8 +333,7 @@ export async function deleteFromStore(storeName, key, notifySync = true) {
                         action: 'delete', storeName, value: beforeValue, before: beforeValue, key, at: new Date().toISOString()
                     } }));
                 } catch {}
-            }
-            resolve();
+            }, 0);
         };
         tx.onerror = () => reject(tx.error);
         tx.onabort = () => reject(tx.error || new Error(`تعذر حذف ${storeName}`));
@@ -255,11 +346,11 @@ export async function clearStore(storeName, notifySync = true) {
         const tx = db.transaction(storeName, 'readwrite');
         tx.objectStore(storeName).clear();
         tx.oncomplete = () => {
-            if (notifySync) {
+            resolve();
+            if (notifySync) setTimeout(() => {
                 existing.forEach(v => scheduleCloudCapture(storeName, null, { deleted:true, key: storeName === 'stock' ? [v.productId, v.warehouseId] : (storeName === 'settings' ? v.key : v.id) }));
                 broadcastStoreUpdated(storeName);
-            }
-            resolve();
+            }, 0);
         };
         tx.onerror = () => reject(tx.error);
         tx.onabort = () => reject(tx.error || new Error(`تعذر مسح ${storeName}`));
@@ -267,33 +358,34 @@ export async function clearStore(storeName, notifySync = true) {
 }
 // Bulk put items
 export async function bulkPut(storeName, items, notifySync = true) {
+    const rows = Array.isArray(items) ? items.filter(Boolean) : [];
+    if (!rows.length) return;
     const db = await openDB();
-    let changedItems = Array.isArray(items) ? items : [];
-    if (notifySync && changedItems.length) {
-        try {
-            const beforeRows = await getAllFromStore(storeName);
-            const beforeMap = new Map(beforeRows.map(row => [JSON.stringify(recordKey(storeName, row)), row]));
-            changedItems = changedItems.filter(item => !sameRecord(beforeMap.get(JSON.stringify(recordKey(storeName, item))), item));
-        } catch { changedItems = Array.isArray(items) ? items : []; }
-    }
-    if (!changedItems.length) return;
-    if (storeName === 'stock' && notifySync) {
-        const stamp = new Date().toISOString();
-        changedItems = changedItems.map(item => (item && typeof item === 'object') ? { ...item, updatedAt: stamp } : item);
-    }
+    const changedItems = [];
+    const stamp = new Date().toISOString();
     return new Promise((resolve, reject) => {
         const tx = db.transaction(storeName, 'readwrite');
         const store = tx.objectStore(storeName);
-        changedItems.forEach((item) => store.put(item));
+        const putChanged = (item) => {
+            const stored = (storeName === 'stock' && notifySync && item && typeof item === 'object') ? { ...item, updatedAt: stamp } : item;
+            changedItems.push(stored);
+            store.put(stored);
+        };
+        if (!notifySync) rows.forEach(item => store.put(item));
+        else rows.forEach(item => {
+            const req = store.get(recordKey(storeName, item));
+            req.onsuccess = () => { if (!sameRecord(req.result, item)) putChanged(item); };
+            req.onerror = (event) => { try { event.preventDefault(); event.stopPropagation(); } catch {} putChanged(item); };
+        });
         tx.oncomplete = () => {
-            if (notifySync) {
+            resolve();
+            if (notifySync && changedItems.length) setTimeout(() => {
                 changedItems.forEach(item => scheduleCloudCapture(storeName, item));
                 broadcastStoreUpdated(storeName);
                 try {
                     if (changedItems.length <= 25) changedItems.forEach(item => window.dispatchEvent(new CustomEvent('oscar:db-mutation', { detail: { action:'update', storeName, value:item, before:null, bulk:true, at:new Date().toISOString() } })));
                 } catch {}
-            }
-            resolve();
+            }, 0);
         };
         tx.onerror = () => reject(tx.error);
         tx.onabort = () => reject(tx.error || new Error(`تعذر حفظ مجموعة ${storeName}`));
@@ -1025,16 +1117,46 @@ export async function ensurePrimaryShowroomWarehouse() {
 // Never inject demo products/customers/suppliers/stock into a real activation key.
 export async function seedDatabaseDefaults() {
     const settings = await getFromStore('settings', 'store_config');
-    if (settings) return false;
     const rt = window.OscarActivation?.readRuntime?.() || {};
     const companyId = String(rt.companyId || '').trim();
     const companyName = String(rt.companyName || '').trim();
+    const trialProfile = rt.plan === 'trial' && rt.trialProfile && typeof rt.trialProfile === 'object' ? rt.trialProfile : null;
+    if (settings) {
+        if (trialProfile) {
+            const profileLogo = String(trialProfile.logo || '').trim();
+            const next = {
+                ...settings,
+                ...(!String(settings.storeName || '').trim() && trialProfile.companyName ? { storeName: String(trialProfile.companyName) } : {}),
+                ...(!String(settings.address || '').trim() && trialProfile.address ? { address: String(trialProfile.address) } : {}),
+                ...(!String(settings.phone || '').trim() && trialProfile.phone ? { phone: String(trialProfile.phone) } : {}),
+                ...(!String(settings.currency || '').trim() && trialProfile.currency ? { currency: String(trialProfile.currency) } : {}),
+                ...(!String(settings.currencySymbol || '').trim() && trialProfile.currencySymbol ? { currencySymbol: String(trialProfile.currencySymbol) } : {}),
+                ...(!String(settings.logoUrl || '').trim() && !String(settings.logoSourceUrl || '').trim() && profileLogo ? { logoUrl: profileLogo, logoSourceUrl: '' } : {}),
+            };
+            if (JSON.stringify(next) !== JSON.stringify(settings)) {
+                await putInStore('settings', next);
+                return true;
+            }
+        }
+        return false;
+    }
     await putInStore('settings', {
         key: 'store_config',
         ...DEFAULT_SETTINGS,
         ...(companyName ? { storeName: companyName } : {}),
+        ...(trialProfile ? {
+            storeName: String(trialProfile.companyName || companyName || DEFAULT_SETTINGS.storeName),
+            address: String(trialProfile.address || ''),
+            phone: String(trialProfile.phone || ''),
+            currency: String(trialProfile.currency || DEFAULT_SETTINGS.currency),
+            currencySymbol: String(trialProfile.currencySymbol || DEFAULT_SETTINGS.currencySymbol),
+            logoUrl: String(trialProfile.logo || ''),
+            logoSourceUrl: '',
+            activeWarehouseId: 'wh-main',
+            activeBranchName: 'الفرع الرئيسي',
+        } : {}),
         tenantId: companyId,
-        seedMode: 'production-empty',
+        seedMode: trialProfile ? 'trial-empty' : 'production-empty',
     });
     await bulkPut('warehouses', [{ ...DEFAULT_WAREHOUSES[0], isDefault: true }]);
     await bulkPut('accounts', [{ ...DEFAULT_ACCOUNTS[0], balance: 0, isDefault: true }]);

@@ -1,23 +1,26 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.57-telegram-chatid';
-import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.57-telegram-chatid';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.57-telegram-chatid';
+import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
+import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.76-company-brand-only';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.76-company-brand-only';
+import { BrandLogoImage } from './components__common__BrandLogoImage.js?v=7.9.4.76-company-brand-only';
+import { uploadProductImageToTelegram } from './services__productImages.js?v=7.9.4.76-company-brand-only';
 import { Wifi, WifiOff, RefreshCw, Maximize2, Minimize2, Clock, Store, Camera, Menu, LogOut, Building2, Bell } from 'lucide-react';
-import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.57-telegram-chatid';
-import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.57-telegram-chatid';
-import { saveTelegramConfig, uploadTelegramSnapshot } from './services__telegramReports.js?v=7.9.4.57-telegram-chatid';
+import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.76-company-brand-only';
+import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.76-company-brand-only';
+import { saveTelegramConfig, uploadTelegramSnapshot } from './services__telegramReports.js?v=7.9.4.76-company-brand-only';
 
 const h = React.createElement;
 
 export const Header = () => {
   const app = useApp();
   const {
-    settings, saveSettings, isOnline, isSyncing, syncQueue, setShowSyncModal,
+    settings, saveSettings, isLoaded, isOnline, isSyncing, syncQueue, setShowSyncModal,
     activeShift, setActiveTab, mobileSidebarOpen, setMobileSidebarOpen, showToast,
     customers, suppliers, products, categories, invoices, purchases, expenses, auditLogs, stock, stockMovements, warehouses, accounts, transfers, vouchers, shifts, employees, heldInvoices, getProductStock, currentUser, activeEmployee,
   } = app;
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
   const telegramRevision = useMemo(() => {
     const stockSig=(stock||[]).reduce((s,x)=>s+Number(x?.baseQuantity ?? x?.quantity ?? 0),0).toFixed(4);
     const customerSig=(customers||[]).reduce((s,x)=>s+Number(x?.balance||0),0).toFixed(2);
@@ -40,7 +43,20 @@ export const Header = () => {
     return()=>{cancelled=true;window.clearTimeout(timer);};
   }, [telegramRevision, settings.telegramAutoReportEnabled, settings.telegramDailyReportEnabled, settings.telegramDailyBackupEnabled, settings.telegramRecipients]);
   const notificationCount = useMemo(() => buildSystemNotifications({ customers, suppliers, products, invoices, stock, settings, getProductStock }).length, [customers, suppliers, products, invoices, stock, settings.activeWarehouseId, settings.currencySymbol]);
-  const runtime = window.OscarActivation?.readRuntime?.();
+  const runtime = window.OscarActivation?.readRuntime?.() || null;
+  const runtimeBrandName = String(runtime?.companyName || runtime?.trialProfile?.companyName || '').trim();
+  const runtimeBrandLogo = String(runtime?.trialProfile?.logo || '').trim();
+  const legacyBrandNames = new Set(['أوسكار المحاسبي','الميزان ماركت','AlMezan Market POS']);
+  const configuredName = String(settings?.storeName || '').trim();
+  const brandName = runtimeBrandName && (!configuredName || legacyBrandNames.has(configuredName))
+    ? runtimeBrandName
+    : (configuredName || runtimeBrandName || '');
+  const configuredLogoFileId = String(settings?.logoTelegramFileId || '').trim();
+  const configuredLogoSource = String(settings?.logoSourceUrl || settings?.logoUrl || '').trim();
+  const hasCompanyLogo = !!configuredLogoFileId || (!!configuredLogoSource && !/(^|\/)brand-logo\.png(?:[?#].*)?$/i.test(configuredLogoSource));
+  const brandSettings = runtimeBrandLogo && !hasCompanyLogo
+    ? { ...settings, logoUrl:runtimeBrandLogo, logoSourceUrl:'', logoTelegramFileId:'' }
+    : settings;
   const accessArgs = { runtime, currentUser, activeEmployee, restaurantEnabled: !!settings.isRestaurantModeEnabled };
   const homeTab = firstAllowedTab(accessArgs) || 'no_access';
   const canAccounts = canAccessTab('accounts', accessArgs);
@@ -54,30 +70,34 @@ export const Header = () => {
       document.exitFullscreen?.().then(() => setIsFullscreen(false)).catch(() => {});
     }
   };
-  const handleLogoUpload = (e) => {
+  const handleLogoUpload = async (e) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) { showToast('يرجى اختيار ملف صورة صالح', 'error'); return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      saveSettings({ ...settings, logoUrl: reader.result, logoSourceUrl: '' });
-      showToast('تم تحديث شعار المحل', 'success');
-    };
-    reader.readAsDataURL(file);
     e.target.value = '';
+    if (!file) return;
+    if (!/^image\/(png|jpe?g|webp)$/i.test(file.type || '')) { showToast('اختر صورة PNG أو JPG أو WEBP', 'error'); return; }
+    setLogoUploading(true);
+    try {
+      const dataUrl = await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result||''));r.onerror=()=>reject(new Error('تعذر قراءة الشعار'));r.readAsDataURL(file);});
+      const uploaded = await uploadProductImageToTelegram(dataUrl, `store-logo-${Date.now()}.jpg`);
+      await saveSettings({ ...settings, logoUrl:'', logoSourceUrl:uploaded.url||'', logoTelegramFileId:uploaded.fileId, logoTelegramUniqueId:uploaded.fileUniqueId, logoStorage:'telegram-photo', logoUpdatedAt:new Date().toISOString() });
+      showToast('تم تحديث شعار المحل وحفظه عبر Telegram', 'success');
+    } catch(error) { showToast(error?.message || 'تعذر رفع شعار المحل', 'error'); }
+    finally { setLogoUploading(false); }
   };
 
   return h('header', { id: 'main-header', className: 'sticky top-0 z-40 h-14 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-slate-200 dark:border-slate-800 px-2.5 sm:px-4 flex items-center justify-between gap-2.5 shadow-xs select-none' },
     h('div', { className: 'flex items-center gap-2 shrink-0 min-w-0 lg:hidden' },
       h('button', { type: 'button', onClick: () => setMobileSidebarOpen(!mobileSidebarOpen), className: 'lg:hidden p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800', title: 'القائمة الجانبية' }, h(Menu, { className: 'w-5 h-5' })),
       h('input', { ref: logoInputRef, type: 'file', accept: 'image/*', className: 'hidden', onChange: handleLogoUpload }),
-      h('button', { type: 'button', onClick: () => canSettings ? logoInputRef.current?.click() : setActiveTab(homeTab), className: 'relative w-9 h-9 shrink-0 rounded-xl overflow-hidden bg-white border border-emerald-500/30 shadow-xs group', title: canSettings ? 'تغيير شعار المحل' : 'الصفحة الرئيسية المسموحة' },
-        h('img', { src: getBrandLogoDisplayUrl(settings), alt: settings.storeName, className: 'w-full h-full object-contain bg-white p-0.5', onError: (e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_LOGO_DATA_URL; } }),
-        h('span', { className: 'absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity' }, h(Camera, { className: 'w-4 h-4' }))
+      h('button', { type: 'button', onClick: () => canSettings ? logoInputRef.current?.click() : setActiveTab(homeTab), className: 'relative w-9 h-9 shrink-0 rounded-xl overflow-hidden bg-white border border-emerald-500/30 shadow-xs group', title: canSettings ? 'تغيير شعار المحل — يتم حفظ الصورة عبر Telegram' : 'الصفحة الرئيسية المسموحة', disabled:logoUploading || !isLoaded },
+        brandSettings
+          ? h(BrandLogoImage, { settings:brandSettings, alt:brandName, className:'w-full h-full object-cover bg-white' })
+          : h('span',{className:'w-full h-full grid place-items-center bg-slate-50 text-slate-300'},h(Store,{className:'w-4 h-4'})),
+        logoUploading ? h('span',{className:'absolute inset-0 bg-white/80 flex items-center justify-center'},h('span',{className:'w-5 h-5 rounded-full border-2 border-emerald-200 border-t-emerald-600 animate-spin'})) : (isLoaded ? h('span', { className: 'absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity' }, h(Camera, { className: 'w-4 h-4' })) : null)
       ),
       h('button', { type: 'button', onClick: () => setActiveTab(homeTab), className: 'flex flex-col text-right min-w-0 group focus:outline-none' },
-        h('h1', { className: 'text-[11px] sm:text-xs font-black leading-tight text-slate-900 dark:text-white tracking-tight max-w-[155px] sm:max-w-[210px] line-clamp-2 group-hover:text-emerald-600 transition' }, settings.storeName),
-        h('span', { className: 'text-[10px] text-emerald-600 dark:text-emerald-400 font-bold block leading-none truncate' }, settings.subtitle || 'إدارة ذكية')
+        h('h1', { className: 'text-[11px] sm:text-xs font-black leading-tight text-slate-900 dark:text-white tracking-tight max-w-[155px] sm:max-w-[210px] line-clamp-2 group-hover:text-emerald-600 transition min-h-[17px]' }, brandName || ''),
+        h('span', { className: 'text-[10px] text-emerald-600 dark:text-emerald-400 font-bold block leading-none truncate min-h-[10px]' }, isLoaded ? (settings.subtitle || 'إدارة ذكية') : '')
       ),
       h('div', { className: 'hidden xl:flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] font-medium' }, h(Store, { className: 'w-3 h-3 text-slate-400' }), h('span', null, settings.activeBranchName))
     ),

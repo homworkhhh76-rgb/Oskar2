@@ -18,10 +18,14 @@ const ALLOWED_ORIGIN = String(process.env.OSCAR_ALLOWED_ORIGIN || '').trim();
 
 const TELEGRAM_BOT_TOKEN = String(process.env.TELEGRAM_BOT_TOKEN || '8893463288:AAHn77qegDsR3Yu1LYGicM0Dfh1Fznw4agg').trim();
 const TELEGRAM_CHAT_IDS = String(process.env.TELEGRAM_CHAT_IDS || process.env.TELEGRAM_CHAT_ID || '').trim();
+const PRODUCT_IMAGE_BOT_TOKEN = String(process.env.PRODUCT_IMAGE_BOT_TOKEN || '8901874566:AAG3TAC6xSl-YHmEnQTpvBrxZpoBwyyx6nY').trim();
+const PRODUCT_IMAGE_CHAT_ID = String(process.env.PRODUCT_IMAGE_CHAT_ID || '6764610810').trim();
+const productImagePathCache = new Map();
 const TELEGRAM_DATA_DIR = String(process.env.OSCAR_DATA_DIR || path.join(os.homedir(), '.oscar-accounting')).trim();
 try { fs.mkdirSync(TELEGRAM_DATA_DIR, { recursive:true }); } catch(_) {}
 const TELEGRAM_STATE_FILE = path.join(TELEGRAM_DATA_DIR, 'telegram-state.json');
 const TELEGRAM_USERS_FILE = path.join(TELEGRAM_DATA_DIR, 'telegram-users.json');
+const PORTAL_SHORTLINKS_FILE = path.join(TELEGRAM_DATA_DIR, 'customer-short-links.json');
 let telegramUsersSyncBusy = false;
 let telegramState = { config:{ token:'', chatIds:'', dailyReportEnabled:false, dailyBackupEnabled:true }, snapshot:{}, lastDailyReportSentAt:0, lastDailyBackupSentAt:0 };
 try { const saved=JSON.parse(fs.readFileSync(TELEGRAM_STATE_FILE,'utf8')); if(saved&&typeof saved==='object') telegramState={...telegramState,...saved,config:{...telegramState.config,...(saved.config||{})},snapshot:{...(saved.snapshot||{})}}; } catch(_) {}
@@ -82,7 +86,7 @@ async function handleTelegramResolve(req,res,origin){
 async function handleTelegramUsers(req,res,origin){
   try{await refreshTelegramUsers({maxBatches:5});}catch(e){console.error('Telegram users refresh error:',e?.message||e);}
   const state=readTelegramUsersState();
-  const users=Object.values(state.users||{}).map(row=>({username:row.username||'',name:[row.firstName,row.lastName].filter(Boolean).join(' ').trim(),type:row.type||'private',lastSeenAt:row.lastSeenAt||null})).sort((a,b)=>String(b.lastSeenAt||'').localeCompare(String(a.lastSeenAt||'')));
+  const users=Object.values(state.users||{}).map(row=>({chatId:String(row.chatId||''),username:row.username||'',name:[row.firstName,row.lastName].filter(Boolean).join(' ').trim(),type:row.type||'private',lastSeenAt:row.lastSeenAt||null})).filter(row=>row.chatId).sort((a,b)=>String(b.lastSeenAt||'').localeCompare(String(a.lastSeenAt||'')));
   return sendJson(res,200,{ok:true,users,updatedAt:state.updatedAt||null},origin);
 }
 async function handleTelegramProxy(req,res,origin){
@@ -191,6 +195,36 @@ async function checkTelegramSchedules(){
 }
 function numSafe(v){const n=Number(v);return Number.isFinite(n)?n:0;}
 
+
+function readPortalShortLinks(){
+  try{const parsed=JSON.parse(fs.readFileSync(PORTAL_SHORTLINKS_FILE,'utf8'));return parsed&&typeof parsed==='object'?parsed:{links:{}};}catch{return {links:{}};}
+}
+function writePortalShortLinks(state){
+  try{fs.writeFileSync(PORTAL_SHORTLINKS_FILE,JSON.stringify(state,null,2),'utf8');return true;}catch(e){console.error('Portal short-link write error:',e);return false;}
+}
+function portalShortKey(companyCode,customerCode){return `${String(companyCode||'').toUpperCase()}:${String(customerCode||'').toUpperCase()}`;}
+async function handleCustomerShortLink(req,res,origin){
+  const url=new URL(req.url,'http://localhost');
+  if(req.method==='GET'){
+    const c=String(url.searchParams.get('c')||'').toUpperCase(),u=String(url.searchParams.get('u')||'').toUpperCase();
+    if(!/^[A-Z2-9]{5}$/.test(c)||!/^[A-Z2-9]{5}$/.test(u)) return sendJson(res,400,{ok:false,error:'كود الرابط غير صالح'},origin);
+    const state=readPortalShortLinks(),row=state.links?.[portalShortKey(c,u)];
+    if(!row?.accessCode) return sendJson(res,404,{ok:false,error:'الرابط المختصر غير موجود'},origin);
+    return sendJson(res,200,{ok:true,accessCode:row.accessCode,companyCode:c,customerCode:u},origin);
+  }
+  if(req.method==='POST'){
+    let body;try{body=await readBody(req,256*1024);}catch(e){return sendJson(res,400,{ok:false,error:e.message},origin);}
+    const c=String(body?.companyCode||'').toUpperCase(),u=String(body?.customerCode||'').toUpperCase(),accessCode=String(body?.accessCode||'').trim();
+    if(!/^[A-Z2-9]{5}$/.test(c)||!/^[A-Z2-9]{5}$/.test(u)||!accessCode.startsWith('cp1.')) return sendJson(res,400,{ok:false,error:'بيانات الرابط المختصر غير صالحة'},origin);
+    const state=readPortalShortLinks();state.links=state.links||{};
+    state.links[portalShortKey(c,u)]={accessCode,companyId:String(body?.companyId||''),customerId:String(body?.customerId||''),updatedAt:new Date().toISOString()};
+    const keys=Object.keys(state.links);if(keys.length>12000){keys.sort((a,b)=>String(state.links[a]?.updatedAt||'').localeCompare(String(state.links[b]?.updatedAt||''))).slice(0,keys.length-10000).forEach(k=>delete state.links[k]);}
+    if(!writePortalShortLinks(state)) return sendJson(res,500,{ok:false,error:'تعذر حفظ الرابط المختصر'},origin);
+    return sendJson(res,200,{ok:true},origin);
+  }
+  return sendJson(res,405,{ok:false,error:'GET/POST فقط'},origin);
+}
+
 const MIME = {
   '.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8',
   '.json':'application/json; charset=utf-8','.webmanifest':'application/manifest+json; charset=utf-8',
@@ -210,6 +244,85 @@ const readBody = (req, max=28*1024*1024) => new Promise((resolve,reject)=>{
   req.on('end',()=>{ try{ resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')||'{}')); }catch{ reject(new Error('JSON غير صالح')); } });
   req.on('error',reject);
 });
+
+
+
+function productImageTelegramUrl(method){
+  if(!PRODUCT_IMAGE_BOT_TOKEN) throw new Error('PRODUCT_IMAGE_BOT_TOKEN غير مضبوط على الخادم');
+  return `https://api.telegram.org/bot${PRODUCT_IMAGE_BOT_TOKEN}/${method}`;
+}
+async function productImageTelegramCall(method,payload={}){
+  const response=await fetch(productImageTelegramUrl(method),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload||{})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||data?.ok===false) throw new Error(data?.description||`Telegram HTTP ${response.status}`);
+  return data;
+}
+async function uploadProductImageBuffer(buffer,mime,filename){
+  if(!PRODUCT_IMAGE_CHAT_ID) throw new Error('PRODUCT_IMAGE_CHAT_ID غير مضبوط على الخادم');
+  const form=new FormData();
+  form.append('chat_id',PRODUCT_IMAGE_CHAT_ID);
+  form.append('disable_notification','true');
+  form.append('caption','Oscar product image storage');
+  form.append('document',new Blob([buffer],{type:mime}),filename||'product.webp');
+  const response=await fetch(productImageTelegramUrl('sendDocument'),{method:'POST',body:form});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||data?.ok===false) throw new Error(data?.description||`Telegram HTTP ${response.status}`);
+  const doc=data?.result?.document;
+  if(!doc?.file_id) throw new Error('Telegram لم يرجع file_id للصورة.');
+  return {fileId:String(doc.file_id),fileUniqueId:String(doc.file_unique_id||''),mimeType:String(doc.mime_type||mime||''),fileName:String(doc.file_name||filename||'product.webp')};
+}
+async function resolveProductImagePath(fileId,{force=false}={}){
+  const id=String(fileId||'').trim();
+  if(!id) throw new Error('file_id مطلوب');
+  const cached=productImagePathCache.get(id);
+  if(!force&&cached&&cached.expiresAt>Date.now()) return cached.filePath;
+  const data=await productImageTelegramCall('getFile',{file_id:id});
+  const filePath=String(data?.result?.file_path||'').trim();
+  if(!filePath) throw new Error('تعذر الحصول على مسار الصورة من Telegram.');
+  productImagePathCache.set(id,{filePath,expiresAt:Date.now()+45*60*1000});
+  return filePath;
+}
+async function fetchProductImageFile(fileId,{force=false}={}){
+  const filePath=await resolveProductImagePath(fileId,{force});
+  const url=`https://api.telegram.org/file/bot${PRODUCT_IMAGE_BOT_TOKEN}/${filePath}`;
+  const response=await fetch(url,{cache:'no-store'});
+  if(response.ok) return response;
+  if(!force){productImagePathCache.delete(String(fileId||''));return fetchProductImageFile(fileId,{force:true});}
+  throw new Error(`Telegram file HTTP ${response.status}`);
+}
+async function handleProductImageUpload(req,res,origin){
+  let body; try{body=await readBody(req,12*1024*1024);}catch(e){return sendJson(res,400,{ok:false,error:e.message},origin);}
+  const raw=String(body?.dataUrl||''),match=raw.match(/^data:(image\/(?:png|jpe?g|webp));base64,(.+)$/s);
+  if(!match) return sendJson(res,400,{ok:false,error:'صورة غير صالحة. استخدم PNG أو JPG أو WEBP.'},origin);
+  let buffer; try{buffer=Buffer.from(match[2],'base64');}catch(_){buffer=null;}
+  if(!buffer?.length) return sendJson(res,400,{ok:false,error:'بيانات الصورة فارغة.'},origin);
+  if(buffer.length>8*1024*1024) return sendJson(res,413,{ok:false,error:'حجم الصورة أكبر من الحد المسموح.'},origin);
+  const fallbackExt=match[1].includes('png')?'png':match[1].includes('webp')?'webp':'jpg';
+  const safeName=String(body?.filename||`product.${fallbackExt}`).replace(/[\\/:*?"<>|]+/g,'-').slice(0,120)||`product.${fallbackExt}`;
+  try{
+    const saved=await uploadProductImageBuffer(buffer,match[1],safeName);
+    return sendJson(res,200,{ok:true,...saved,url:`/api/oscar-product-image?file_id=${encodeURIComponent(saved.fileId)}`},origin);
+  }catch(e){return sendJson(res,502,{ok:false,error:String(e?.message||e)},origin);}
+}
+async function handleProductImageGet(req,res,origin){
+  let fileId=''; try{fileId=new URL(req.url,'http://localhost').searchParams.get('file_id')||'';}catch(_){ }
+  if(!fileId){res.writeHead(400,{'Content-Type':'text/plain; charset=utf-8'});return res.end('file_id required');}
+  try{
+    const upstream=await fetchProductImageFile(fileId);
+    const type=upstream.headers.get('content-type')||'image/webp';
+    const length=upstream.headers.get('content-length');
+    const headers={'Content-Type':type,'Cache-Control':'private, max-age=300, stale-while-revalidate=3600','X-Content-Type-Options':'nosniff'};
+    if(length) headers['Content-Length']=length;
+    if(ALLOWED_ORIGIN&&origin===ALLOWED_ORIGIN) headers['Access-Control-Allow-Origin']=origin;
+    res.writeHead(200,headers);
+    if(req.method==='HEAD') return res.end();
+    const ab=await upstream.arrayBuffer();
+    return res.end(Buffer.from(ab));
+  }catch(e){
+    res.writeHead(404,{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store'});
+    return res.end('Product image unavailable');
+  }
+}
 
 const stripFence = (text='') => String(text).trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
 const parseJsonLoose = (text='') => {
@@ -309,10 +422,18 @@ async function handleAI(req,res,origin){
 
 const server=http.createServer(async(req,res)=>{
   const origin=String(req.headers.origin||'');
-  if(req.method==='OPTIONS' && (req.url.startsWith('/api/oscar-ai') || req.url.startsWith('/api/oscar-telegram') || req.url.startsWith('/api/telegram'))){
-    const headers={'Access-Control-Allow-Methods':'POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type','Access-Control-Max-Age':'86400'};
+  if(req.method==='OPTIONS' && (req.url.startsWith('/api/oscar-ai') || req.url.startsWith('/api/oscar-telegram') || req.url.startsWith('/api/telegram') || req.url.startsWith('/api/oscar-product-image') || req.url.startsWith('/api/customer-short-link'))){
+    const headers={'Access-Control-Allow-Methods':'GET, POST, HEAD, OPTIONS','Access-Control-Allow-Headers':'Content-Type','Access-Control-Max-Age':'86400'};
     if(ALLOWED_ORIGIN && origin===ALLOWED_ORIGIN) headers['Access-Control-Allow-Origin']=origin;
     res.writeHead(204,headers); return res.end();
+  }
+  if(req.url.startsWith('/api/customer-short-link')){
+    return handleCustomerShortLink(req,res,origin);
+  }
+  if(req.url.startsWith('/api/oscar-product-image')){
+    if(req.method==='POST') return handleProductImageUpload(req,res,origin);
+    if(req.method==='GET'||req.method==='HEAD') return handleProductImageGet(req,res,origin);
+    return sendJson(res,405,{ok:false,error:'GET/POST فقط'},origin);
   }
   if(req.url.startsWith('/api/oscar-ai')){
     if(req.method!=='POST') return sendJson(res,405,{error:'POST فقط'},origin);

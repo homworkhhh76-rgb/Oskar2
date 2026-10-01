@@ -1,14 +1,14 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.57-telegram-chatid';
-import { ProductGrid } from './components__pos__ProductGrid.js?v=7.9.4.57-telegram-chatid';
-import { CartPanel } from './components__pos__CartPanel.js?v=7.9.4.57-telegram-chatid';
-import { FullCartView } from './components__pos__FullCartView.js?v=7.9.4.57-telegram-chatid';
-import { PaymentModal } from './components__pos__PaymentModal.js?v=7.9.4.57-telegram-chatid';
-import { CameraScannerModal } from './components__pos__CameraScannerModal.js?v=7.9.4.57-telegram-chatid';
-import { HoldInvoicesModal } from './components__pos__HoldInvoicesModal.js?v=7.9.4.57-telegram-chatid';
-import { RestaurantPendingOrdersModal } from './restaurant__components__RestaurantPendingOrdersModal.js?v=7.9.4.57-telegram-chatid';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.57-telegram-chatid';
+import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
+import { ProductGrid } from './components__pos__ProductGrid.js?v=7.9.4.76-company-brand-only';
+import { CartPanel } from './components__pos__CartPanel.js?v=7.9.4.76-company-brand-only';
+import { FullCartView } from './components__pos__FullCartView.js?v=7.9.4.76-company-brand-only';
+import { PaymentModal } from './components__pos__PaymentModal.js?v=7.9.4.76-company-brand-only';
+import { CameraScannerModal } from './components__pos__CameraScannerModal.js?v=7.9.4.76-company-brand-only';
+import { HoldInvoicesModal } from './components__pos__HoldInvoicesModal.js?v=7.9.4.76-company-brand-only';
+import { RestaurantPendingOrdersModal } from './restaurant__components__RestaurantPendingOrdersModal.js?v=7.9.4.76-company-brand-only';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.76-company-brand-only';
 import { Barcode, Camera, Maximize2, UtensilsCrossed } from 'lucide-react';
 export const POSView = () => {
     const { cart, handleScannedBarcode, setShowCameraModal, holdCurrentInvoice, posCartLayout, setPosCartLayout, settings } = useApp();

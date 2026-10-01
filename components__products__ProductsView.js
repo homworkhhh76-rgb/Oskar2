@@ -1,14 +1,17 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import React, { useState, useRef } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.57-telegram-chatid';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.57-telegram-chatid';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.57-telegram-chatid';
-import { BarcodeCameraModal } from './components__pos__CameraScannerModal.js?v=7.9.4.57-telegram-chatid';
-import { calculateUnitConversions, formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.57-telegram-chatid';
-import { exportToCSV } from './utils__export.js?v=7.9.4.57-telegram-chatid';
-import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.57-telegram-chatid';
-import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.57-telegram-chatid';
-import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.57-telegram-chatid';
+import React, { useState, useRef, useEffect } from 'react';
+import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.76-company-brand-only';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.76-company-brand-only';
+import { BarcodeCameraModal } from './components__pos__CameraScannerModal.js?v=7.9.4.76-company-brand-only';
+import { calculateUnitConversions, formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.76-company-brand-only';
+import { exportToCSV } from './utils__export.js?v=7.9.4.76-company-brand-only';
+import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.76-company-brand-only';
+import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.76-company-brand-only';
+import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.76-company-brand-only';
+import { isTrialAccount } from './trial__config.js?v=7.9.4.76-company-brand-only';
+import { uploadProductImageToTelegram, createPendingProductImageState, isProductImageOfflineError, ensureProductImageAutoSync } from './services__productImages.js?v=7.9.4.76-company-brand-only';
+import { ProductImage } from './components__common__ProductImage.js?v=7.9.4.76-company-brand-only';
 import { Plus, Search, Trash2, Edit, Layers, FolderTree, X, Download, Image as ImageIcon, FileSpreadsheet, Camera, } from 'lucide-react';
 const h = React.createElement;
 const normalizeArabicDigits = (value) => String(value ?? '')
@@ -27,14 +30,46 @@ const toNumber = (value, fallback = 0) => {
     return Number.isFinite(n) ? n : fallback;
 };
 const round4 = (n) => Math.round((Number(n) + Number.EPSILON) * 10000) / 10000;
+const compressProductImage = (file) => new Promise((resolve, reject) => {
+    if (!file) { resolve(''); return; }
+    if (!/^image\/(png|jpe?g|webp)$/i.test(file.type || '')) { reject(new Error('اختر صورة PNG أو JPG أو WEBP.')); return; }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('تعذر قراءة الصورة.'));
+    reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('الصورة غير صالحة.'));
+        img.onload = () => {
+            const maxSide = 1200;
+            const scale = Math.min(1, maxSide / Math.max(img.width || 1, img.height || 1));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(img.width * scale));
+            canvas.height = Math.max(1, Math.round(img.height * scale));
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', .9));
+        };
+        img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+});
 export const ProductsView = () => {
     const { products, categories, settings, saveProduct, softDeleteProduct, getProductStock, showToast, } = useApp();
     const [search, setSearch] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
     const tableContainerRef = useRef(null);
+    const productImageRef = useRef(null);
+    const productCameraRef = useRef(null);
+    const trialImageMode = false; // صور الأصناف ترفع إلى Telegram في جميع أنواع الحسابات
     // Modal State for Product Editor
     const [editingProduct, setEditingProduct] = useState(null);
     const [isNew, setIsNew] = useState(false);
+    const [imageDraft, setImageDraft] = useState(null);
+    const [imageRemoved, setImageRemoved] = useState(false);
+    const [imageSaving, setImageSaving] = useState(false);
+    const productImageUploadEnabled = true;
+    useEffect(() => { ensureProductImageAutoSync(); }, []);
     const [barcodeScanUnitId, setBarcodeScanUnitId] = useState(null);
     // Filter products
     const activeProducts = products.filter((p) => !p.deletedAt);
@@ -61,6 +96,7 @@ export const ProductsView = () => {
             internalCode: (products.length + 1001).toString(),
             categoryId: categories[0]?.id || '',
             brand: '',
+            imageData: '',
             costPrice: 0,
             sellingPrice: 0,
             reorderPoint: 10,
@@ -89,6 +125,8 @@ export const ProductsView = () => {
             updatedAt: new Date().toISOString(),
         };
         setEditingProduct(newProd);
+        setImageDraft(null);
+        setImageRemoved(false);
         setIsNew(true);
     };
     const handleOpenEdit = (prod) => {
@@ -97,6 +135,8 @@ export const ProductsView = () => {
         clone.salesChannel = clone.salesChannel || 'both';
         clone.units = (clone.units || []).map((u) => ({ ...u, openingQuantity: '' }));
         setEditingProduct(clone);
+        setImageDraft(null);
+        setImageRemoved(false);
         setIsNew(false);
     };
     const handleSaveModal = async (e) => {
@@ -158,8 +198,112 @@ export const ProductsView = () => {
             openingUnitBreakdown,
             updatedAt: new Date().toISOString(),
         };
-        await saveProduct(finalProd);
-        setEditingProduct(null);
+        let productToSave = finalProd;
+        if (imageRemoved) {
+            productToSave = {
+                ...productToSave,
+                imageData: '',
+                imagePendingUpload: false,
+                imagePendingName: '',
+                imageTelegramFileId: '',
+                imageTelegramUniqueId: '',
+                imageTelegramUrl: '',
+                imageStorage: '',
+                imageUpdatedAt: new Date().toISOString()
+            };
+        }
+        else if (imageDraft?.dataUrl) {
+            let uploaded = imageDraft.uploaded || null;
+            if (!uploaded?.fileId && !imageDraft?.queued) {
+                setImageSaving(true);
+                try {
+                    const cleanName = String(editingProduct.name || 'product').replace(/[\/:*?"<>|]+/g, '-').trim().slice(0, 80) || 'product';
+                    uploaded = await uploadProductImageToTelegram(imageDraft.dataUrl, `${cleanName}-${Date.now()}.jpg`);
+                    setImageDraft((prev) => prev ? ({ ...prev, uploaded, queued:false }) : prev);
+                } catch (err) {
+                    if (isProductImageOfflineError(err)) {
+                        const pendingImage = createPendingProductImageState(imageDraft.dataUrl, imageDraft.name || 'product.jpg');
+                        productToSave = { ...productToSave, ...pendingImage };
+                        setImageDraft((prev) => prev ? ({ ...prev, queued: true }) : prev);
+                        showToast('لا يوجد إنترنت. تم حفظ الصورة محلياً وسيتم رفعها تلقائياً عند عودة الاتصال.', 'info');
+                    } else {
+                        showToast(String(err?.message || err || 'تعذر حفظ صورة الصنف'), 'error');
+                        return;
+                    }
+                } finally {
+                    setImageSaving(false);
+                }
+            }
+            if (uploaded?.fileId) {
+                productToSave = {
+                    ...productToSave,
+                    imageData: '',
+                    imagePendingUpload: false,
+                    imagePendingName: '',
+                    imageTelegramFileId: uploaded.fileId,
+                    imageTelegramUniqueId: uploaded.fileUniqueId,
+                    imageTelegramUrl: uploaded.url || '',
+                    imageStorage: 'telegram-photo',
+                    imageUpdatedAt: new Date().toISOString()
+                };
+            } else if (imageDraft?.queued || productToSave.imagePendingUpload) {
+                const pendingImage = createPendingProductImageState(imageDraft.dataUrl, imageDraft.name || 'product.jpg');
+                productToSave = { ...productToSave, ...pendingImage };
+            }
+        } else if (productToSave.imagePendingUpload && productToSave.imageData) {
+            productToSave = { ...productToSave, imageStorage: productToSave.imageStorage || 'telegram-pending' };
+        } else {
+            productToSave = { ...productToSave, imageData: '' };
+        }
+        const saved = await saveProduct(productToSave);
+        if (saved !== false) {
+            setEditingProduct(null);
+            setImageDraft(null);
+            setImageRemoved(false);
+        }
+    };
+    const handleProductImageFile = async (file) => {
+        if (!file || !editingProduct || imageSaving) return;
+        setImageRemoved(false);
+        setImageSaving(true);
+        try {
+            const imageData = await compressProductImage(file);
+            const draftName = String(file.name || 'product.jpg');
+            setImageDraft({ dataUrl: imageData, name: draftName, uploaded: null, queued: false });
+            const cleanName = String(editingProduct.name || file.name || 'product').replace(/[\/:*?"<>|]+/g, '-').replace(/\.[a-z0-9]+$/i, '').trim().slice(0, 80) || 'product';
+            try {
+                const uploaded = await uploadProductImageToTelegram(imageData, `${cleanName}-${Date.now()}.jpg`);
+                setImageDraft((prev) => prev ? ({ ...prev, uploaded, queued: false }) : prev);
+                setEditingProduct((prev) => prev ? ({
+                    ...prev,
+                    imageData: '',
+                    imagePendingUpload: false,
+                    imagePendingName: '',
+                    imageTelegramFileId: uploaded.fileId,
+                    imageTelegramUniqueId: uploaded.fileUniqueId,
+                    imageTelegramUrl: uploaded.url || '',
+                    imageStorage: 'telegram-photo',
+                    imageUpdatedAt: new Date().toISOString(),
+                }) : prev);
+                showToast('تم رفع صورة الصنف بنجاح', 'success');
+            } catch (err) {
+                if (isProductImageOfflineError(err)) {
+                    const pendingImage = createPendingProductImageState(imageData, draftName);
+                    setImageDraft((prev) => prev ? ({ ...prev, queued: true }) : prev);
+                    setEditingProduct((prev) => prev ? ({ ...prev, ...pendingImage }) : prev);
+                    showToast('لا يوجد إنترنت. تم حفظ الصورة محلياً وستُرفع تلقائياً عند عودة الاتصال.', 'info');
+                } else {
+                    throw err;
+                }
+            }
+        } catch (err) {
+            setImageDraft(null);
+            showToast(String(err?.message || err || 'تعذر إضافة صورة الصنف'), 'error');
+        } finally {
+            setImageSaving(false);
+            if (productImageRef.current) productImageRef.current.value = '';
+            if (productCameraRef.current) productCameraRef.current.value = '';
+        }
     };
     // Tree Unit Helper: Add Parent Unit
     const handleAddParentUnit = () => {
@@ -315,6 +459,20 @@ export const ProductsView = () => {
             )
         );
     };
+    const hasCurrentImage = !!(editingProduct && (imageDraft?.dataUrl || (!imageRemoved && (editingProduct.imageData || editingProduct.imageUrl || editingProduct.imageTelegramFileId))));
+    const editorImageProduct = editingProduct ? (imageDraft?.dataUrl ? { ...editingProduct, imageData:imageDraft.dataUrl, imageTelegramFileId:'', imagePendingUpload: !!imageDraft?.queued } : editingProduct) : null;
+    const editorImagePreview = h('div', { className: 'relative w-20 h-20 shrink-0' },
+        hasCurrentImage
+            ? h(ProductImage, { product: editorImageProduct, alt: 'صورة الصنف', className: 'w-20 h-20 rounded-xl object-cover border border-slate-200 bg-white' })
+            : h('div', { className: 'w-20 h-20 rounded-xl border border-dashed border-slate-300 bg-white text-slate-300', style:{display:'flex',alignItems:'center',justifyContent:'center'} }, h(ImageIcon, { className: 'w-7 h-7', style:{display:'block',margin:'auto'} })),
+        imageSaving
+            ? h('div', { className: 'absolute inset-0 rounded-xl bg-white/85 dark:bg-slate-900/85 grid place-items-center border border-emerald-200' },
+                h('div', { className: 'flex flex-col items-center gap-1' },
+                    h('span', { className: 'block w-9 h-9 rounded-full border-[3px] border-emerald-100 border-t-emerald-600 animate-spin' }),
+                )
+            )
+            : null
+    );
     const getProductsExportData = () => ({
         headers:['الصنف','الكود','التصنيف','الوحدات','سعر البيع','التكلفة','المخزون'],
         rows: filteredProducts.map(p => { const cat=categories.find(c=>c.id===p.categoryId); const stock=getProductStock(p.id, settings.activeWarehouseId); const units=(p.units||[]).map(u=>`${u.name} ×${u.factorToBase || 1}`).join(' / '); const sale=(p.units||[]).find(u=>u.isDefaultSale)?.salePrice ?? p.salePrice ?? 0; return [p.name,p.sku||p.internalCode||'',cat?.name||'عام',units,Number(sale||0),Number(p.costPrice||0),Number(stock||0)]; })
@@ -339,14 +497,14 @@ export const ProductsView = () => {
                                 }, className: "flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 transition shadow-xs", children: [_jsx(FileSpreadsheet, { className: "w-4 h-4 text-emerald-600" }), _jsx("span", { children: "Excel" })] }), _jsxs("button", { id: "btn-add-product", onClick: handleOpenNew, className: "flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-md shadow-emerald-600/20 self-start sm:self-auto", children: [_jsx(Plus, { className: "w-4 h-4" }), _jsx("span", { children: "\u0625\u0636\u0627\u0641\u0629 \u0635\u0646\u0641 \u062c\u062f\u064a\u062f + \u0634\u062c\u0631\u0629 \u0648\u062d\u062f\u0627\u062a" })] })] })] }), _jsxs("div", { className: "p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-wrap items-center gap-3", children: [_jsxs("div", { className: "flex-1 min-w-[220px] relative", children: [_jsx(Search, { className: "absolute right-3 top-2.5 w-4 h-4 text-slate-400" }), _jsx("input", { type: "text", value: search, onChange: (e) => setSearch(e.target.value), placeholder: "\u0628\u062d\u062b \u0628\u0627\u0644\u0627\u0633\u0645\u060c \u0627\u0644\u0628\u0627\u0631\u0643\u0648\u062f\u060c \u0627\u0644\u0643\u0648\u062f\u060c \u0627\u0644\u0639\u0644\u0627\u0645\u0629 \u0627\u0644\u062a\u062c\u0627\u0631\u064a\u0629...", className: "w-full pr-9 pl-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500" })] }), _jsx("div", { className: "min-w-[190px]", children: _jsx(SearchableDropdown, { id: "products-filter-category", options: [{id:"all",label:`\u0643\u0627\u0641\u0629 \u0627\u0644\u062a\u0635\u0646\u064a\u0641\u0627\u062a (${activeProducts.length})`}, ...categories.map((c) => ({ id:c.id, label:c.name }))], selectedId: selectedCategory, onSelect: setSelectedCategory, placeholder: "\u0627\u0628\u062d\u062b \u0639\u0646 \u0627\u0644\u062a\u0635\u0646\u064a\u0641..." }) })] }), _jsx("div", { id: "products-table-container", ref: tableContainerRef, className: "rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden", children: _jsx("div", { className: "overflow-x-auto max-w-full slim-scrollbar", children: filteredProducts.length === 0 ? (_jsx("div", { className: "p-12 text-center text-xs text-slate-400", children: "\u0644\u0627 \u062a\u0648\u062c\u062f \u0623\u0635\u0646\u0627\u0641 \u062a\u0637\u0627\u0628\u0642 \u0645\u0639\u0627\u064a\u064a\u0631 \u0627\u0644\u0628\u062d\u062b" })) : (_jsxs("table", { className: "w-full text-xs text-right whitespace-nowrap min-w-[800px]", children: [_jsx("thead", { children: _jsxs("tr", { className: "border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 text-slate-500 font-semibold", children: [_jsx("th", { className: "p-3", children: "\u0627\u0633\u0645 \u0627\u0644\u0635\u0646\u0641" }), _jsx("th", { className: "p-3", children: "\u0627\u0644\u062a\u0635\u0646\u064a\u0641" }), _jsx("th", { className: "p-3", children: "\u0634\u062c\u0631\u0629 \u0627\u0644\u0648\u062d\u062f\u0627\u062a \u0648\u0627\u0644\u0628\u0627\u0631\u0643\u0648\u062f" }), _jsx("th", { className: "p-3 text-left", children: "\u0633\u0639\u0631 \u0627\u0644\u0628\u064a\u0639 (\u0627\u0644\u0627\u0641\u062a\u0631\u0627\u0636\u064a)" }), _jsx("th", { className: "p-3 text-left", children: "\u0627\u0644\u062a\u0643\u0644\u0641\u0629 (\u0627\u0644\u0648\u062d\u062f\u0629 \u0627\u0644\u0623\u0633\u0627\u0633\u064a\u0629)" }), _jsx("th", { className: "p-3 text-center", children: "\u0627\u0644\u0645\u062e\u0632\u0648\u0646 \u0627\u0644\u0645\u062a\u0648\u0641\u0631" }), _jsx("th", { className: "p-3 text-center", children: "\u0625\u062c\u0631\u0627\u0621\u0627\u062a" })] }) }), _jsx("tbody", { className: "divide-y divide-slate-100 dark:divide-slate-800", children: productsPager.pageItems.map((prod) => {
                                     const baseStock = getProductStock(prod.id, settings.activeWarehouseId);
                                     const cat = categories.find((c) => c.id === prod.categoryId);
-                                    return (_jsxs("tr", { className: "hover:bg-slate-50/60 dark:hover:bg-slate-800/30", children: [_jsxs("td", { className: "p-3", children: [_jsx("div", { className: "font-bold text-slate-900 dark:text-white", children: prod.name }), _jsxs("div", { className: "text-[10px] text-slate-400 font-mono", children: [prod.sku || prod.internalCode || 'صنف', " ", prod.brand && `• ${prod.brand}`] })] }), _jsx("td", { className: "p-3", children: _jsx("span", { className: "px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300", children: cat?.name || 'عام' }) }), _jsx("td", { className: "p-3", children: _jsx("div", { className: "flex flex-wrap items-center gap-1", children: prod.units.map((u, i) => (_jsxs("span", { className: `px-1.5 py-0.5 rounded text-[10px] font-mono font-medium flex items-center gap-1 ${u.isDefaultSale
+                                    return (_jsxs("tr", { className: "hover:bg-slate-50/60 dark:hover:bg-slate-800/30", children: [_jsx("td", { className: "p-3", children: _jsxs("div", { className: "flex items-center gap-2.5 min-w-0", children: [_jsx(ProductImage, { product: prod, alt: prod.name, className: "w-12 h-12 rounded-xl object-cover border border-slate-200 bg-white shrink-0", fallback: _jsx("div", { className: "w-12 h-12 rounded-xl border border-slate-200 bg-slate-50 text-slate-300 shrink-0", style: { display: "flex", alignItems: "center", justifyContent: "center" }, children: _jsx(ImageIcon, { className: "w-5 h-5", style: { display: "block", margin: "auto" } }) }) }), _jsxs("div", { className: "min-w-0", children: [_jsx("div", { className: "font-bold text-slate-900 dark:text-white truncate max-w-[210px]", children: prod.name }), _jsxs("div", { className: "text-[10px] text-slate-400 font-mono truncate max-w-[210px]", children: [prod.sku || prod.internalCode || 'صنف', " ", prod.brand && `• ${prod.brand}`] })] })] }) }), _jsx("td", { className: "p-3", children: _jsx("span", { className: "px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300", children: cat?.name || 'عام' }) }), _jsx("td", { className: "p-3", children: _jsx("div", { className: "flex flex-wrap items-center gap-1", children: prod.units.map((u, i) => (_jsxs("span", { className: `px-1.5 py-0.5 rounded text-[10px] font-mono font-medium flex items-center gap-1 ${u.isDefaultSale
                                                             ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
                                                             : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`, title: `سعر البيع: ${u.salePrice} | الباركود: ${u.barcodes.join(', ')}`, children: [_jsx("span", { children: u.name }), _jsx("span", { className: "text-[9px] opacity-70", children: u.conversionToBase > 1 && `(×${u.conversionToBase})` }), i < prod.units.length - 1 && _jsx("span", { className: "opacity-40", children: "\u2190" })] }, u.id))) }) }), _jsxs("td", { className: "p-3 text-left font-mono font-bold text-slate-900 dark:text-white", children: [prod.sellingPrice.toFixed(2), " ", settings.currencySymbol] }), _jsxs("td", { className: "p-3 text-left font-mono text-slate-500", children: [prod.costPrice.toFixed(2), " ", settings.currencySymbol] }), _jsxs("td", { className: "p-3 text-center", children: [_jsxs("span", { className: `px-2 py-0.5 rounded font-mono font-bold text-xs ${baseStock <= (prod.reorderPoint || 0)
                                                             ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
                                                             : 'bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'}`, title: formatStockBreakdown(baseStock, prod.units), children: formatStockBreakdown(baseStock, prod.units, prod.baseUnitName) }), _jsx("div", { className: "text-[9px] text-slate-400 mt-0.5 truncate max-w-[140px]", children: formatStockBreakdown(baseStock, prod.units) })] }), _jsx("td", { className: "p-3 text-center", children: _jsxs("div", { className: "flex items-center justify-center gap-1.5", children: [_jsx("button", { onClick: () => handleOpenEdit(prod), className: "p-1.5 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/50", title: "\u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0635\u0646\u0641 \u0648\u0634\u062c\u0631\u0629 \u0627\u0644\u0648\u062d\u062f\u0627\u062a", children: _jsx(Edit, { className: "w-3.5 h-3.5" }) }), _jsx("button", { onClick: () => softDeleteProduct(prod.id), className: "p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50", title: "\u0646\u0642\u0644 \u0644\u0633\u0644\u0629 \u0627\u0644\u0645\u062d\u0630\u0648\u0641\u0627\u062a", children: _jsx(Trash2, { className: "w-3.5 h-3.5" }) })] }) })] }, prod.id));
-                                }) })] })) }) }), _jsx(Pagination, { pager: productsPager }), editingProduct && (_jsx("div", { className: "product-editor-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 overflow-y-auto animate-in fade-in", children: _jsxs("form", { onSubmit: handleSaveModal, className: "product-editor-modal-panel w-full max-w-3xl rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden text-right my-6", children: [_jsxs("div", { className: "flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40", children: [_jsxs("div", { className: "flex items-center gap-2", children: [_jsx(FolderTree, { className: "w-5 h-5 text-emerald-600" }), _jsxs("div", { children: [_jsx("h3", { className: "text-base font-black text-slate-900 dark:text-white", children: isNew ? 'إضافة صنف جديد مع شجرة وحدات' : `تعديل صنف: ${editingProduct.name}` }), _jsx("p", { className: "text-xs text-slate-500", children: "\u062d\u062f\u062f \u0627\u0644\u0648\u062d\u062f\u0629 \u0627\u0644\u0635\u063a\u0631\u0649 \u0627\u0644\u0623\u0633\u0627\u0633\u064a\u0629 \u062b\u0645 \u0623\u0636\u0641 \u0627\u0644\u0648\u062d\u062f\u0627\u062a \u0627\u0644\u0623\u0643\u0628\u0631 (\u0628\u0627\u0643\u064a\u062a\u060c \u0643\u0631\u062a\u0648\u0646\u0629\u060c \u0645\u0634\u0637\u0627\u062d)" })] })] }), _jsx("button", { type: "button", onClick: () => setEditingProduct(null), className: "p-1 rounded-lg text-slate-400 hover:text-slate-600", children: _jsx(X, { className: "w-5 h-5" }) })] }), _jsxs("div", { className: "product-editor-body p-4 sm:p-5 space-y-5 max-h-[75vh] overflow-y-auto overflow-x-hidden custom-scrollbar", children: [_jsxs("div", { className: "oscar-mobile-form-grid grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3", children: [_jsxs("div", { className: "min-w-0", children: [_jsx("label", { className: "text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1", children: "\u0627\u0633\u0645 \u0627\u0644\u0635\u0646\u0641 \u0627\u0644\u0643\u0627\u0645\u0644 *" }), _jsx("input", { type: "text", required: true, value: editingProduct.name, onChange: (e) => setEditingProduct((prev) => prev ? ({ ...prev, name: e.target.value }) : prev), placeholder: "\u0645\u062b\u0627\u0644: \u0645\u064a\u0627\u0647 \u0645\u0639\u062f\u0646\u064a\u0629 \u0623\u0631\u0648\u0649 500 \u0645\u0644", className: "w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900" })] }), _jsxs("div", { children: [_jsx("label", { className: "text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1", children: "\u0627\u0644\u062a\u0635\u0646\u064a\u0641:" }), _jsx(SearchableDropdown, { id: "product-category", options: categories.map((c) => ({ id: c.id, label: c.name })), selectedId: editingProduct.categoryId, onSelect: (id) => setEditingProduct((prev) => prev ? ({ ...prev, categoryId: id }) : prev), placeholder: "\u0627\u0628\u062d\u062b \u0639\u0646 \u0627\u0644\u062a\u0635\u0646\u064a\u0641..." })] }), _jsxs("div", { children: [_jsx("label", { className: "text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1", children: "مكان ظهور الصنف / الاستخدام:" }), _jsxs("select", { id: "product-sales-channel", value: editingProduct.salesChannel || 'both', onChange: (e) => setEditingProduct((prev) => prev ? ({ ...prev, salesChannel: e.target.value }) : prev), className: "w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold", children: [_jsx("option", { value: "shop", children: "المحل / الكاشير فقط" }), _jsx("option", { value: "restaurant", children: "المطعم والجرسون فقط" }), _jsx("option", { value: "both", children: "المحل والمطعم معاً" }), _jsx("option", { value: "raw_material", children: "مادة خام فقط - للوصفات والتصنيع" })] })] }), _jsxs("div", { children: [_jsx("label", { className: "text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1", children: "\u0627\u0644\u0639\u0644\u0627\u0645\u0629 \u0627\u0644\u062a\u062c\u0627\u0631\u064a\u0629 (\u0627\u0644\u0645\u0627\u0631\u0643\u0629):" }), _jsx("input", { type: "text", value: editingProduct.brand || '', onChange: (e) => setEditingProduct((prev) => prev ? ({ ...prev, brand: e.target.value }) : prev), placeholder: "\u0645\u062b\u0627\u0644: \u0623\u0631\u0648\u0649\u060c \u0643\u0648\u0643\u0627\u0643\u0648\u0644\u0627\u060c \u0627\u0644\u062c\u0646\u064a\u062f\u064a", className: "w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900" })] }), _jsxs("div", { children: [_jsx("label", { className: "text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1", children: "\u0643\u0648\u062f \u0627\u0644\u0635\u0646\u0641 \u0627\u0644\u062f\u0627\u062e\u0644\u064a (SKU):" }), _jsx("input", { type: "text", value: editingProduct.internalCode || '', onChange: (e) => setEditingProduct((prev) => prev ? ({ ...prev, internalCode: e.target.value }) : prev), className: "w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono" })] }), _jsxs("div", { children: [_jsx("label", { className: "text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1", children: "\u062d\u062f \u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0637\u0644\u0628 (\u062a\u0646\u0628\u064a\u0647 \u0627\u0644\u0646\u0648\u0627\u0642\u0635):" }), _jsx("input", { type: "text", inputMode: "decimal", dir: "ltr", value: editingProduct.reorderPoint ?? '', onChange: (e) => setEditingProduct((prev) => prev ? ({ ...prev, reorderPoint: cleanDecimalInput(e.target.value) }) : prev), className: "w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono" })] }), _jsxs("div", { children: [_jsx("label", { className: "text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1", children: "\u062a\u0627\u0631\u064a\u062e \u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0635\u0644\u0627\u062d\u064a\u0629:" }), _jsx("input", { type: "date", value: editingProduct.expiryDate || '', onChange: (e) => setEditingProduct((prev) => prev ? ({ ...prev, expiryDate: e.target.value }) : prev), className: "w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900" })] })] }), _jsxs("div", { className: "p-3 sm:p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 space-y-3 min-w-0 overflow-hidden", children: [_jsxs("div", { className: "flex items-center justify-between", children: [_jsxs("div", { className: "flex items-center gap-2", children: [_jsx(Layers, { className: "w-4 h-4 text-emerald-600" }), _jsx("h4", { className: "text-xs font-bold text-slate-900 dark:text-white", children: "\u0634\u062c\u0631\u0629 \u0627\u0644\u0648\u062d\u062f\u0627\u062a \u0627\u0644\u0647\u0631\u0645\u064a\u0629 \u0648\u0627\u0644\u0628\u0627\u0631\u0643\u0648\u062f\u0627\u062a:" })] }), _jsxs("button", { type: "button", onClick: handleAddParentUnit, className: "flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition", children: [_jsx(Plus, { className: "w-3.5 h-3.5" }), _jsx("span", { children: "\u0625\u0636\u0627\u0641\u0629 \u0648\u062d\u062f\u0629 \u0623\u0643\u0628\u0631 (\u0643\u0631\u062a\u0648\u0646\u0629 / \u0645\u0634\u0637\u0627\u062d)" })] })] }), _jsx("div", { className: "space-y-3", children: editingProduct.units.map((unit, idx) => {
+                                }) })] })) }) }), _jsx(Pagination, { pager: productsPager }), editingProduct && (_jsx("div", { className: "product-editor-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 overflow-y-auto animate-in fade-in", children: _jsxs("form", { onSubmit: handleSaveModal, className: "product-editor-modal-panel w-full max-w-3xl rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden text-right my-6", children: [_jsxs("div", { className: "flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40", children: [_jsxs("div", { className: "flex items-center gap-2", children: [_jsx(FolderTree, { className: "w-5 h-5 text-emerald-600" }), _jsxs("div", { children: [_jsx("h3", { className: "text-base font-black text-slate-900 dark:text-white", children: isNew ? 'إضافة صنف جديد مع شجرة وحدات' : `تعديل صنف: ${editingProduct.name}` }), _jsx("p", { className: "text-xs text-slate-500", children: "\u062d\u062f\u062f \u0627\u0644\u0648\u062d\u062f\u0629 \u0627\u0644\u0635\u063a\u0631\u0649 \u0627\u0644\u0623\u0633\u0627\u0633\u064a\u0629 \u062b\u0645 \u0623\u0636\u0641 \u0627\u0644\u0648\u062d\u062f\u0627\u062a \u0627\u0644\u0623\u0643\u0628\u0631 (\u0628\u0627\u0643\u064a\u062a\u060c \u0643\u0631\u062a\u0648\u0646\u0629\u060c \u0645\u0634\u0637\u0627\u062d)" })] })] }), _jsx("button", { type: "button", onClick: () => setEditingProduct(null), className: "p-1 rounded-lg text-slate-400 hover:text-slate-600", children: _jsx(X, { className: "w-5 h-5" }) })] }), _jsxs("div", { className: "product-editor-body p-4 sm:p-5 space-y-5 max-h-[75vh] overflow-y-auto overflow-x-hidden custom-scrollbar", children: [productImageUploadEnabled ? _jsxs("div", { className: "p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 flex items-center gap-3", children: [editorImagePreview, _jsxs("div", { className: "flex-1 min-w-0", children: [_jsx("div", { className: "text-xs font-black text-slate-800 dark:text-white", children: "صورة الصنف" }), _jsxs("div", { className: "flex items-center gap-2 mt-2 flex-wrap", children: [_jsx("button", { type: "button", disabled: imageSaving, onClick: () => productImageRef.current?.click(), className: "px-3 py-1.5 rounded-lg bg-emerald-600 disabled:opacity-60 text-white text-[10px] font-bold", children: hasCurrentImage ? "تغيير الصورة" : "اختيار صورة" }), _jsxs("button", { type: "button", disabled: imageSaving, onClick: () => productCameraRef.current?.click(), className: "inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-emerald-200 bg-white text-emerald-700 disabled:opacity-60 text-[10px] font-bold", children: [_jsx(Camera,{className:"w-3.5 h-3.5"}),_jsx("span",{children:"كاميرا"})] }), hasCurrentImage ? _jsx("button", { type: "button", disabled: imageSaving, onClick: () => { setImageDraft(null); setImageRemoved(true); setEditingProduct((prev) => prev ? ({ ...prev, imageData: '', imagePendingUpload:false }) : prev); }, className: "px-2 py-1.5 text-rose-600 disabled:opacity-50 text-[10px] font-bold", children: "إزالة" }) : null] }), _jsx("input", { ref: productImageRef, type: "file", accept: "image/png,image/jpeg,image/webp", className: "hidden", disabled: imageSaving, onChange: (e) => handleProductImageFile(e.target.files?.[0]) }), _jsx("input", { ref: productCameraRef, type: "file", accept: "image/*", capture: "environment", className: "hidden", disabled: imageSaving, onChange: (e) => handleProductImageFile(e.target.files?.[0]) })] })] }) : null, _jsxs("div", { className: "oscar-mobile-form-grid grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3", children: [_jsxs("div", { className: "min-w-0", children: [_jsx("label", { className: "text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1", children: "\u0627\u0633\u0645 \u0627\u0644\u0635\u0646\u0641 \u0627\u0644\u0643\u0627\u0645\u0644 *" }), _jsx("input", { type: "text", required: true, value: editingProduct.name, onChange: (e) => setEditingProduct((prev) => prev ? ({ ...prev, name: e.target.value }) : prev), placeholder: "\u0645\u062b\u0627\u0644: \u0645\u064a\u0627\u0647 \u0645\u0639\u062f\u0646\u064a\u0629 \u0623\u0631\u0648\u0649 500 \u0645\u0644", className: "w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900" })] }), _jsxs("div", { children: [_jsx("label", { className: "text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1", children: "\u0627\u0644\u062a\u0635\u0646\u064a\u0641:" }), _jsx(SearchableDropdown, { id: "product-category", options: categories.map((c) => ({ id: c.id, label: c.name })), selectedId: editingProduct.categoryId, onSelect: (id) => setEditingProduct((prev) => prev ? ({ ...prev, categoryId: id }) : prev), placeholder: "\u0627\u0628\u062d\u062b \u0639\u0646 \u0627\u0644\u062a\u0635\u0646\u064a\u0641..." })] }), _jsxs("div", { children: [_jsx("label", { className: "text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1", children: "مكان ظهور الصنف / الاستخدام:" }), _jsxs("select", { id: "product-sales-channel", value: editingProduct.salesChannel || 'both', onChange: (e) => setEditingProduct((prev) => prev ? ({ ...prev, salesChannel: e.target.value }) : prev), className: "w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold", children: [_jsx("option", { value: "shop", children: "المحل / الكاشير فقط" }), _jsx("option", { value: "restaurant", children: "المطعم والجرسون فقط" }), _jsx("option", { value: "both", children: "المحل والمطعم معاً" }), _jsx("option", { value: "raw_material", children: "مادة خام فقط - للوصفات والتصنيع" })] })] }), _jsxs("div", { children: [_jsx("label", { className: "text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1", children: "\u0627\u0644\u0639\u0644\u0627\u0645\u0629 \u0627\u0644\u062a\u062c\u0627\u0631\u064a\u0629 (\u0627\u0644\u0645\u0627\u0631\u0643\u0629):" }), _jsx("input", { type: "text", value: editingProduct.brand || '', onChange: (e) => setEditingProduct((prev) => prev ? ({ ...prev, brand: e.target.value }) : prev), placeholder: "\u0645\u062b\u0627\u0644: \u0623\u0631\u0648\u0649\u060c \u0643\u0648\u0643\u0627\u0643\u0648\u0644\u0627\u060c \u0627\u0644\u062c\u0646\u064a\u062f\u064a", className: "w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900" })] }), _jsxs("div", { children: [_jsx("label", { className: "text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1", children: "\u0643\u0648\u062f \u0627\u0644\u0635\u0646\u0641 \u0627\u0644\u062f\u0627\u062e\u0644\u064a (SKU):" }), _jsx("input", { type: "text", value: editingProduct.internalCode || '', onChange: (e) => setEditingProduct((prev) => prev ? ({ ...prev, internalCode: e.target.value }) : prev), className: "w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono" })] }), _jsxs("div", { children: [_jsx("label", { className: "text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1", children: "\u062d\u062f \u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0637\u0644\u0628 (\u062a\u0646\u0628\u064a\u0647 \u0627\u0644\u0646\u0648\u0627\u0642\u0635):" }), _jsx("input", { type: "text", inputMode: "decimal", dir: "ltr", value: editingProduct.reorderPoint ?? '', onChange: (e) => setEditingProduct((prev) => prev ? ({ ...prev, reorderPoint: cleanDecimalInput(e.target.value) }) : prev), className: "w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono" })] }), _jsxs("div", { children: [_jsx("label", { className: "text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1", children: "\u062a\u0627\u0631\u064a\u062e \u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0635\u0644\u0627\u062d\u064a\u0629:" }), _jsx("input", { type: "date", value: editingProduct.expiryDate || '', onChange: (e) => setEditingProduct((prev) => prev ? ({ ...prev, expiryDate: e.target.value }) : prev), className: "w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900" })] })] }), _jsxs("div", { className: "p-3 sm:p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 space-y-3 min-w-0 overflow-hidden", children: [_jsxs("div", { className: "flex items-center justify-between", children: [_jsxs("div", { className: "flex items-center gap-2", children: [_jsx(Layers, { className: "w-4 h-4 text-emerald-600" }), _jsx("h4", { className: "text-xs font-bold text-slate-900 dark:text-white", children: "\u0634\u062c\u0631\u0629 \u0627\u0644\u0648\u062d\u062f\u0627\u062a \u0627\u0644\u0647\u0631\u0645\u064a\u0629 \u0648\u0627\u0644\u0628\u0627\u0631\u0643\u0648\u062f\u0627\u062a:" })] }), _jsxs("button", { type: "button", onClick: handleAddParentUnit, className: "flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition", children: [_jsx(Plus, { className: "w-3.5 h-3.5" }), _jsx("span", { children: "\u0625\u0636\u0627\u0641\u0629 \u0648\u062d\u062f\u0629 \u0623\u0643\u0628\u0631 (\u0643\u0631\u062a\u0648\u0646\u0629 / \u0645\u0634\u0637\u0627\u062d)" })] })] }), _jsx("div", { className: "space-y-3", children: editingProduct.units.map((unit, idx) => {
                                                 const isBase = unit.id === editingProduct.baseUnitId;
                                                 const childUnit = editingProduct.units.find((u) => u.id === unit.childUnitId);
                                                 return renderUnitCard(unit, idx, isBase, childUnit);
-                                            }) })] })] }), _jsxs("div", { className: "p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 flex justify-between", children: [_jsx("button", { type: "button", onClick: () => setEditingProduct(null), className: "px-4 py-2 text-xs font-bold text-slate-600 rounded-lg hover:bg-slate-200", children: "\u0625\u0644\u063a\u0627\u0621" }), _jsx("button", { type: "submit", id: "btn-save-product-modal", className: "px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20", children: "\u062d\u0641\u0638 \u0627\u0644\u0635\u0646\u0641 \u0648\u062a\u062d\u062f\u064a\u062b \u0634\u062c\u0631\u0629 \u0627\u0644\u0648\u062d\u062f\u0627\u062a" })] })] }) })), _jsx(BarcodeCameraModal, { open: !!barcodeScanUnitId, onClose: () => setBarcodeScanUnitId(null), onDetected: handleDetectedUnitBarcode, title: "التقاط باركود الوحدة" })] }));
+                                            }) })] })] }), _jsxs("div", { className: "p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 flex justify-between", children: [_jsx("button", { type: "button", onClick: () => setEditingProduct(null), className: "px-4 py-2 text-xs font-bold text-slate-600 rounded-lg hover:bg-slate-200", children: "\u0625\u0644\u063a\u0627\u0621" }), _jsx("button", { type: "submit", id: "btn-save-product-modal", disabled: imageSaving, className: "px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20", children: imageSaving ? _jsx('span', { className: 'inline-block w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin' }) : "\u062d\u0641\u0638 \u0627\u0644\u0635\u0646\u0641 \u0648\u062a\u062d\u062f\u064a\u062b \u0634\u062c\u0631\u0629 \u0627\u0644\u0648\u062d\u062f\u0627\u062a" })] })] }) })), _jsx(BarcodeCameraModal, { open: !!barcodeScanUnitId, onClose: () => setBarcodeScanUnitId(null), onDetected: handleDetectedUnitBarcode, title: "التقاط باركود الوحدة" })] }));
 };

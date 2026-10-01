@@ -16,6 +16,7 @@ export const GENERAL_PAGE_PERMISSIONS = [
   ['canAccessReports','reports','التقارير والأرباح'],
   ['canAccessTrash','trash','سلة المحذوفات'],
   ['canAccessSettings','settings','إعدادات النظام'],
+  ['canAccessMessageTemplates','message_templates','قوالب الرسائل'],
   ['canAccessAI','oscar_ai','أوسكار AI'],
 ];
 
@@ -98,8 +99,9 @@ export function isManagerAccess({ runtime = null, currentUser = null, activeEmpl
 
 export function canAccessPermission(permissionKey, { runtime = null, currentUser = null, activeEmployee = null } = {}) {
   if (!permissionKey) return true;
-  if (isManagerAccess({ runtime, currentUser, activeEmployee })) return true;
   const rt = runtime || (typeof window !== 'undefined' ? window.OscarActivation?.readRuntime?.() : null);
+  if (permissionKey === 'canAccessAI' && rt?.plan === 'trial') return false;
+  if (isManagerAccess({ runtime:rt, currentUser, activeEmployee })) return true;
   const roleCode = String(currentUser?.roleCode || rt?.account?.role || activeEmployee?.role || 'custom').trim().toLowerCase();
   const raw = currentUser?.permissions ?? rt?.account?.permissions ?? activeEmployee?.permissions ?? {};
   const perms = normalizeEmployeePermissions(raw, roleCode);
@@ -118,7 +120,7 @@ export function canAccessTab(tab, { runtime = null, currentUser = null, activeEm
 export const DEFAULT_TAB_ORDER = [
   'pos','dashboard','sales','purchases','products','inventory','customers','suppliers','accounts','expenses','vouchers','reports','barcodes',
   'restaurant_tables','restaurant_waiter','restaurant_kitchen','restaurant_waste',
-  'categories','employees','financial_years','settings','trash'
+  'categories','employees','financial_years','message_templates','settings','trash'
 ];
 
 export function firstAllowedTab(args = {}) {

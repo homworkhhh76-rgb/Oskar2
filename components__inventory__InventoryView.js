@@ -1,13 +1,13 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.57-telegram-chatid';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.57-telegram-chatid';
-import { formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.57-telegram-chatid';
-import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.57-telegram-chatid';
-import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.57-telegram-chatid';
-import { downloadProfessionalTablePDF, downloadProfessionalTableExcel, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.57-telegram-chatid';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.57-telegram-chatid';
-import { TransferForm } from './components__inventory__TransferForm.js?v=7.9.4.57-telegram-chatid';
+import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.76-company-brand-only';
+import { formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.76-company-brand-only';
+import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.76-company-brand-only';
+import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.76-company-brand-only';
+import { downloadProfessionalTablePDF, downloadProfessionalTableExcel, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.76-company-brand-only';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.76-company-brand-only';
+import { TransferForm } from './components__inventory__TransferForm.js?v=7.9.4.76-company-brand-only';
 import { ArrowLeftRight, Building2, Download, Search, Image as ImageIcon, FileSpreadsheet, Trash2, } from 'lucide-react';
 export const InventoryView = () => {
     const { products, warehouses, settings, getProductStock, adjustStockCount, transferStock, recordDamagedStock, showToast, } = useApp();
@@ -16,7 +16,7 @@ export const InventoryView = () => {
     const [search, setSearch] = useState('');
     const stockTableRef = useRef(null);
     const countTableRef = useRef(null);
-    // Stock count state: productId -> actual count in base unit
+    // Stock count state: productId -> { unitId: quantity }
     const [actualCounts, setActualCounts] = useState({});
     const [countNotes, setCountNotes] = useState('');
     // Transfer state
@@ -37,12 +37,58 @@ export const InventoryView = () => {
     });
     const inventoryPager = usePagination(filteredProducts, 50, `${search}|${selectedWarehouseId}|balance`);
     const countPager = usePagination(activeProducts, 50, `${selectedWarehouseId}|count`);
+    const unitFactor = (unit) => Math.max(1, Number(unit?.conversionToBase) || 1);
+    const countUnitsFor = (prod) => Array.isArray(prod?.units) && prod.units.length ? prod.units : [{ id: prod?.baseUnitId || 'base', name: prod?.baseUnitName || 'حبة', conversionToBase: 1 }];
+    const decomposeStock = (prod, baseQty) => {
+        const result = {};
+        let remaining = Math.max(0, Number(baseQty) || 0);
+        const sorted = [...countUnitsFor(prod)].sort((a, b) => unitFactor(b) - unitFactor(a));
+        sorted.forEach((unit, index) => {
+            const factor = unitFactor(unit);
+            if (index === sorted.length - 1 || factor === 1) {
+                const qty = factor === 1 ? remaining : remaining / factor;
+                result[unit.id] = Math.round((qty + Number.EPSILON) * 1000) / 1000;
+                remaining = 0;
+            } else {
+                const qty = Math.floor((remaining + 1e-9) / factor);
+                result[unit.id] = qty;
+                remaining -= qty * factor;
+            }
+        });
+        return result;
+    };
+    const countStateFor = (prod) => {
+        const row = actualCounts[prod.id] || {};
+        const units = countUnitsFor(prod);
+        const entries = units.filter((u) => row[u.id] !== undefined && row[u.id] !== '');
+        const hasInput = entries.length > 0;
+        const currentStock = getProductStock(prod.id, selectedWarehouseId);
+        const unitBreakdown = entries.map((u) => {
+            const quantity = Math.max(0, Number(row[u.id]) || 0);
+            const conversionToBase = unitFactor(u);
+            return { unitId: u.id, unitName: u.name || prod.baseUnitName || 'حبة', quantity, conversionToBase, baseQuantity: quantity * conversionToBase };
+        });
+        const actualBase = hasInput ? unitBreakdown.reduce((sum, item) => sum + item.baseQuantity, 0) : currentStock;
+        return { row, units, hasInput, currentStock, actualBase, unitBreakdown, placeholders: decomposeStock(prod, currentStock) };
+    };
+    const setCountUnit = (productId, unitId, raw) => {
+        setActualCounts((prev) => {
+            const next = { ...prev };
+            const row = { ...(next[productId] || {}) };
+            if (raw === '') delete row[unitId];
+            else row[unitId] = Math.max(0, Number(raw) || 0);
+            if (Object.keys(row).length) next[productId] = row;
+            else delete next[productId];
+            return next;
+        });
+    };
 
     const handleApplyStockCount = async () => {
-        const adjustments = Object.entries(actualCounts).map(([productId, actualQty]) => ({
-            productId,
-            actualQty,
-        }));
+        const adjustments = activeProducts.map((prod) => {
+            const state = countStateFor(prod);
+            if (!state.hasInput) return null;
+            return { productId: prod.id, actualQty: state.actualBase, unitBreakdown: state.unitBreakdown };
+        }).filter(Boolean);
         if (adjustments.length === 0) {
             showToast('يرجى إدخال الجرد الفعلي لصنف واحد على الأقل', 'warning');
             return;
@@ -100,12 +146,14 @@ export const InventoryView = () => {
     };
     const getCountExportData = () => {
         const warehouseName = warehouses.find((w) => w.id === selectedWarehouseId)?.name || 'المخزن';
-        const headers = ['الصنف', 'الرصيد الدفتري', 'الجرد الفعلي', 'الفرق', 'قيمة الفرق'];
+        const headers = ['الصنف', 'الرصيد الدفتري', 'الجرد حسب الوحدات', 'الإجمالي بالوحدة الأساسية', 'الفرق', 'قيمة الفرق'];
         const rows = activeProducts.map((prod) => {
-            const currentStock = getProductStock(prod.id, selectedWarehouseId);
-            const actual = actualCounts[prod.id] !== undefined ? Number(actualCounts[prod.id]) : currentStock;
-            const diff = actual - currentStock;
-            return [prod.name, currentStock, actual, diff, diff * Number(prod.costPrice || 0)];
+            const state = countStateFor(prod);
+            const actualText = state.hasInput
+                ? state.unitBreakdown.map((u) => `${u.quantity} ${u.unitName}`).join(' + ')
+                : formatStockBreakdown(state.currentStock, prod.units, prod.baseUnitName);
+            const diff = state.actualBase - state.currentStock;
+            return [prod.name, formatStockBreakdown(state.currentStock, prod.units, prod.baseUnitName), actualText, state.actualBase, diff, diff * Number(prod.costPrice || 0)];
         });
         return { warehouseName, headers, rows };
     };
@@ -140,24 +188,20 @@ export const InventoryView = () => {
                                             return (_jsxs("tr", { className: "hover:bg-slate-50/50", children: [_jsx("td", { className: "p-3 font-bold text-slate-900 dark:text-white", children: prod.name }), _jsx("td", { className: "p-3 font-mono text-slate-400", children: prod.sku || prod.internalCode || '-' }), _jsx("td", { className: "p-3 text-center", children: _jsxs("span", { className: `px-2 py-0.5 rounded font-mono font-bold text-xs ${stock <= (prod.reorderPoint || 0)
                                                                 ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
                                                                 : 'bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'}`, children: formatStockBreakdown(stock, prod.units, prod.baseUnitName) }) }), _jsx("td", { className: "p-3 text-slate-600 dark:text-slate-300 font-medium", children: formatStockBreakdown(stock, prod.units) }), _jsxs("td", { className: "p-3 text-left font-mono font-bold text-slate-900 dark:text-white", children: [totalVal.toFixed(2), " ", settings.currencySymbol] }), _jsx("td", { className: "p-3 text-center", children: _jsxs("button", { type: "button", onClick: async () => { const raw = window.prompt("\u0643\u0645\u064a\u0629 \u0627\u0644\u062a\u0627\u0644\u0641 \u0628\u0627\u0644\u0648\u062d\u062f\u0629 \u0627\u0644\u0623\u0633\u0627\u0633\u064a\u0629", "1"); if (raw === null) return; const qty = parseFloat(raw); if (!(qty > 0)) { showToast("\u0623\u062f\u062e\u0644 \u0643\u0645\u064a\u0629 \u0635\u062d\u064a\u062d\u0629", "warning"); return; } await recordDamagedStock(prod.id, selectedWarehouseId, qty); }, className: "inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 font-bold text-[10px]", children: [_jsx(Trash2, { className: "w-3.5 h-3.5" }), "\u062a\u0627\u0644\u0641"] }) })] }, prod.id));
-                                        }) })] }) }) })] })), activeSubTab === 'balance' && (_jsx(Pagination, { pager: inventoryPager })), activeSubTab === 'count' && (_jsxs("div", { className: "rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-4", children: [_jsxs("div", { className: "flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3 border-slate-100 dark:border-slate-800", children: [_jsxs("div", { children: [_jsx("h3", { className: "text-sm font-bold text-slate-900 dark:text-white", children: "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062c\u0631\u062f \u0627\u0644\u0641\u0639\u0644\u064a \u0648\u0645\u0637\u0627\u0628\u0642\u0629 \u0627\u0644\u0641\u0631\u0648\u0642\u0627\u062a" }), _jsx("p", { className: "text-xs text-slate-500", children: "\u0623\u062f\u062e\u0644 \u0627\u0644\u0643\u0645\u064a\u0629 \u0627\u0644\u0641\u0639\u0644\u064a\u0629 \u0627\u0644\u0645\u0648\u062c\u0648\u062f\u0629 \u0639\u0644\u0649 \u0627\u0644\u0631\u0641. \u0633\u064a\u062a\u0645 \u0627\u062d\u062a\u0633\u0627\u0628 \u0627\u0644\u0639\u062c\u0632 \u0648\u0627\u0644\u0641\u0627\u0626\u0636 \u0648\u062a\u0633\u0648\u064a\u0629 \u0627\u0644\u0642\u064a\u0648\u062f \u0641\u0648\u0631\u0627\u064b." })] }), _jsxs("div", { className: "flex items-center gap-2 flex-wrap", children: [_jsxs("button", { type: "button", onClick: handleExportCountPDF, className: "flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 text-slate-700 dark:text-slate-300 text-xs font-semibold", title: "\u062a\u0646\u0632\u064a\u0644 \u0643\u0640 PDF", children: [_jsx(Download, { className: "w-3.5 h-3.5 text-rose-600" }), _jsx("span", { children: "PDF" })] }), _jsxs("button", { type: "button", onClick: handleExportCountImage, className: "flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 text-slate-700 dark:text-slate-300 text-xs font-semibold", title: "\u062a\u0646\u0632\u064a\u0644 \u0643\u0635\u0648\u0631\u0629", children: [_jsx(ImageIcon, { className: "w-3.5 h-3.5 text-blue-600" }), _jsx("span", { children: "\u0635\u0648\u0631\u0629" })] }), _jsxs("div", { className: "flex items-center gap-1.5 mr-2", children: [_jsx("span", { className: "text-xs font-semibold", children: "\u0645\u062e\u0632\u0646 \u0627\u0644\u062c\u0631\u062f:" }), _jsx("div", { className: "min-w-[190px]", children: _jsx(SearchableDropdown, { id: "count-warehouse", options: warehouses.map((w) => ({ id: w.id, label: w.name, subLabel: w.code || undefined })), selectedId: selectedWarehouseId, onSelect: setSelectedWarehouseId, placeholder: "\u0627\u0628\u062d\u062b \u0639\u0646 \u0627\u0644\u0645\u062e\u0632\u0646..." }) })] })] })] }), _jsx("div", { id: "stock-count-table-card", ref: countTableRef, className: "overflow-x-auto max-w-full slim-scrollbar border rounded-xl", children: _jsxs("table", { className: "w-full text-xs text-right whitespace-nowrap min-w-[700px]", children: [_jsx("thead", { children: _jsxs("tr", { className: "bg-slate-50 dark:bg-slate-800/60 border-b text-slate-500", children: [_jsx("th", { className: "p-2.5", children: "\u0627\u0644\u0635\u0646\u0641" }), _jsx("th", { className: "p-2.5 text-center", children: "\u0627\u0644\u0631\u0635\u064a\u062f \u0627\u0644\u062f\u0641\u062a\u0631\u064a \u0627\u0644\u0645\u0633\u062c\u0644" }), _jsx("th", { className: "p-2.5 text-center", children: "\u0627\u0644\u062c\u0631\u062f \u0627\u0644\u0641\u0639\u0644\u064a (\u0628\u0627\u0644\u0648\u062d\u062f\u0629 \u0627\u0644\u0623\u0633\u0627\u0633\u064a\u0629)" }), _jsx("th", { className: "p-2.5 text-center", children: "\u0627\u0644\u0641\u0631\u0642 (\u0639\u062c\u0632 / \u0641\u0627\u0626\u0636)" }), _jsx("th", { className: "p-2.5 text-left", children: "\u0642\u064a\u0645\u0629 \u0627\u0644\u0641\u0631\u0642 \u0627\u0644\u0645\u0627\u0644\u064a\u0629" })] }) }), _jsx("tbody", { className: "divide-y", children: countPager.pageItems.map((prod) => {
-                                        const currentStock = getProductStock(prod.id, selectedWarehouseId);
-                                        const hasInput = actualCounts[prod.id] !== undefined;
-                                        const actual = hasInput ? actualCounts[prod.id] : currentStock;
-                                        const diff = actual - currentStock;
+                                        }) })] }) }) })] })), activeSubTab === 'balance' && (_jsx(Pagination, { pager: inventoryPager })), activeSubTab === 'count' && (_jsxs("div", { className: "rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-4", children: [_jsxs("div", { className: "flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3 border-slate-100 dark:border-slate-800", children: [_jsxs("div", { children: [_jsx("h3", { className: "text-sm font-bold text-slate-900 dark:text-white", children: "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062c\u0631\u062f \u0627\u0644\u0641\u0639\u0644\u064a \u0648\u0645\u0637\u0627\u0628\u0642\u0629 \u0627\u0644\u0641\u0631\u0648\u0642\u0627\u062a" }), _jsx("p", { className: "text-xs text-slate-500", children: "\u0623\u062f\u062e\u0644 \u0627\u0644\u0643\u0645\u064a\u0629 \u0627\u0644\u0641\u0639\u0644\u064a\u0629 \u0627\u0644\u0645\u0648\u062c\u0648\u062f\u0629 \u0639\u0644\u0649 \u0627\u0644\u0631\u0641. \u0633\u064a\u062a\u0645 \u0627\u062d\u062a\u0633\u0627\u0628 \u0627\u0644\u0639\u062c\u0632 \u0648\u0627\u0644\u0641\u0627\u0626\u0636 \u0648\u062a\u0633\u0648\u064a\u0629 \u0627\u0644\u0642\u064a\u0648\u062f \u0641\u0648\u0631\u0627\u064b." })] }), _jsxs("div", { className: "flex items-center gap-2 flex-wrap", children: [_jsxs("button", { type: "button", onClick: handleExportCountPDF, className: "flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 text-slate-700 dark:text-slate-300 text-xs font-semibold", title: "\u062a\u0646\u0632\u064a\u0644 \u0643\u0640 PDF", children: [_jsx(Download, { className: "w-3.5 h-3.5 text-rose-600" }), _jsx("span", { children: "PDF" })] }), _jsxs("button", { type: "button", onClick: handleExportCountImage, className: "flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 text-slate-700 dark:text-slate-300 text-xs font-semibold", title: "\u062a\u0646\u0632\u064a\u0644 \u0643\u0635\u0648\u0631\u0629", children: [_jsx(ImageIcon, { className: "w-3.5 h-3.5 text-blue-600" }), _jsx("span", { children: "\u0635\u0648\u0631\u0629" })] }), _jsxs("div", { className: "flex items-center gap-1.5 mr-2", children: [_jsx("span", { className: "text-xs font-semibold", children: "\u0645\u062e\u0632\u0646 \u0627\u0644\u062c\u0631\u062f:" }), _jsx("div", { className: "min-w-[190px]", children: _jsx(SearchableDropdown, { id: "count-warehouse", options: warehouses.map((w) => ({ id: w.id, label: w.name, subLabel: w.code || undefined })), selectedId: selectedWarehouseId, onSelect: setSelectedWarehouseId, placeholder: "\u0627\u0628\u062d\u062b \u0639\u0646 \u0627\u0644\u0645\u062e\u0632\u0646..." }) })] })] })] }), _jsx("div", { id: "stock-count-table-card", ref: countTableRef, className: "overflow-x-auto max-w-full slim-scrollbar border rounded-xl", children: _jsxs("table", { className: "w-full text-xs text-right min-w-[920px]", children: [_jsx("thead", { children: _jsxs("tr", { className: "bg-slate-50 dark:bg-slate-800/60 border-b text-slate-500", children: [_jsx("th", { className: "p-2.5", children: "\u0627\u0644\u0635\u0646\u0641" }), _jsx("th", { className: "p-2.5 text-center", children: "\u0627\u0644\u0631\u0635\u064a\u062f \u0627\u0644\u062f\u0641\u062a\u0631\u064a \u0627\u0644\u0645\u0633\u062c\u0644" }), _jsx("th", { className: "p-2.5 text-center", children: "\u0627\u0644\u062c\u0631\u062f \u0627\u0644\u0641\u0639\u0644\u064a \u062d\u0633\u0628 \u062c\u0645\u064a\u0639 \u0627\u0644\u0648\u062d\u062f\u0627\u062a" }), _jsx("th", { className: "p-2.5 text-center", children: "\u0627\u0644\u0641\u0631\u0642 (\u0639\u062c\u0632 / \u0641\u0627\u0626\u0636)" }), _jsx("th", { className: "p-2.5 text-left", children: "\u0642\u064a\u0645\u0629 \u0627\u0644\u0641\u0631\u0642 \u0627\u0644\u0645\u0627\u0644\u064a\u0629" })] }) }), _jsx("tbody", { className: "divide-y", children: countPager.pageItems.map((prod) => {
+                                        const state = countStateFor(prod);
+                                        const diff = state.actualBase - state.currentStock;
                                         const diffVal = diff * (prod.costPrice || 0);
-                                        return (_jsxs("tr", { className: "hover:bg-slate-50/50", children: [_jsx("td", { className: "p-2.5 font-medium", children: prod.name }), _jsxs("td", { className: "p-2.5 text-center font-mono font-bold text-slate-600", children: [currentStock, " ", prod.baseUnitName] }), _jsx("td", { className: "p-2.5 text-center", children: _jsx("input", { type: "number", placeholder: currentStock.toString(), value: hasInput ? actualCounts[prod.id] : '', onChange: (e) => {
-                                                            const val = e.target.value === '' ? undefined : parseFloat(e.target.value);
-                                                            setActualCounts((prev) => {
-                                                                const copy = { ...prev };
-                                                                if (val === undefined) {
-                                                                    delete copy[prod.id];
-                                                                }
-                                                                else {
-                                                                    copy[prod.id] = val;
-                                                                }
-                                                                return copy;
-                                                            });
-                                                        }, className: "w-24 px-2 py-1 border rounded text-center font-mono font-bold bg-white dark:bg-slate-800" }) }), _jsx("td", { className: "p-2.5 text-center font-mono font-bold", children: diff === 0 ? (_jsx("span", { className: "text-slate-400", children: "\u0645\u0637\u0627\u0628\u0642" })) : diff > 0 ? (_jsxs("span", { className: "text-emerald-600", children: ["+", diff, " (\u0641\u0627\u0626\u0636)"] })) : (_jsxs("span", { className: "text-rose-600", children: [diff, " (\u0639\u062c\u0632)"] })) }), _jsx("td", { className: "p-2.5 text-left font-mono font-bold", children: diffVal !== 0 ? (_jsxs("span", { className: diffVal > 0 ? 'text-emerald-600' : 'text-rose-600', children: [diffVal.toFixed(2), " ", settings.currencySymbol] })) : ('-') })] }, prod.id));
+                                        return (_jsxs("tr", { className: "hover:bg-slate-50/50 align-top", children: [
+                                            _jsx("td", { className: "p-2.5 font-medium whitespace-nowrap", children: prod.name }),
+                                            _jsx("td", { className: "p-2.5 text-center font-mono font-bold text-slate-600 min-w-[150px]", children: formatStockBreakdown(state.currentStock, prod.units, prod.baseUnitName) }),
+                                            _jsx("td", { className: "p-2.5 min-w-[330px]", children: _jsx("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-2", children: state.units.map((unit) => _jsxs("label", { className: "flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1.5", children: [
+                                                _jsx("span", { className: "text-[10px] font-bold text-slate-600 dark:text-slate-300 min-w-[58px] truncate", title: unit.name, children: unit.name || prod.baseUnitName || "حبة" }),
+                                                _jsx("input", { type: "number", min: "0", step: "any", inputMode: "decimal", placeholder: String(state.placeholders[unit.id] ?? 0), value: state.row[unit.id] ?? '', onChange: (e) => setCountUnit(prod.id, unit.id, e.target.value), className: "w-20 min-w-0 flex-1 px-2 py-1 border rounded-md text-center font-mono font-bold bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-emerald-500" }),
+                                                _jsxs("span", { className: "text-[9px] text-slate-400 font-mono whitespace-nowrap", children: ["×", unitFactor(unit)] })
+                                            ] }, unit.id)) }) }),
+                                            _jsx("td", { className: "p-2.5 text-center font-mono font-bold", children: diff === 0 ? (_jsx("span", { className: "text-slate-400", children: "مطابق" })) : diff > 0 ? (_jsxs("span", { className: "text-emerald-600", children: ["+", Math.round(diff * 1000) / 1000, " (فائض)"] })) : (_jsxs("span", { className: "text-rose-600", children: [Math.round(diff * 1000) / 1000, " (عجز)"] })) }),
+                                            _jsx("td", { className: "p-2.5 text-left font-mono font-bold", children: diffVal !== 0 ? (_jsxs("span", { className: diffVal > 0 ? 'text-emerald-600' : 'text-rose-600', children: [diffVal.toFixed(2), " ", settings.currencySymbol] })) : ('-') })
+                                        ] }, prod.id));
                                     }) })] }) }), _jsxs("div", { className: "flex flex-col sm:flex-row items-center justify-between gap-3 pt-3", children: [_jsx("input", { type: "text", placeholder: "\u0645\u0644\u0627\u062d\u0638\u0627\u062a \u0627\u0644\u062c\u0631\u062f \u0627\u0644\u062f\u0648\u0631\u064a (\u0645\u062b\u0644\u0627\u064b: \u062c\u0631\u062f \u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0631)...", value: countNotes, onChange: (e) => setCountNotes(e.target.value), className: "w-full sm:w-96 px-3 py-2 text-xs border rounded-xl" }), _jsx("button", { onClick: handleApplyStockCount, className: "px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition", children: "\u0627\u0639\u062a\u0645\u0627\u062f \u0627\u0644\u062c\u0631\u062f \u0648\u062a\u0633\u0648\u064a\u0629 \u0627\u0644\u0641\u0631\u0648\u0642\u0627\u062a \u0622\u0644\u064a\u0627\u064b" })] })] })), activeSubTab === 'count' && (_jsx(Pagination, { pager: countPager })), activeSubTab === 'transfer' && (_jsx(TransferForm, {}))] }));
 };

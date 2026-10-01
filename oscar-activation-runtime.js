@@ -142,7 +142,7 @@
     if(!payload||payload.app!==APP_TAG)throw new Error('ملف التفعيل غير صالح.');
     const companyId=safe(payload.companyId||payload.tenantId),companyKey=safe(payload.companyKey||payload.activationKey);
     if(!companyId||!companyKey)throw new Error('ملف الشركة غير مكتمل.');
-    const cfg=payload.database||{},customerCfg=payload.customerDatabase||{},aiCfg=payload.ai||{},runtime={activationKey:payload.activationKey,fileId:payload.fileId,type:payload.type,companyId,tenantId:companyId,companyKey,companyName:payload.companyName,account:payload.account||null,permissions:payload.permissions||payload.account?.permissions||[],status:payload.status||'active',plan:payload.plan||'lifetime',expiresAt:payload.expiresAt||'',database:{databaseURL:safe(cfg.databaseURL),authToken:safe(cfg.authToken),table:safe(cfg.table||'oscar_rtdb')},customerDatabase:{databaseURL:safe(customerCfg.databaseURL||cfg.databaseURL),authToken:safe(customerCfg.authToken),table:safe(customerCfg.table||cfg.table||'oscar_rtdb')},ai:{provider:safe(aiCfg.provider||'openrouter')||'openrouter',apiKey:safe(aiCfg.apiKey),model:safe(aiCfg.model||'google/gemini-2.5-flash:free')||'google/gemini-2.5-flash:free'},rootPath:payload.rootPath||'oscar/companies',activatedAt:Date.now()};
+    const cfg=payload.database||{},customerCfg=payload.customerDatabase||{},aiCfg=payload.ai||{},runtime={activationKey:payload.activationKey,fileId:payload.fileId,type:payload.type,companyId,tenantId:companyId,companyKey,companyName:payload.companyName,account:payload.account||null,permissions:payload.permissions||payload.account?.permissions||[],status:payload.status||'active',plan:payload.plan||'lifetime',expiresAt:payload.expiresAt||'',database:{databaseURL:safe(cfg.databaseURL),authToken:safe(cfg.authToken),table:safe(cfg.table||'oscar_rtdb')},customerDatabase:{databaseURL:safe(customerCfg.databaseURL||cfg.databaseURL),authToken:safe(customerCfg.authToken),table:safe(customerCfg.table||cfg.table||'oscar_rtdb')},trialProfile:clone(payload.trialProfile||{}),trialLimits:clone(payload.trialLimits||{}),ai:{provider:safe(aiCfg.provider||'openrouter')||'openrouter',apiKey:safe(aiCfg.apiKey),model:safe(aiCfg.model||'google/gemini-2.5-flash:free')||'google/gemini-2.5-flash:free'},rootPath:payload.rootPath||'oscar/companies',activatedAt:Date.now()};
     localStorage.setItem(RUNTIME_KEY,wrapText(JSON.stringify(runtime)));
     if(runtime.database.databaseURL&&runtime.database.authToken)saveDatabaseAccess(runtime.database,{companyId});
     window.dispatchEvent(new CustomEvent('oscar:activation-loaded',{detail:{...runtime,database:{...runtime.database,authToken:''},customerDatabase:{...runtime.customerDatabase,authToken:runtime.customerDatabase?.authToken?'***':''},ai:{...runtime.ai,apiKey:runtime.ai.apiKey?'***':''}}}));
@@ -160,13 +160,20 @@
 
   function accountPath(payload){const companyId=encodeURIComponent(String(payload.companyId||payload.tenantId||''));const base=`oscar/companies/${companyId}`;if(payload.type==='company-manager')return `${base}/access/company`;return `${base}/d/employees/${encodeURIComponent(String(payload.account?.id||''))}`}
   function unwrapRecord(value){if(value&&typeof value==='object'&&Object.prototype.hasOwnProperty.call(value,'v'))return value.deleted?null:value.v;return value}
+  function assertCompanyAccessStatus(access){
+    const status=String(access?.status||'').trim().toLowerCase();
+    if(status==='active')return true;
+    if(['pending_payment','payment_review','pending'].includes(status))throw new Error('جاري معالجة دفعتك. سيتم تفعيل ملف الدخول فور اعتماد الدفعة من الإدارة.');
+    if(['rejected_payment','rejected','payment_rejected'].includes(status))throw new Error('لم يتم اعتماد دفعتك. راجع بيانات التحويل أو تواصل مع الإدارة ثم أعد المحاولة.');
+    throw new Error('تم إيقاف مفتاح الشركة من الإدارة العامة.');
+  }
   async function verifyCompanyAccessRemote(payload){
     const db=payload?.database||readDatabaseAccess(payload?.companyId)||{},companyId=String(payload?.companyId||payload?.tenantId||'');
     if(!companyId||!db.databaseURL||!db.authToken)throw new Error('بيانات قاعدة الشركة غير متاحة.');
     const base=`oscar/companies/${encodeURIComponent(companyId)}`,access=unwrapRecord(await readExact(db,`${base}/access/company`,{ensureSchema:true}));
     if(!access)throw new Error('مفتاح الشركة غير مسجل في قاعدة الشركة.');
     if(String(access.companyKey||'').toUpperCase()!==String(payload.companyKey||payload.activationKey||'').toUpperCase())throw new Error('ملف التفعيل لا يطابق مفتاح الشركة.');
-    if(access.status!=='active')throw new Error('تم إيقاف مفتاح الشركة من الإدارة العامة.');
+    assertCompanyAccessStatus(access);
     if(access.endAt&&Date.now()>=new Date(access.endAt).getTime())throw new Error('انتهت مدة تفعيل الشركة.');
     try{markVerified(payload,access)}catch(_){}
     return {access,online:true};
@@ -174,7 +181,7 @@
   async function verifyPayloadRemote(payload){
     const db=payload.database||readDatabaseAccess(payload.companyId)||{},companyId=String(payload.companyId||payload.tenantId||'');if(!companyId||!db.databaseURL||!db.authToken)throw new Error('ملف التفعيل لا يحتوي على قاعدة شركة صالحة.');
     const base=`oscar/companies/${encodeURIComponent(companyId)}`,accessPath=`${base}/access/company`;let access=unwrapRecord(await readExact(db,accessPath,{ensureSchema:true}));
-    if(!access)throw new Error('مفتاح الشركة غير مسجل في قاعدة الشركة.');if(String(access.companyKey||'').toUpperCase()!==String(payload.companyKey||payload.activationKey||'').toUpperCase())throw new Error('ملف التفعيل لا يطابق مفتاح الشركة.');if(access.status!=='active')throw new Error('تم إيقاف مفتاح الشركة من الإدارة العامة.');if(access.endAt&&Date.now()>=new Date(access.endAt).getTime())throw new Error('انتهت مدة تفعيل الشركة.');
+    if(!access)throw new Error('مفتاح الشركة غير مسجل في قاعدة الشركة.');if(String(access.companyKey||'').toUpperCase()!==String(payload.companyKey||payload.activationKey||'').toUpperCase())throw new Error('ملف التفعيل لا يطابق مفتاح الشركة.');assertCompanyAccessStatus(access);if(access.endAt&&Date.now()>=new Date(access.endAt).getTime())throw new Error('انتهت مدة تفعيل الشركة.');
     const account=payload.account||{};let verifiedAccount=null;
     if(payload.type==='company-manager'){
       let row=access.manager;if(!row||row.active===false)throw new Error('حساب مدير الشركة غير متاح.');if(String(row.id||'')!==String(account.id||''))throw new Error('ملف المدير لا يطابق الحساب المسجل.');
@@ -195,13 +202,18 @@
 
   function isLogicalVerificationError(error){
     const msg=String(error?.message||error||'');
-    return /مفتاح الشركة غير مسجل|لا يطابق|تم إيقاف|انتهت مدة|غير متاح|تم إصدار ملف|الحساب غير موجود|تم إيقاف هذا الحساب|لم يعد مندوباً|مدير الفرع غير متاح/.test(msg);
+    return /مفتاح الشركة غير مسجل|لا يطابق|تم إيقاف|انتهت مدة|غير متاح|تم إصدار ملف|الحساب غير موجود|تم إيقاف هذا الحساب|لم يعد مندوباً|مدير الفرع غير متاح|جاري معالجة دفعتك|لم يتم اعتماد دفعتك/.test(msg);
   }
   function validatePayloadLocally(payload){
     if(!payload||payload.app!==APP_TAG)throw new Error('ملف التفعيل غير صالح.');
     const companyId=String(payload.companyId||payload.tenantId||'').trim();
     if(!companyId)throw new Error('ملف الشركة غير مكتمل.');
-    if(payload.status&&payload.status!=='active')throw new Error('ملف الشركة غير فعال.');
+    if(payload.status&&payload.status!=='active'){
+      const st=String(payload.status||'').toLowerCase();
+      if(['pending_payment','payment_review','pending'].includes(st))throw new Error('جاري معالجة دفعتك. أول دخول بعد الموافقة يحتاج اتصالاً بالإنترنت.');
+      if(['rejected_payment','rejected','payment_rejected'].includes(st))throw new Error('لم يتم اعتماد دفعتك. راجع بيانات التحويل أو تواصل مع الإدارة.');
+      throw new Error('ملف الشركة غير فعال.');
+    }
     if(payload.expiresAt&&Date.now()>=new Date(payload.expiresAt).getTime())throw new Error('انتهت مدة تفعيل الشركة.');
     const db=payload.database||readDatabaseAccess(companyId)||{};
     if(!db.databaseURL||!db.authToken)throw new Error('ملف التفعيل لا يحتوي على قاعدة شركة صالحة.');
@@ -226,7 +238,7 @@
     if(allowOffline){const access=validatePayloadLocally(payload);try{markVerified(payload,access)}catch(_){}return{access,online:false,deferred:true,provisional:true}}
     throw new Error('تعذر التحقق من ملف الدخول.');
   }
-  function buildRolePayload(type,account,extra={}){const rt=readRuntime()||{};return{type,activationKey:rt.companyKey||rt.activationKey,fileId:`${type}_${account?.id||Date.now()}_${account?.authVersion||''}`,companyId:rt.companyId,tenantId:rt.companyId,companyKey:rt.companyKey||rt.activationKey,companyName:rt.companyName||'الشركة',status:rt.status||'active',plan:rt.plan||'lifetime',expiresAt:rt.expiresAt||'',rootPath:rt.rootPath||'oscar/companies',database:readDatabaseAccess(rt.companyId)||rt.database||{},customerDatabase:clone(rt.customerDatabase||{}),ai:clone(rt.ai||{}),permissions:account?.permissions||[],account:clone(account),...extra}}
+  function buildRolePayload(type,account,extra={}){const rt=readRuntime()||{};return{type,activationKey:rt.companyKey||rt.activationKey,fileId:`${type}_${account?.id||Date.now()}_${account?.authVersion||''}`,companyId:rt.companyId,tenantId:rt.companyId,companyKey:rt.companyKey||rt.activationKey,companyName:rt.companyName||'الشركة',status:rt.status||'active',plan:rt.plan||'lifetime',expiresAt:rt.expiresAt||'',rootPath:rt.rootPath||'oscar/companies',database:readDatabaseAccess(rt.companyId)||rt.database||{},customerDatabase:clone(rt.customerDatabase||{}),trialProfile:clone(rt.trialProfile||{}),trialLimits:clone(rt.trialLimits||{}),ai:clone(rt.ai||{}),permissions:account?.permissions||[],account:clone(account),...extra}}
   async function prepareVerifiedRoleFile(type,account,fileName){const payload=buildRolePayload(type,account);if(window.OscarCloudSync){const result=await window.OscarCloudSync.syncNow({manual:false,force:true});if(result?.remaining>0||result?.error)throw new Error('الحساب محفوظ محلياً لكن لم يصل إلى قاعدة الشركة بعد. شغّل المزامنة ثم أعد المحاولة.')}await verifyPayloadRemote(payload);return downloadActivationFile(payload,fileName)}
 
   async function prepareCompanyManagerFileRotation(fileName=''){
@@ -238,7 +250,7 @@
     if(policyVersion>=2&&currentVersion!==remoteVersion&&currentVersion!==previousVersion)throw new Error('هذا الملف لم يعد مخولاً بتغيير ملف المدير. ادخل بأحدث ملف مدير أولاً.');
     const authVersion='AUTH-'+(crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`),issuedAt=new Date().toISOString();
     const manager={...remote,...current,id:remote.id||current.id,active:true,authVersion,previousAuthVersion:currentVersion,pendingAuthVersion:authVersion,pendingIssuedAt:issuedAt,authPolicyVersion:2,updatedAt:issuedAt},updatedAt=Date.now(),nextAccess={...access,manager,updatedAt};
-    const account={...manager,branchId:current.branchId||'BR-MAIN',permissions:Array.isArray(current.permissions)?current.permissions:[]},payload={type:'company-manager',activationKey:rt.companyKey||rt.activationKey,fileId:`manager_${account.id}_${authVersion}`,companyId,tenantId:companyId,companyKey:rt.companyKey||rt.activationKey,companyName:rt.companyName||access.companyName||'الشركة',status:access.status||rt.status||'active',plan:access.plan||rt.plan||'lifetime',expiresAt:access.endAt||rt.expiresAt||'',rootPath:rt.rootPath||'oscar/companies',database:db,customerDatabase:clone(rt.customerDatabase||{}),ai:clone(rt.ai||{}),account,permissions:account.permissions,app:APP_TAG};
+    const account={...manager,branchId:current.branchId||'BR-MAIN',permissions:Array.isArray(current.permissions)?current.permissions:[]},payload={type:'company-manager',activationKey:rt.companyKey||rt.activationKey,fileId:`manager_${account.id}_${authVersion}`,companyId,tenantId:companyId,companyKey:rt.companyKey||rt.activationKey,companyName:rt.companyName||access.companyName||'الشركة',status:access.status||rt.status||'active',plan:access.plan||rt.plan||'lifetime',expiresAt:access.endAt||rt.expiresAt||'',rootPath:rt.rootPath||'oscar/companies',database:db,customerDatabase:clone(rt.customerDatabase||{}),trialProfile:clone(rt.trialProfile||{}),trialLimits:clone(rt.trialLimits||{}),ai:clone(rt.ai||{}),account,permissions:account.permissions,app:APP_TAG};
     const prepared=await prepareActivationDownload(payload,fileName||`${rt.companyName||access.companyName||'الشركة'}-مدير-جديد.mzauth`);
     await writeExact(db,path,nextAccess,updatedAt,false);
     return{...prepared,authVersion,previousAuthVersion:currentVersion,companyId};

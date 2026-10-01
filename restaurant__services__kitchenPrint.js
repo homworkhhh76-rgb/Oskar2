@@ -1,4 +1,4 @@
-import { printElementOnly } from './utils__export.js?v=7.9.4.57-telegram-chatid';
+import { printElementOnly } from './utils__export.js?v=7.9.4.76-company-brand-only';
 
 const esc = (value) => String(value ?? '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
