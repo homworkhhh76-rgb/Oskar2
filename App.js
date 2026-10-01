@@ -1,40 +1,42 @@
-import React, { useEffect, useState } from 'react';
-import { AppProvider, useApp } from './context__AppContext.js?v=7.9.4.57-telegram-chatid';
-import { Header } from './components__common__Header.js?v=7.9.4.57-telegram-chatid';
-import { Sidebar } from './components__common__Sidebar.js?v=7.9.4.57-telegram-chatid';
-import { BottomNav } from './components__common__BottomNav.js?v=7.9.4.57-telegram-chatid';
-import { Toast } from './components__common__Toast.js?v=7.9.4.57-telegram-chatid';
-import { SyncModal } from './components__sync__SyncModal.js?v=7.9.4.57-telegram-chatid';
-import { POSView } from './components__pos__POSView.js?v=7.9.4.57-telegram-chatid';
-import { DashboardView } from './components__dashboard__DashboardView.js?v=7.9.4.57-telegram-chatid';
-import { SalesView } from './components__sales__SalesView.js?v=7.9.4.57-telegram-chatid';
-import { PurchasesView } from './components__purchases__PurchasesView.js?v=7.9.4.57-telegram-chatid';
-import { ProductsView } from './components__products__ProductsView.js?v=7.9.4.57-telegram-chatid';
-import { CategoriesView } from './components__categories__CategoriesView.js?v=7.9.4.57-telegram-chatid';
-import { InventoryView } from './components__inventory__InventoryView.js?v=7.9.4.57-telegram-chatid';
-import { CustomersView } from './components__customers__CustomersView.js?v=7.9.4.57-telegram-chatid';
-import { SuppliersView } from './components__suppliers__SuppliersView.js?v=7.9.4.57-telegram-chatid';
-import { AccountsView } from './components__accounts__AccountsView.js?v=7.9.4.57-telegram-chatid';
-import { ExpensesView } from './components__expenses__ExpensesView.js?v=7.9.4.57-telegram-chatid';
-import { VouchersView } from './components__vouchers__VouchersView.js?v=7.9.4.57-telegram-chatid';
-import { EmployeesView } from './components__employees__EmployeesView.js?v=7.9.4.57-telegram-chatid';
-import { BarcodesView } from './components__barcodes__BarcodesView.js?v=7.9.4.57-telegram-chatid';
-import { ReportsView } from './components__reports__ReportsView.js?v=7.9.4.57-telegram-chatid';
-import { TrashView } from './components__trash__TrashView.js?v=7.9.4.57-telegram-chatid';
-import { SettingsView } from './components__settings__SettingsView.js?v=7.9.4.57-telegram-chatid';
-import { FinancialYearsView } from './components__financial__FinancialYearsView.js?v=7.9.4.57-telegram-chatid';
-import { ThermalReceiptModal } from './components__pos__ThermalReceiptModal.js?v=7.9.4.57-telegram-chatid';
-import { DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.57-telegram-chatid';
-import { LoginGate } from './components__auth__LoginGate.js?v=7.9.4.57-telegram-chatid';
-import { RestaurantProvider } from './restaurant__context__RestaurantContext.js?v=7.9.4.57-telegram-chatid';
-import { RestaurantTablesView } from './restaurant__components__RestaurantTablesView.js?v=7.9.4.57-telegram-chatid';
-import { RestaurantWaiterView } from './restaurant__components__RestaurantWaiterView.js?v=7.9.4.57-telegram-chatid';
-import { RestaurantKDSView } from './restaurant__components__RestaurantKDSView.js?v=7.9.4.57-telegram-chatid';
-import { RestaurantWasteView } from './restaurant__components__RestaurantWasteView.js?v=7.9.4.57-telegram-chatid';
-import { RestaurantSettingsPanel } from './restaurant__components__RestaurantSettingsPanel.js?v=7.9.4.57-telegram-chatid';
-import { OscarAI } from './components__ai__OscarAI.js?v=7.9.4.57-telegram-chatid';
-import { canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.57-telegram-chatid';
-import { startTelegramAutomation } from './services__telegram.js?v=7.9.4.57-telegram-chatid';
+import React, { useEffect } from 'react';
+import { AppProvider, useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
+import { Header } from './components__common__Header.js?v=7.9.4.76-company-brand-only';
+import { Sidebar } from './components__common__Sidebar.js?v=7.9.4.76-company-brand-only';
+import { BottomNav } from './components__common__BottomNav.js?v=7.9.4.76-company-brand-only';
+import { Toast } from './components__common__Toast.js?v=7.9.4.76-company-brand-only';
+import { SyncModal } from './components__sync__SyncModal.js?v=7.9.4.76-company-brand-only';
+import { POSView } from './components__pos__POSView.js?v=7.9.4.76-company-brand-only';
+import { DashboardView } from './components__dashboard__DashboardView.js?v=7.9.4.76-company-brand-only';
+import { SalesView } from './components__sales__SalesView.js?v=7.9.4.76-company-brand-only';
+import { PurchasesView } from './components__purchases__PurchasesView.js?v=7.9.4.76-company-brand-only';
+import { ProductsView } from './components__products__ProductsView.js?v=7.9.4.76-company-brand-only';
+import { CategoriesView } from './components__categories__CategoriesView.js?v=7.9.4.76-company-brand-only';
+import { InventoryView } from './components__inventory__InventoryView.js?v=7.9.4.76-company-brand-only';
+import { CustomersView } from './components__customers__CustomersView.js?v=7.9.4.76-company-brand-only';
+import { SuppliersView } from './components__suppliers__SuppliersView.js?v=7.9.4.76-company-brand-only';
+import { AccountsView } from './components__accounts__AccountsView.js?v=7.9.4.76-company-brand-only';
+import { ExpensesView } from './components__expenses__ExpensesView.js?v=7.9.4.76-company-brand-only';
+import { VouchersView } from './components__vouchers__VouchersView.js?v=7.9.4.76-company-brand-only';
+import { EmployeesView } from './components__employees__EmployeesView.js?v=7.9.4.76-company-brand-only';
+import { BarcodesView } from './components__barcodes__BarcodesView.js?v=7.9.4.76-company-brand-only';
+import { ReportsView } from './components__reports__ReportsView.js?v=7.9.4.76-company-brand-only';
+import { TrashView } from './components__trash__TrashView.js?v=7.9.4.76-company-brand-only';
+import { SettingsView } from './components__settings__SettingsView.js?v=7.9.4.76-company-brand-only';
+import { FinancialYearsView } from './components__financial__FinancialYearsView.js?v=7.9.4.76-company-brand-only';
+import { ThermalReceiptModal } from './components__pos__ThermalReceiptModal.js?v=7.9.4.76-company-brand-only';
+import { LoginGate } from './components__auth__LoginGate.js?v=7.9.4.76-company-brand-only';
+import { RestaurantProvider } from './restaurant__context__RestaurantContext.js?v=7.9.4.76-company-brand-only';
+import { RestaurantTablesView } from './restaurant__components__RestaurantTablesView.js?v=7.9.4.76-company-brand-only';
+import { RestaurantWaiterView } from './restaurant__components__RestaurantWaiterView.js?v=7.9.4.76-company-brand-only';
+import { RestaurantKDSView } from './restaurant__components__RestaurantKDSView.js?v=7.9.4.76-company-brand-only';
+import { RestaurantWasteView } from './restaurant__components__RestaurantWasteView.js?v=7.9.4.76-company-brand-only';
+import { RestaurantSettingsPanel } from './restaurant__components__RestaurantSettingsPanel.js?v=7.9.4.76-company-brand-only';
+import { OscarAI } from './components__ai__OscarAI.js?v=7.9.4.76-company-brand-only';
+import { MessageTemplatesView } from './components__messages__MessageTemplatesView.js?v=7.9.4.76-company-brand-only';
+import { isTrialAccount } from './trial__config.js?v=7.9.4.76-company-brand-only';
+import { canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.76-company-brand-only';
+import { startTelegramAutomation } from './services__telegram.js?v=7.9.4.76-company-brand-only';
+import { ensureProductImageAutoSync, syncPendingProductImages } from './services__productImages.js?v=7.9.4.76-company-brand-only';
 
 const h = React.createElement;
 const ScrollScreen = ({ children }) => h('div', { className:'scroll-chain-page h-full min-h-0 overflow-y-auto custom-scrollbar mobile-safe-bottom lg:pb-0' }, children);
@@ -48,16 +50,10 @@ const RESTAURANT_TAB_PERMISSIONS = {
 
 const MainLayout = () => {
   const { activeTab, setActiveTab, isLoaded, settings, saveSettings, currentUser, activeEmployee, cart } = useApp();
-  const [forceEnter, setForceEnter] = useState(false);
-  const [showSkipButton, setShowSkipButton] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setShowSkipButton(true), 1500);
-    return () => clearTimeout(timer);
-  }, []);
-
   useEffect(() => {
     if (!isLoaded) return;
+    ensureProductImageAutoSync();
+    syncPendingProductImages({limit:24}).catch(()=>{});
     return startTelegramAutomation();
   }, [isLoaded]);
 
@@ -124,7 +120,12 @@ const MainLayout = () => {
 
   useEffect(() => {
     if (!isLoaded) return;
-    document.title = 'أوسكار المحاسبي';
+    const runtimeCompanyName = String(window.OscarActivation?.readRuntime?.()?.companyName || '').trim();
+    const configuredStoreName = String(settings.storeName || '').trim();
+    const legacyShellNames = new Set(['أوسكار المحاسبي','الميزان ماركت','AlMezan Market POS']);
+    document.title = (runtimeCompanyName && (!configuredStoreName || legacyShellNames.has(configuredStoreName)))
+      ? runtimeCompanyName
+      : (configuredStoreName || runtimeCompanyName || 'نظام المحاسبة');
     document.documentElement.classList.remove('dark');
     if (settings.theme !== 'light') {
       saveSettings({ ...settings, theme:'light' });
@@ -159,15 +160,6 @@ const MainLayout = () => {
     }
   }, [activeTab, settings.isRestaurantModeEnabled, currentUser, activeEmployee, isLoaded]);
 
-  if (!isLoaded && !forceEnter) {
-    return h('div', { className:'min-h-[100dvh] w-screen flex flex-col items-center justify-center bg-slate-50 text-slate-900 px-4' },
-      h('img', { src:DEFAULT_LOGO_DATA_URL, alt:'أوسكار المحاسبي', className:'w-20 h-20 rounded-2xl object-cover shadow-xl mb-4 bg-white' }),
-      h('h2', { className:'text-xl font-black tracking-tight' }, 'أوسكار المحاسبي Oscar Accounting POS'),
-      h('p', { className:'text-xs text-slate-500 mt-1 font-semibold' }, 'جاري تهيئة قاعدة البيانات المحلية...'),
-      showSkipButton && h('button', { id:'force-enter-btn', onClick:()=>setForceEnter(true), className:'mt-6 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl shadow-md active:scale-95' }, 'الدخول الفوري للنظام ⚡')
-    );
-  }
-
   const screen = (() => {
     if (activeTab === 'no_access' || !canAccessTab(activeTab, accessArgs)) {
       return h('div', { className:'h-full flex items-center justify-center p-6 bg-slate-100' },
@@ -194,6 +186,7 @@ const MainLayout = () => {
     if (activeTab === 'reports') return h(ScrollScreen, null, h(ReportsView));
     if (activeTab === 'trash') return h(ScrollScreen, null, h(TrashView));
     if (activeTab === 'financial_years') return h(ScrollScreen, null, h(FinancialYearsView));
+    if (activeTab === 'message_templates') return h(ScrollScreen, null, h(MessageTemplatesView));
     if (activeTab === 'settings') return h(ScrollScreen, null, h(React.Fragment, null, h(SettingsView), h('div', { className:'px-4 sm:px-6 pb-6 max-w-4xl mx-auto' }, h(RestaurantSettingsPanel))));
     if (activeTab === 'restaurant_tables' && canOpenRestaurantTab(activeTab)) return h(ScrollScreen, null, h(RestaurantTablesView));
     if (activeTab === 'restaurant_waiter' && canOpenRestaurantTab(activeTab)) return h(RestaurantWaiterView);
@@ -216,7 +209,7 @@ const MainLayout = () => {
     ),
     h(ThermalReceiptModal),
     h(SyncModal),
-    h(OscarAI),
+    !isTrialAccount() ? h(OscarAI) : null,
     h(Toast)
   );
 };
