@@ -1,4 +1,5 @@
-import { decodeCustomerPortalAccess } from './customer-portal-codec.js?v=7.9.4.76-company-brand-only';
+import { decodeCustomerPortalAccess } from './customer-portal-codec.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { TRIAL_DATABASE } from './trial__config.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -13,10 +14,20 @@ async function resolvePortalAccessCode(){
   const params=new URLSearchParams(location.search);
   const c=String(params.get('c')||'').toUpperCase(),u=String(params.get('u')||'').toUpperCase();
   if(/^[A-Z2-9]{5}$/.test(c)&&/^[A-Z2-9]{5}$/.test(u)){
-    const response=await fetch(`/api/customer-short-link?c=${encodeURIComponent(c)}&u=${encodeURIComponent(u)}`,{cache:'no-store'});
-    const data=await response.json().catch(()=>null);
-    if(!response.ok||!data?.accessCode)throw new Error(data?.error||'تعذر فتح الرابط المختصر.');
-    return data.accessCode;
+    const path=`oscar/public/customer_short_links/${c}/${u}`;
+    const direct=window.OscarActivation?.tursoDirect;
+    if(direct){
+      try{
+        const row=await direct.readExact(TRIAL_DATABASE,path);
+        if(row?.accessCode)return row.accessCode;
+      }catch(_){ }
+    }
+    try{
+      const response=await fetch(`/api/customer-short-link?c=${encodeURIComponent(c)}&u=${encodeURIComponent(u)}`,{cache:'no-store'});
+      const data=await response.json().catch(()=>null);
+      if(response.ok&&data?.accessCode)return data.accessCode;
+    }catch(_){ }
+    throw new Error('تعذر فتح الرابط المختصر. أعد إنشاء رابط العميل من البرنامج ثم أرسله مرة أخرى.');
   }
   return location.hash;
 }

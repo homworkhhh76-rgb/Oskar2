@@ -1,11 +1,11 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, commitLocalBatch, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.76-company-brand-only';
-import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.76-company-brand-only';
-import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.76-company-brand-only';
-import { notifyTelegramInvoice } from './services__telegram.js?v=7.9.4.76-company-brand-only';
-import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.76-company-brand-only';
-import { isTrialAccount, TRIAL_LIMITS } from './trial__config.js?v=7.9.4.76-company-brand-only';
+import { getAllFromStore, getFromStore, putInStore, deleteFromStore, clearStore, bulkPut, commitLocalBatch, initializeDatabase, seedDatabaseDefaults, cleanupLegacyDemoSeedIfPristine, ensurePrimaryShowroomWarehouse, resetDatabase, exportDatabaseBackup, importDatabaseBackup, syncChannel, DEFAULT_SETTINGS, CASH_CUSTOMER, DEFAULT_CATEGORIES, DEFAULT_WAREHOUSES, DEFAULT_ACCOUNTS, DEFAULT_SUPPLIERS, getDemoProducts, getDemoStock, DEFAULT_EMPLOYEES, } from './services__db.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { calculateUnitConversions, findUnitByBarcode, toBaseQuantity } from './utils__unitTree.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { playBeepSound, playSuccessSound, playErrorSound } from './services__audio.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { notifyTelegramInvoice } from './services__telegram.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { normalizeEmployeePermissions, canAccessTab, firstAllowedTab } from './utils__permissions.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { isTrialAccount, TRIAL_LIMITS } from './trial__config.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 const AppContext = createContext(null);
 const recordTime = (item = {}) => {
     const fields = ['createdAt', 'date', 'timestamp', 'startTime', 'updatedAt'];
@@ -1449,7 +1449,8 @@ export const AppProvider = ({ children }) => {
             showToast(`وصلت إلى الحد المتاح للأصناف (${TRIAL_LIMITS.products}).`, 'warning');
             return false;
         }
-        const openingBaseQuantity = existedBefore ? 0 : Math.max(0, Number(product.openingBaseQuantity) || 0);
+        const openingStockSet = product.openingStockSet === true;
+        const openingBaseQuantity = Math.max(0, Number(product.openingBaseQuantity) || 0);
         const now = new Date().toISOString();
         const baseUnit = verifiedUnits.find((u) => u.id === product.baseUnitId) || verifiedUnits[0];
         const cleanProduct = {
@@ -1463,6 +1464,64 @@ export const AppProvider = ({ children }) => {
         // until auto-upload finishes and replaces it with Telegram identifiers.
         if (typeof cleanProduct.imageData === 'string' && cleanProduct.imageData.startsWith('data:image/') && !cleanProduct.imagePendingUpload) {
             cleanProduct.imageData = '';
+        }
+        if (existedBefore && openingStockSet) {
+            const warehouseId = settings.activeWarehouseId || warehouses[0]?.id;
+            if (warehouseId) {
+                const liveStockRows = await getAllFromStore('stock').catch(() => stock || []);
+                const stockRow = (Array.isArray(liveStockRows) ? liveStockRows : []).find((row) => row.productId === product.id && row.warehouseId === warehouseId);
+                const currentQty = Number(stockRow?.baseQuantity) || 0;
+                const targetQty = Math.max(0, openingBaseQuantity);
+                const delta = targetQty - currentQty;
+                if (Math.abs(delta) > 0.0000001) {
+                    const fifo = Array.isArray(cleanProduct.fifoBatches) ? cleanProduct.fifoBatches.map((b) => ({ ...b })) : [];
+                    const baseCost = Math.max(0, Number(baseUnit?.costPrice ?? product.costPrice) || 0);
+                    if (delta > 0) {
+                        fifo.push({
+                            id: `opening-edit-${product.id}-${Date.now()}`,
+                            purchaseId: 'opening-stock-edit',
+                            warehouseId,
+                            receivedAt: now,
+                            expiryDate: product.expiryDate || '',
+                            unitCost: baseCost,
+                            remainingBaseQty: delta,
+                        });
+                    } else {
+                        let left = Math.abs(delta);
+                        const candidates = fifo
+                            .filter((b) => (b.warehouseId === warehouseId || !b.warehouseId) && Number(b.remainingBaseQty) > 0)
+                            .sort((a, b) => new Date(a.receivedAt || 0).getTime() - new Date(b.receivedAt || 0).getTime());
+                        for (const batch of candidates) {
+                            if (left <= 0) break;
+                            const take = Math.min(left, Math.max(0, Number(batch.remainingBaseQty) || 0));
+                            batch.remainingBaseQty = Math.max(0, (Number(batch.remainingBaseQty) || 0) - take);
+                            left -= take;
+                        }
+                    }
+                    cleanProduct.fifoBatches = fifo;
+                    await putInStore('stock', { ...(stockRow || {}), productId: product.id, warehouseId, baseQuantity: targetQty, updatedAt: now });
+                    await putInStore('stock_movements', {
+                        id: `mov-opening-edit-${product.id}-${Date.now()}`,
+                        date: now,
+                        financialYearId: settings.activeFinancialYearId || 'fy-initial',
+                        productId: product.id,
+                        productName: product.name,
+                        warehouseId,
+                        warehouseName: warehouses.find((w) => w.id === warehouseId)?.name || 'صالة العرض',
+                        type: 'opening_adjustment',
+                        unitName: baseUnit?.name || product.baseUnitName || 'حبة',
+                        quantityInUnit: targetQty,
+                        conversionFactor: 1,
+                        baseQuantityChange: delta,
+                        newBaseBalance: targetQty,
+                        unitBreakdown: Array.isArray(product.openingUnitBreakdown) ? product.openingUnitBreakdown : [],
+                        referenceType: 'OPENING_EDIT',
+                        userId: currentUser.id,
+                        userName: currentUser.name,
+                        notes: `تعديل الكمية الافتتاحية من ${currentQty} إلى ${targetQty} ${baseUnit?.name || product.baseUnitName || 'حبة'}`,
+                    });
+                }
+            }
         }
         if (!existedBefore && openingBaseQuantity > 0) {
             const warehouseId = settings.activeWarehouseId || warehouses[0]?.id;
@@ -1505,11 +1564,12 @@ export const AppProvider = ({ children }) => {
                 }
             }
         }
+        cleanProduct.openingStockSet = false;
         await putInStore('products', cleanProduct);
         await reloadData();
         showToast(`تم حفظ الصنف: ${cleanProduct.name}`, 'success');
         return true;
-    }, [products, settings.activeWarehouseId, warehouses, currentUser, reloadData, showToast]);
+    }, [products, settings.activeWarehouseId, settings.activeFinancialYearId, warehouses, currentUser, stock, reloadData, showToast]);
     const softDeleteProduct = useCallback(async (productId) => {
         const prod = products.find((p) => p.id === productId);
         if (!prod)

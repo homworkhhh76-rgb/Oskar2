@@ -1,7 +1,7 @@
-import { TELEGRAM_BOT_TOKEN, normalizeTelegramRecipients, sendTelegramTextToRecipients, sendTelegramPhotoBlobToRecipients, sendTelegramDocumentBlobToRecipients, buildFullTelegramReportText } from './services__telegram.js?v=7.9.4.76-company-brand-only';
-import { renderExecutiveReportCanvas, renderTablePages } from './utils__canvasRenderer.js?v=7.9.4.76-company-brand-only';
-import { canvasesToPDFBlob } from './utils__pdfExport.js?v=7.9.4.76-company-brand-only';
-import { canvasToImageBlob } from './utils__imageExport.js?v=7.9.4.76-company-brand-only';
+import { TELEGRAM_BOT_TOKEN, normalizeTelegramRecipients, sendTelegramTextToRecipients, sendTelegramPhotoBlobToRecipients, sendTelegramDocumentBlobToRecipients, buildFullTelegramReportText } from './services__telegram.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { renderExecutiveReportCanvas, renderTablePages } from './utils__canvasRenderer.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { canvasesToPDFBlob } from './utils__pdfExport.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { canvasToImageBlob } from './utils__imageExport.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 
 const num=v=>{const n=Number(v);return Number.isFinite(n)?n:0;};
 const money=v=>num(v).toFixed(2);
@@ -189,7 +189,7 @@ export async function generateBackupArtifact(app){
 }
 
 export async function telegramRequest(body){
-  const r=await fetch('./api/oscar-telegram',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store'});
+  const r=await fetch('/api/oscar-telegram',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store'});
   const data=await r.json().catch(()=>null);
   if(!r.ok||data?.ok!==true) throw new Error(data?.error||data?.message||`خادم Telegram غير متاح (${r.status})`);
   return data;
@@ -206,6 +206,52 @@ function deliveryError(result,label){
 }
 function requireDelivery(result,label){ const e=deliveryError(result,label); if(e) throw e; return result; }
 async function bestEffortServer(action){ try{return await telegramRequest(action);}catch{return null;} }
+
+const BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+let backupAutomationBusy = false;
+const backupTenantKey = () => {
+  try {
+    const rt = window.OscarActivation?.readRuntime?.() || {};
+    return String(rt.companyId || rt.tenantId || rt.companyName || 'local').trim() || 'local';
+  } catch (_) { return 'local'; }
+};
+const backupStampKey = () => `oscar_daily_full_backup_last_v77::${backupTenantKey()}`;
+function readLocalBackupStamp(){ try{return Number(localStorage.getItem(backupStampKey())||0)||0;}catch(_){return 0;} }
+function writeLocalBackupStamp(value){ try{localStorage.setItem(backupStampKey(),String(Number(value)||Date.now()));}catch(_){ } }
+
+export async function checkDailyBackupDue(app,{force=false}={}){
+  if(backupAutomationBusy) return {ok:true,skipped:'busy'};
+  const current = typeof app === 'function' ? app() : app;
+  if(!current?.settings?.telegramDailyBackupEnabled) return {ok:true,skipped:'disabled'};
+  if(typeof navigator!=='undefined' && navigator.onLine===false) return {ok:true,skipped:'offline'};
+  const recipients=enabledReportRecipients(current.settings||{});
+  if(!recipients.length) return {ok:true,skipped:'no-recipients'};
+  backupAutomationBusy=true;
+  try{
+    const now=Date.now();
+    const status=await bestEffortServer({action:'status'});
+    const last=Math.max(readLocalBackupStamp(),Number(status?.lastDailyBackupSentAt||0)||0);
+    if(!force && last>0 && now-last<BACKUP_INTERVAL_MS) return {ok:true,skipped:'not-due',last};
+    const result=await sendBackupNow(current);
+    writeLocalBackupStamp(now);
+    return {...result,automatic:true};
+  }finally{backupAutomationBusy=false;}
+}
+
+export function startDailyBackupAutomation(getApp){
+  if(typeof window==='undefined') return ()=>{};
+  let stopped=false;
+  const run=()=>{if(!stopped)checkDailyBackupDue(getApp).catch(()=>{});};
+  const onVisible=()=>{if(!document.hidden)run();};
+  const onCustom=()=>run();
+  const timer=window.setInterval(run,60*1000);
+  window.addEventListener('online',run);
+  window.addEventListener('focus',run);
+  window.addEventListener('oscar-backup-check',onCustom);
+  document.addEventListener('visibilitychange',onVisible);
+  window.setTimeout(run,450);
+  return()=>{stopped=true;window.clearInterval(timer);window.removeEventListener('online',run);window.removeEventListener('focus',run);window.removeEventListener('oscar-backup-check',onCustom);document.removeEventListener('visibilitychange',onVisible);};
+}
 
 export async function saveTelegramConfig(settings){
   // Manual sending must work even on static hosting / HTML preview without server.js.
@@ -267,9 +313,12 @@ export async function sendBackupNow(app){
   const settings=app.settings||{};
   if(!enabledReportRecipients(settings).length) throw new Error('لا يوجد Chat ID فعّال. أضفه من الإعدادات وتأكد أن صاحب المعرف فتح البوت وضغط Start.');
   const a=await generateBackupArtifact(app);
-  const result=requireDelivery(await sendTelegramDocumentBlobToRecipients(a.blob,{settings,caption:`نسخة احتياطية — ${settings.storeName||'أوسكار المحاسبي'}`,filename:a.name}),'إرسال النسخة الاحتياطية');
+  const result=requireDelivery(await sendTelegramDocumentBlobToRecipients(a.blob,{settings,caption:`نسخة احتياطية كاملة — ${settings.storeName||'أوسكار المحاسبي'}`,filename:a.name}),'إرسال النسخة الاحتياطية');
   await saveTelegramConfig(settings).catch(()=>{});
+  const sentAt=Date.now();
+  writeLocalBackupStamp(sentAt);
   await bestEffortServer({action:'upload_backup',backupBase64:await blobToBase64(a.blob),backupName:a.name});
-  return {ok:true,sent:result.sent,mode:'direct'};
+  await bestEffortServer({action:'mark_backup_sent',sentAt});
+  return {ok:true,sent:result.sent,mode:'direct',sentAt};
 }
 

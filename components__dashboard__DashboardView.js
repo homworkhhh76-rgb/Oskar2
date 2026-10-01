@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
+import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 import { BarChart3, Wallet, Users, Package, ShoppingCart, PackagePlus, ClipboardList, Receipt, ArrowLeft, CalendarDays, TrendingUp, CircleDot } from 'lucide-react';
 
 const h = React.createElement;

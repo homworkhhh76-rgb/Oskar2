@@ -1,12 +1,12 @@
 import React from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.76-company-brand-only';
-import { BrandLogoImage } from './components__common__BrandLogoImage.js?v=7.9.4.76-company-brand-only';
-import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.76-company-brand-only';
+import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { BrandLogoImage } from './components__common__BrandLogoImage.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 import {
   LayoutDashboard, ShoppingCart, ReceiptText, Truck, Package, Boxes, Warehouse,
   Users, Building2, Wallet, Receipt, FileSpreadsheet, UserCheck, Barcode, BarChart3,
-  Trash2, Settings, LayoutGrid, UtensilsCrossed, ChefHat, Scale, Sparkles, CalendarRange, MessageSquareText
+  Trash2, Settings, LayoutGrid, UtensilsCrossed, ChefHat, Scale, Sparkles, CalendarRange, MessageSquareText, Headphones, BookOpenCheck
 } from 'lucide-react';
 
 const h = React.createElement;
@@ -57,6 +57,8 @@ export const Sidebar = () => {
     { id:'reports', label:'التقارير والأرباح', icon:BarChart3 },
     { id:'financial_years', label:'السنة المالية والأرشيف', icon:CalendarRange },
     { id:'message_templates', label:'قوالب الرسائل', icon:MessageSquareText },
+    { id:'oscar_ledger', label:'دفتر أوسكار', icon:BookOpenCheck },
+    { id:'support', label:'الدعم الفني', icon:Headphones },
     { id:'trash', label:'سلة المحذوفات', icon:Trash2 },
     { id:'settings', label:'إعدادات النظام', icon:Settings },
   ];
@@ -69,10 +71,22 @@ export const Sidebar = () => {
   ] : [];
 
   const orderedItems = settings.isRestaurantModeEnabled ? [navItems[0], navItems[1], ...restaurantItems, ...navItems.slice(2)] : navItems;
-  const allNavItems = orderedItems.filter(item => item.id === 'oscar_ai'
+  const allNavItems = orderedItems.filter(item => item.id === 'support' ? true : (item.id === 'oscar_ai'
     ? canAccessPermission('canAccessAI', accessArgs)
-    : canAccessTab(item.id, accessArgs));
+    : canAccessTab(item.id, accessArgs)));
   const go = id => {
+    if (id === 'support') {
+      setMobileSidebarOpen(false);
+      window.location.href='./support.html';
+      return;
+    }
+    if (id === 'oscar_ledger') {
+      if (canAccessPermission('canAccessOscarLedger', accessArgs)) {
+        setMobileSidebarOpen(false);
+        window.location.href='./oscar-ledger.html';
+      }
+      return;
+    }
     if (id === 'oscar_ai') {
       if (canAccessPermission('canAccessAI', accessArgs)) window.dispatchEvent(new Event('oscar-ai-open'));
       setMobileSidebarOpen(false);

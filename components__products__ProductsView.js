@@ -1,17 +1,18 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef, useEffect } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.76-company-brand-only';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.76-company-brand-only';
-import { BarcodeCameraModal } from './components__pos__CameraScannerModal.js?v=7.9.4.76-company-brand-only';
-import { calculateUnitConversions, formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.76-company-brand-only';
-import { exportToCSV } from './utils__export.js?v=7.9.4.76-company-brand-only';
-import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.76-company-brand-only';
-import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.76-company-brand-only';
-import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.76-company-brand-only';
-import { isTrialAccount } from './trial__config.js?v=7.9.4.76-company-brand-only';
-import { uploadProductImageToTelegram, createPendingProductImageState, isProductImageOfflineError, ensureProductImageAutoSync } from './services__productImages.js?v=7.9.4.76-company-brand-only';
-import { ProductImage } from './components__common__ProductImage.js?v=7.9.4.76-company-brand-only';
+import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { BarcodeCameraModal } from './components__pos__CameraScannerModal.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { calculateUnitConversions, formatStockBreakdown } from './utils__unitTree.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { exportToCSV } from './utils__export.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { isTrialAccount } from './trial__config.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { uploadProductImageToTelegram, createPendingProductImageState, isProductImageOfflineError, ensureProductImageAutoSync } from './services__productImages.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { ProductImage } from './components__common__ProductImage.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { playBeepSound } from './services__audio.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 import { Plus, Search, Trash2, Edit, Layers, FolderTree, X, Download, Image as ImageIcon, FileSpreadsheet, Camera, } from 'lucide-react';
 const h = React.createElement;
 const normalizeArabicDigits = (value) => String(value ?? '')
@@ -61,6 +62,7 @@ export const ProductsView = () => {
     const tableContainerRef = useRef(null);
     const productImageRef = useRef(null);
     const productCameraRef = useRef(null);
+    const openingBaselineRef = useRef('');
     const trialImageMode = false; // صور الأصناف ترفع إلى Telegram في جميع أنواع الحسابات
     // Modal State for Product Editor
     const [editingProduct, setEditingProduct] = useState(null);
@@ -86,6 +88,26 @@ export const ProductsView = () => {
         return true;
     });
     const productsPager = usePagination(filteredProducts, 50, `${search}|${selectedCategory}`);
+
+    const decomposeOpeningStock = (prod, baseQty) => {
+        const rows = Array.isArray(prod?.units) && prod.units.length ? [...prod.units] : [];
+        const result = {};
+        let remaining = Math.max(0, Number(baseQty) || 0);
+        rows.sort((a, b) => Math.max(1, toNumber(b.conversionToBase, 1)) - Math.max(1, toNumber(a.conversionToBase, 1)));
+        rows.forEach((unit, index) => {
+            const factor = Math.max(1, toNumber(unit.conversionToBase, 1));
+            if (index === rows.length - 1 || factor === 1) {
+                const qty = factor === 1 ? remaining : remaining / factor;
+                result[unit.id] = String(Math.round((qty + Number.EPSILON) * 1000) / 1000);
+                remaining = 0;
+            } else {
+                const qty = Math.floor((remaining + 1e-9) / factor);
+                result[unit.id] = String(qty);
+                remaining -= qty * factor;
+            }
+        });
+        return result;
+    };
     const handleOpenNew = () => {
         const defaultBaseUnitId = 'u-' + Date.now();
         const newProd = {
@@ -124,16 +146,21 @@ export const ProductsView = () => {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         };
+        openingBaselineRef.current = JSON.stringify({});
         setEditingProduct(newProd);
         setImageDraft(null);
         setImageRemoved(false);
         setIsNew(true);
     };
     const handleOpenEdit = (prod) => {
-        // Clone deeply to allow cancelation. Opening quantities are only for first-time stock setup.
+        // عند تعديل الصنف نعرض الرصيد الحالي موزعاً على وحداته. إذا غيّر المستخدم
+        // هذه القيم نعتبرها رصيداً مستهدفاً جديداً للمخزون، أما تركها كما هي فلا يغيّر الرصيد.
         const clone = JSON.parse(JSON.stringify(prod));
         clone.salesChannel = clone.salesChannel || 'both';
-        clone.units = (clone.units || []).map((u) => ({ ...u, openingQuantity: '' }));
+        const currentBaseStock = getProductStock(prod.id, settings.activeWarehouseId || undefined);
+        const breakdown = decomposeOpeningStock(clone, currentBaseStock);
+        clone.units = (clone.units || []).map((u) => ({ ...u, openingQuantity: breakdown[u.id] ?? '' }));
+        openingBaselineRef.current = JSON.stringify(Object.fromEntries(clone.units.map((u) => [u.id, String(u.openingQuantity ?? '')])));
         setEditingProduct(clone);
         setImageDraft(null);
         setImageRemoved(false);
@@ -150,6 +177,8 @@ export const ProductsView = () => {
             showToast('يجب أن يحتوي الصنف على وحدة واحدة على الأقل', 'warning');
             return;
         }
+        const rawOpeningMap = Object.fromEntries((editingProduct.units || []).map((u) => [u.id, String(u.openingQuantity ?? '')]));
+        const openingStockEdited = isNew || JSON.stringify(rawOpeningMap) !== openingBaselineRef.current;
         const numericUnits = editingProduct.units.map((u) => ({
             ...u,
             multiplier: u.id === editingProduct.baseUnitId ? 1 : Math.max(1, toNumber(u.multiplier, 1)),
@@ -177,7 +206,7 @@ export const ProductsView = () => {
                 }));
             }
         }
-        const openingUnitBreakdown = isNew
+        const openingUnitBreakdown = openingStockEdited
             ? updatedUnits.filter((u) => Math.max(0, toNumber(u.openingQuantity, 0)) > 0).map((u) => ({
                 unitId: u.id, unitName: u.name, quantity: Math.max(0, toNumber(u.openingQuantity, 0)),
                 conversionToBase: Math.max(1, toNumber(u.conversionToBase, 1)),
@@ -196,6 +225,7 @@ export const ProductsView = () => {
             costPrice: toNumber(finalBaseUnit?.costPrice, 0),
             openingBaseQuantity,
             openingUnitBreakdown,
+            openingStockSet: openingStockEdited,
             updatedAt: new Date().toISOString(),
         };
         let productToSave = finalProd;
@@ -349,13 +379,18 @@ export const ProductsView = () => {
         if (!barcodeScanUnitId || !code) return;
         const clean = normalizeArabicDigits(code).trim();
         if (!clean) return;
+        const targetUnitId = barcodeScanUnitId;
         setEditingProduct((prev) => prev ? ({
             ...prev,
-            units: prev.units.map((u) => u.id === barcodeScanUnitId
+            units: prev.units.map((u) => u.id === targetUnitId
                 ? ({ ...u, barcodes: [clean, ...(u.barcodes || []).filter((x) => x !== clean)] })
                 : u),
         }) : prev);
-        showToast(`تم التقاط الباركود: ${clean} — يمكنك مسح باركود آخر أو إغلاق الكاميرا`, 'success');
+        // في شاشة إضافة/تعديل الصنف: قراءة واحدة فقط، صوت الماسح ثم إغلاق الكاميرا فوراً.
+        // ماسح الكاشير منفصل ويظل مفتوحاً للمسح المتتابع كما هو.
+        playBeepSound(settings.scannerBeepEnabled);
+        setBarcodeScanUnitId(null);
+        showToast(`تم التقاط الباركود: ${clean}`, 'success');
     };
     const updateUnitField = (unitId, field, value, recalculate = false) => {
         setEditingProduct((prev) => {
@@ -506,5 +541,5 @@ export const ProductsView = () => {
                                                 const isBase = unit.id === editingProduct.baseUnitId;
                                                 const childUnit = editingProduct.units.find((u) => u.id === unit.childUnitId);
                                                 return renderUnitCard(unit, idx, isBase, childUnit);
-                                            }) })] })] }), _jsxs("div", { className: "p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 flex justify-between", children: [_jsx("button", { type: "button", onClick: () => setEditingProduct(null), className: "px-4 py-2 text-xs font-bold text-slate-600 rounded-lg hover:bg-slate-200", children: "\u0625\u0644\u063a\u0627\u0621" }), _jsx("button", { type: "submit", id: "btn-save-product-modal", disabled: imageSaving, className: "px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20", children: imageSaving ? _jsx('span', { className: 'inline-block w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin' }) : "\u062d\u0641\u0638 \u0627\u0644\u0635\u0646\u0641 \u0648\u062a\u062d\u062f\u064a\u062b \u0634\u062c\u0631\u0629 \u0627\u0644\u0648\u062d\u062f\u0627\u062a" })] })] }) })), _jsx(BarcodeCameraModal, { open: !!barcodeScanUnitId, onClose: () => setBarcodeScanUnitId(null), onDetected: handleDetectedUnitBarcode, title: "التقاط باركود الوحدة" })] }));
+                                            }) })] })] }), _jsxs("div", { className: "p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 flex justify-between", children: [_jsx("button", { type: "button", onClick: () => setEditingProduct(null), className: "px-4 py-2 text-xs font-bold text-slate-600 rounded-lg hover:bg-slate-200", children: "\u0625\u0644\u063a\u0627\u0621" }), _jsx("button", { type: "submit", id: "btn-save-product-modal", disabled: imageSaving, className: "px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20", children: imageSaving ? _jsx('span', { className: 'inline-block w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin' }) : "\u062d\u0641\u0638 \u0627\u0644\u0635\u0646\u0641 \u0648\u062a\u062d\u062f\u064a\u062b \u0634\u062c\u0631\u0629 \u0627\u0644\u0648\u062d\u062f\u0627\u062a" })] })] }) })), _jsx(BarcodeCameraModal, { open: !!barcodeScanUnitId, onClose: () => setBarcodeScanUnitId(null), onDetected: handleDetectedUnitBarcode, title: "التقاط باركود الوحدة", autoClose: true })] }));
 };

@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
+import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 import { Camera, X, AlertCircle, ScanLine } from 'lucide-react';
 
 const h = React.createElement;
 
-export const BarcodeCameraModal = ({ open, onClose, onDetected, title = 'مسح الباركود بالكاميرا' }) => {
+export const BarcodeCameraModal = ({ open, onClose, onDetected, title = 'مسح الباركود بالكاميرا', autoClose = false }) => {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const detectorRef = useRef(null);
@@ -42,8 +42,13 @@ export const BarcodeCameraModal = ({ open, onClose, onDetected, title = 'مسح 
       if (lastCodeRef.current.code === clean && (now - lastCodeRef.current.at) < 1400) return;
       lastCodeRef.current = { code: clean, at: now };
       busyRef.current = true;
-      setStatus(`تمت قراءة ${clean} — الكاميرا ما زالت مفتوحة`);
+      setStatus(autoClose ? `تمت قراءة ${clean}` : `تمت قراءة ${clean} — الكاميرا ما زالت مفتوحة`);
       try { onDetectedRef.current?.(clean); } finally {
+        if (autoClose) {
+          stop();
+          window.requestAnimationFrame(() => onCloseRef.current?.());
+          return;
+        }
         window.setTimeout(() => {
           if (!cancelled) {
             busyRef.current = false;

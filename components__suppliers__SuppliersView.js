@@ -1,12 +1,12 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import React, { useState, useRef } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.76-company-brand-only';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.76-company-brand-only';
-import { exportToCSV, printReceiptElement } from './utils__export.js?v=7.9.4.76-company-brand-only';
-import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.76-company-brand-only';
-import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.76-company-brand-only';
-import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.76-company-brand-only';
+import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { exportToCSV, printReceiptElement } from './utils__export.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { downloadElementAsPDF } from './utils__pdfExport.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { downloadElementAsImage } from './utils__imageExport.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { downloadProfessionalTablePDF, downloadProfessionalTableImage } from './utils__professionalExport.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 import { Plus, Search, FileText, DollarSign, Download, Printer, Trash2, X, Edit, Image as ImageIcon, FileSpreadsheet, } from 'lucide-react';
 const normalizeOpeningBalanceInput = (value) => {
     let raw = String(value ?? '')

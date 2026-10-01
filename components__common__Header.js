@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
-import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.76-company-brand-only';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.76-company-brand-only';
-import { BrandLogoImage } from './components__common__BrandLogoImage.js?v=7.9.4.76-company-brand-only';
-import { uploadProductImageToTelegram } from './services__productImages.js?v=7.9.4.76-company-brand-only';
+import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { PWAInstallButton } from './components__common__PWAInstallButton.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { BrandLogoImage } from './components__common__BrandLogoImage.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { uploadProductImageToTelegram } from './services__productImages.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 import { Wifi, WifiOff, RefreshCw, Maximize2, Minimize2, Clock, Store, Camera, Menu, LogOut, Building2, Bell } from 'lucide-react';
-import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.76-company-brand-only';
-import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.76-company-brand-only';
-import { saveTelegramConfig, uploadTelegramSnapshot } from './services__telegramReports.js?v=7.9.4.76-company-brand-only';
+import { NotificationsModal, buildSystemNotifications } from './components__common__NotificationsModal.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { canAccessTab, canAccessPermission, firstAllowedTab } from './utils__permissions.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { saveTelegramConfig, uploadTelegramSnapshot } from './services__telegramReports.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 
 const h = React.createElement;
 
@@ -80,7 +80,7 @@ export const Header = () => {
       const dataUrl = await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result||''));r.onerror=()=>reject(new Error('تعذر قراءة الشعار'));r.readAsDataURL(file);});
       const uploaded = await uploadProductImageToTelegram(dataUrl, `store-logo-${Date.now()}.jpg`);
       await saveSettings({ ...settings, logoUrl:'', logoSourceUrl:uploaded.url||'', logoTelegramFileId:uploaded.fileId, logoTelegramUniqueId:uploaded.fileUniqueId, logoStorage:'telegram-photo', logoUpdatedAt:new Date().toISOString() });
-      showToast('تم تحديث شعار المحل وحفظه عبر Telegram', 'success');
+      showToast('تم تحديث شعار المحل', 'success');
     } catch(error) { showToast(error?.message || 'تعذر رفع شعار المحل', 'error'); }
     finally { setLogoUploading(false); }
   };
@@ -89,7 +89,7 @@ export const Header = () => {
     h('div', { className: 'flex items-center gap-2 shrink-0 min-w-0 lg:hidden' },
       h('button', { type: 'button', onClick: () => setMobileSidebarOpen(!mobileSidebarOpen), className: 'lg:hidden p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800', title: 'القائمة الجانبية' }, h(Menu, { className: 'w-5 h-5' })),
       h('input', { ref: logoInputRef, type: 'file', accept: 'image/*', className: 'hidden', onChange: handleLogoUpload }),
-      h('button', { type: 'button', onClick: () => canSettings ? logoInputRef.current?.click() : setActiveTab(homeTab), className: 'relative w-9 h-9 shrink-0 rounded-xl overflow-hidden bg-white border border-emerald-500/30 shadow-xs group', title: canSettings ? 'تغيير شعار المحل — يتم حفظ الصورة عبر Telegram' : 'الصفحة الرئيسية المسموحة', disabled:logoUploading || !isLoaded },
+      h('button', { type: 'button', onClick: () => canSettings ? logoInputRef.current?.click() : setActiveTab(homeTab), className: 'relative w-9 h-9 shrink-0 rounded-xl overflow-hidden bg-white border border-emerald-500/30 shadow-xs group', title: canSettings ? 'تغيير شعار المحل' : 'الصفحة الرئيسية المسموحة', disabled:logoUploading || !isLoaded },
         brandSettings
           ? h(BrandLogoImage, { settings:brandSettings, alt:brandName, className:'w-full h-full object-cover bg-white' })
           : h('span',{className:'w-full h-full grid place-items-center bg-slate-50 text-slate-300'},h(Store,{className:'w-4 h-4'})),

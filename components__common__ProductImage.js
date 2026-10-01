@@ -1,6 +1,6 @@
 import React from 'react';
 import { Package } from 'lucide-react';
-import { getProductImageSrc, resolveProductImageUrl, forgetProductImageUrl, ensureProductImageAutoSync } from './services__productImages.js?v=7.9.4.76-company-brand-only';
+import { getProductImageSrc, resolveProductImageUrl, forgetProductImageUrl, ensureProductImageAutoSync } from './services__productImages.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 
 export const ProductImage = ({ product, alt='', className='', wrapperClassName='', fallback=null, loading='lazy' }) => {
   const fileId=String(product?.imageTelegramFileId||'').trim();

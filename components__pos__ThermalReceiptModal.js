@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
-import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.76-company-brand-only';
-import { downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel, warmProfessionalExportLibraries } from './utils__professionalExport.js?v=7.9.4.76-company-brand-only';
-import { renderInvoiceCanvas } from './utils__canvasRenderer.js?v=7.9.4.76-company-brand-only';
-import { smartPrinter } from './services__printer.js?v=7.9.4.76-company-brand-only';
-import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.76-company-brand-only';
+import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { printElementOnly, warmExportLibraries } from './utils__export.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { downloadProfessionalInvoicePDF, downloadProfessionalInvoiceImage, downloadProfessionalInvoiceExcel, warmProfessionalExportLibraries } from './utils__professionalExport.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { renderInvoiceCanvas } from './utils__canvasRenderer.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { smartPrinter } from './services__printer.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { getBrandLogoDataUrl, getBrandLogoDisplayUrl, DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 import { Printer, X, Download, Image as ImageIcon, FileSpreadsheet, Bluetooth } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 

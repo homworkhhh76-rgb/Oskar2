@@ -1,6 +1,6 @@
 import React,{useState} from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
-import { createCustomerPortalLinks } from './services__customerPortalLinks.js?v=7.9.4.76-company-brand-only';
+import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { createCustomerPortalLinks } from './services__customerPortalLinks.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 const h=React.createElement;
 const DEFAULTS={
  invoiceWhatsApp:`مرحباً {customer_name} 👋\nتم إصدار فاتورتك رقم {invoice_no} من {store_name}.\n\nالإجمالي: {invoice_total} {currency}\nالمدفوع: {paid_amount} {currency}\nالمتبقي: {remaining_amount} {currency}\n\nرابط السداد:\n{payment_link}\n\nشكراً لتعاملكم معنا.`,

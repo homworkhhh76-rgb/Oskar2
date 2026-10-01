@@ -4,12 +4,15 @@
  * If the device is offline, the image stays locally with the product until the
  * internet returns, then it is uploaded automatically in the background.
  */
-import { getAllFromStore, putInStore } from './services__db.js?v=7.9.4.76-company-brand-only';
+import { getAllFromStore, putInStore } from './services__db.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 
-const PRODUCT_IMAGE_BOT_TOKEN = '8901874566:AAG3TAC6xSl-YHmEnQTpvBrxZpoBwyyx6nY';
+const PRODUCT_IMAGE_BOT_TOKEN = '8893463288:AAHn77qegDsR3Yu1LYGicM0Dfh1Fznw4agg';
+const LEGACY_IMAGE_BOT_TOKEN = '8901874566:AAG3TAC6xSl-YHmEnQTpvBrxZpoBwyyx6nY';
 const PRODUCT_IMAGE_CHAT_ID = '6764610810';
 const TELEGRAM_API = `https://api.telegram.org/bot${PRODUCT_IMAGE_BOT_TOKEN}`;
 const TELEGRAM_FILE_ROOT = `https://api.telegram.org/file/bot${PRODUCT_IMAGE_BOT_TOKEN}`;
+const LEGACY_TELEGRAM_API = `https://api.telegram.org/bot${LEGACY_IMAGE_BOT_TOKEN}`;
+const LEGACY_TELEGRAM_FILE_ROOT = `https://api.telegram.org/file/bot${LEGACY_IMAGE_BOT_TOKEN}`;
 const CACHE_TTL = 45 * 60 * 1000;
 const CACHE_PREFIX = 'oscar_product_image_url_v64::';
 const memoryCache = new Map();
@@ -68,7 +71,7 @@ export function forgetProductImageUrl(fileId){
   try{localStorage.removeItem(cacheKey(id));}catch(_){ }
 }
 
-async function telegramJson(method,{body=null}={}){
+async function telegramJson(method,{body=null,api=TELEGRAM_API}={}){
   const opts={method:'POST',cache:'no-store'};
   if(body instanceof FormData) opts.body=body;
   else if(body){
@@ -77,7 +80,7 @@ async function telegramJson(method,{body=null}={}){
     opts.body=params;
   }
   let response;
-  try{response=await fetch(`${TELEGRAM_API}/${method}`,opts);}catch(_){
+  try{response=await fetch(`${api}/${method}`,opts);}catch(_){
     throw buildError('تعذر الاتصال بخدمة حفظ الصور. تحقق من الإنترنت ثم أعد المحاولة.','offline');
   }
   const data=await response.json().catch(()=>null);
@@ -98,10 +101,17 @@ export async function resolveProductImageUrl(fileId,{force=false}={}){
   if(!id) return '';
   if(!force){const cached=readCache(id);if(cached?.url) return cached.url;}
   if(force) forgetProductImageUrl(id);
-  const data=await telegramJson('getFile',{body:{file_id:id}});
+  let data=null, fileRoot=TELEGRAM_FILE_ROOT;
+  try{
+    data=await telegramJson('getFile',{body:{file_id:id},api:TELEGRAM_API});
+  }catch(primaryError){
+    // الصور القديمة التي حُفظت قبل نقل التخزين إلى بوت التقارير تبقى قابلة للعرض.
+    try{data=await telegramJson('getFile',{body:{file_id:id},api:LEGACY_TELEGRAM_API});fileRoot=LEGACY_TELEGRAM_FILE_ROOT;}
+    catch(_){throw primaryError;}
+  }
   const filePath=clean(data?.result?.file_path);
   if(!filePath) throw buildError('تعذر الحصول على رابط الصورة من Telegram.','generic');
-  const url=`${TELEGRAM_FILE_ROOT}/${filePath}`;
+  const url=`${fileRoot}/${filePath}`;
   writeCache(id,url,filePath);
   return url;
 }

@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.76-company-brand-only';
-import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.76-company-brand-only';
+import { useRestaurant } from './restaurant__context__RestaurantContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { useApp } from './restaurant__context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 import {
   ChefHat, Flame, Clock, Printer, CheckCircle2, Volume2, VolumeX,
   Utensils, ShoppingBag, Trash2, StickyNote, TimerReset, CircleDot, X
 } from 'lucide-react';
-import { KitchenTicketModal } from './restaurant__components__KitchenTicketModal.js?v=7.9.4.76-company-brand-only';
-import { printKitchenTicketDirect } from './restaurant__services__kitchenPrint.js?v=7.9.4.76-company-brand-only';
+import { KitchenTicketModal } from './restaurant__components__KitchenTicketModal.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { printKitchenTicketDirect } from './restaurant__services__kitchenPrint.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 
 const h = React.createElement;
 const noteText = notes => typeof notes === 'string' ? notes : String(notes?.kitchenNotes || notes?.general || '');

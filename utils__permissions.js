@@ -17,6 +17,7 @@ export const GENERAL_PAGE_PERMISSIONS = [
   ['canAccessTrash','trash','سلة المحذوفات'],
   ['canAccessSettings','settings','إعدادات النظام'],
   ['canAccessMessageTemplates','message_templates','قوالب الرسائل'],
+  ['canAccessOscarLedger','oscar_ledger','دفتر أوسكار'],
   ['canAccessAI','oscar_ai','أوسكار AI'],
 ];
 
@@ -110,6 +111,7 @@ export function canAccessPermission(permissionKey, { runtime = null, currentUser
 
 export function canAccessTab(tab, { runtime = null, currentUser = null, activeEmployee = null, restaurantEnabled = true } = {}) {
   if (tab === 'no_access') return false;
+  if (tab === 'support') return true;
   if (tab === 'financial_years') return canAccessPermission('canAccessSettings', { runtime, currentUser, activeEmployee });
   const permissionKey = PAGE_PERMISSION_MAP[tab];
   if (!permissionKey) return false;
@@ -120,7 +122,7 @@ export function canAccessTab(tab, { runtime = null, currentUser = null, activeEm
 export const DEFAULT_TAB_ORDER = [
   'pos','dashboard','sales','purchases','products','inventory','customers','suppliers','accounts','expenses','vouchers','reports','barcodes',
   'restaurant_tables','restaurant_waiter','restaurant_kitchen','restaurant_waste',
-  'categories','employees','financial_years','message_templates','settings','trash'
+  'categories','employees','financial_years','message_templates','oscar_ledger','settings','trash'
 ];
 
 export function firstAllowedTab(args = {}) {

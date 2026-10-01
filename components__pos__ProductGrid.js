@@ -1,7 +1,7 @@
 import React from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
+import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 import { Layers } from 'lucide-react';
-import { ProductImage } from './components__common__ProductImage.js?v=7.9.4.76-company-brand-only';
+import { ProductImage } from './components__common__ProductImage.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 
 const h = React.createElement;
 

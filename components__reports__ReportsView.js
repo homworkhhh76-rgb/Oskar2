@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
-import { exportToCSV, downloadBlob } from './utils__export.js?v=7.9.4.76-company-brand-only';
-import { generateAllReportsArtifacts } from './services__telegramReports.js?v=7.9.4.76-company-brand-only';
-import { getAllFromStore } from './services__db.js?v=7.9.4.76-company-brand-only';
+import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { exportToCSV, downloadBlob } from './utils__export.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { generateAllReportsArtifacts } from './services__telegramReports.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { getAllFromStore } from './services__db.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 import { Download, ReceiptText, Package, Users, Truck, WalletCards, CalendarDays, CircleDollarSign, FileText, Image as ImageIcon, TrendingUp } from 'lucide-react';
 
 const h = React.createElement;

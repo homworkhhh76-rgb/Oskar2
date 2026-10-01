@@ -1,6 +1,6 @@
 import React,{useMemo,useState} from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
-import { createCustomerPortalLinks } from './services__customerPortalLinks.js?v=7.9.4.76-company-brand-only';
+import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { createCustomerPortalLinks } from './services__customerPortalLinks.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 import { Save, Send, UserRound, ReceiptText, Link2, Copy, MessageSquareText } from 'lucide-react';
 
 const h=React.createElement;

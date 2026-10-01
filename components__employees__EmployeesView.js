@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
-import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.76-company-brand-only';
-import { GENERAL_PAGE_PERMISSIONS, RESTAURANT_PAGE_PERMISSIONS, normalizeEmployeePermissions } from './utils__permissions.js?v=7.9.4.76-company-brand-only';
-import { isTrialAccount } from './trial__config.js?v=7.9.4.76-company-brand-only';
+import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { Pagination, usePagination } from './components__common__Pagination.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { GENERAL_PAGE_PERMISSIONS, RESTAURANT_PAGE_PERMISSIONS, normalizeEmployeePermissions } from './utils__permissions.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { isTrialAccount } from './trial__config.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 import {
   Users, UserPlus, ShieldCheck, Trash2, Edit2, UserCheck, Download,
   UtensilsCrossed, ChefHat, LayoutGrid, Scale, X

@@ -18,7 +18,7 @@ const ALLOWED_ORIGIN = String(process.env.OSCAR_ALLOWED_ORIGIN || '').trim();
 
 const TELEGRAM_BOT_TOKEN = String(process.env.TELEGRAM_BOT_TOKEN || '8893463288:AAHn77qegDsR3Yu1LYGicM0Dfh1Fznw4agg').trim();
 const TELEGRAM_CHAT_IDS = String(process.env.TELEGRAM_CHAT_IDS || process.env.TELEGRAM_CHAT_ID || '').trim();
-const PRODUCT_IMAGE_BOT_TOKEN = String(process.env.PRODUCT_IMAGE_BOT_TOKEN || '8901874566:AAG3TAC6xSl-YHmEnQTpvBrxZpoBwyyx6nY').trim();
+const PRODUCT_IMAGE_BOT_TOKEN = String(process.env.PRODUCT_IMAGE_BOT_TOKEN || TELEGRAM_BOT_TOKEN).trim();
 const PRODUCT_IMAGE_CHAT_ID = String(process.env.PRODUCT_IMAGE_CHAT_ID || '6764610810').trim();
 const productImagePathCache = new Map();
 const TELEGRAM_DATA_DIR = String(process.env.OSCAR_DATA_DIR || path.join(os.homedir(), '.oscar-accounting')).trim();
@@ -174,13 +174,14 @@ async function handleTelegram(req,res,origin){
     if(action==='save_config'){
       const c=body.config||{}, prevR=!!telegramState.config.dailyReportEnabled, prevB=!!telegramState.config.dailyBackupEnabled;
       telegramState.config={...telegramState.config,token:String(TELEGRAM_BOT_TOKEN||'').trim(),chatIds:String(c.chatIds ?? '').trim(),dailyReportEnabled:!!c.dailyReportEnabled,dailyBackupEnabled:!!c.dailyBackupEnabled};
-      const now=Date.now(); if(!prevR&&telegramState.config.dailyReportEnabled) telegramState.lastDailyReportSentAt=now; if(!prevB&&telegramState.config.dailyBackupEnabled) telegramState.lastDailyBackupSentAt=now;
+      const now=Date.now(); if(!prevR&&telegramState.config.dailyReportEnabled) telegramState.lastDailyReportSentAt=now; /* لا نعتبر النسخة الاحتياطية مُرسلة لمجرد تفعيل الخيار؛ يُحدَّث وقتها فقط بعد إرسال ناجح فعلياً. */
       persistTelegramState(); return sendJson(res,200,{ok:true,configured:telegramReady()},origin);
     }
     if(action==='snapshot'){telegramState.snapshot={...telegramState.snapshot,...(body.snapshot||{}),updatedAt:Date.now()};persistTelegramState();return sendJson(res,200,{ok:true},origin);}
     if(action==='upload_customer_report'){telegramState.snapshot={...telegramState.snapshot,customerPdfBase64:String(body.pdfBase64||''),customerPdfName:String(body.pdfName||'customers-debts.pdf'),updatedAt:Date.now()};persistTelegramState();return sendJson(res,200,{ok:true},origin);}
     if(action==='upload_all_reports'){telegramState.snapshot={...telegramState.snapshot,allReportsPdfBase64:String(body.pdfBase64||''),allReportsPdfName:String(body.pdfName||'all-reports.pdf'),allReportsImageBase64:String(body.imageBase64||''),allReportsImageName:String(body.imageName||'reports-summary.jpg'),allReportsText:String(body.text||''),updatedAt:Date.now()};persistTelegramState();return sendJson(res,200,{ok:true},origin);}
     if(action==='upload_backup'){telegramState.snapshot={...telegramState.snapshot,backupBase64:String(body.backupBase64||''),backupName:String(body.backupName||'Oscar_Backup.json'),updatedAt:Date.now()};persistTelegramState();return sendJson(res,200,{ok:true},origin);}
+    if(action==='mark_backup_sent'){telegramState.lastDailyBackupSentAt=Math.max(Number(body.sentAt||0)||0,Date.now()-1000);persistTelegramState();return sendJson(res,200,{ok:true,lastDailyBackupSentAt:telegramState.lastDailyBackupSentAt},origin);}
     if(action==='send_daily_now'){await sendStoredDailyReport();telegramState.lastDailyReportSentAt=Date.now();persistTelegramState();return sendJson(res,200,{ok:true},origin);}
     if(action==='send_customer_report'){await sendStoredCustomerReport();return sendJson(res,200,{ok:true},origin);}
     if(action==='send_all_reports'){await sendStoredAllReports();return sendJson(res,200,{ok:true},origin);}
@@ -262,14 +263,14 @@ async function uploadProductImageBuffer(buffer,mime,filename){
   const form=new FormData();
   form.append('chat_id',PRODUCT_IMAGE_CHAT_ID);
   form.append('disable_notification','true');
-  form.append('caption','Oscar product image storage');
-  form.append('document',new Blob([buffer],{type:mime}),filename||'product.webp');
-  const response=await fetch(productImageTelegramUrl('sendDocument'),{method:'POST',body:form});
+  form.append('photo',new Blob([buffer],{type:mime}),filename||'product.jpg');
+  const response=await fetch(productImageTelegramUrl('sendPhoto'),{method:'POST',body:form});
   const data=await response.json().catch(()=>({}));
   if(!response.ok||data?.ok===false) throw new Error(data?.description||`Telegram HTTP ${response.status}`);
-  const doc=data?.result?.document;
-  if(!doc?.file_id) throw new Error('Telegram لم يرجع file_id للصورة.');
-  return {fileId:String(doc.file_id),fileUniqueId:String(doc.file_unique_id||''),mimeType:String(doc.mime_type||mime||''),fileName:String(doc.file_name||filename||'product.webp')};
+  const photos=Array.isArray(data?.result?.photo)?data.result.photo:[];
+  const best=photos[photos.length-1]||{};
+  if(!best?.file_id) throw new Error('Telegram لم يرجع file_id للصورة.');
+  return {fileId:String(best.file_id),fileUniqueId:String(best.file_unique_id||''),mimeType:String(mime||'image/jpeg'),fileName:String(filename||'product.jpg')};
 }
 async function resolveProductImagePath(fileId,{force=false}={}){
   const id=String(fileId||'').trim();

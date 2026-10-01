@@ -1,4 +1,5 @@
-import { encodeCustomerPortalAccess } from './customer-portal-codec.js?v=7.9.4.76-company-brand-only';
+import { encodeCustomerPortalAccess } from './customer-portal-codec.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { TRIAL_DATABASE } from './trial__config.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 
 const ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const clean=v=>String(v??'').trim();
@@ -25,14 +26,26 @@ function makeNonce(){
   return btoa(raw).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/g,'');
 }
 async function registerShortLink({companyCode,customerCode,accessCode,companyId,customerId}){
+  let registryOk=false, serverOk=false;
+  // سجل عام صغير للرابط المختصر يعمل حتى على الاستضافة الثابتة بدون server.js.
+  try{
+    const direct=window.OscarActivation?.tursoDirect;
+    if(direct){
+      const path=`oscar/public/customer_short_links/${companyCode}/${customerCode}`;
+      await direct.writeExact(TRIAL_DATABASE,path,{accessCode,companyCode,customerCode,companyId,customerId,updatedAt:new Date().toISOString()},Date.now(),false);
+      registryOk=true;
+    }
+  }catch(_){ }
+  // نبقي مسار server.js اختيارياً كنسخة ثانية إذا كان الخادم المحلي مستخدماً.
   try{
     const response=await fetch('/api/customer-short-link',{
       method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',
       body:JSON.stringify({companyCode,customerCode,accessCode,companyId,customerId})
     });
     const data=await response.json().catch(()=>null);
-    return !!(response.ok&&data?.ok);
-  }catch(_){return false;}
+    serverOk=!!(response.ok&&data?.ok);
+  }catch(_){ }
+  return registryOk||serverOk;
 }
 
 export function getCompanyPortalCode(companyId){return fnvCode(clean(companyId)||'oscar',5);}

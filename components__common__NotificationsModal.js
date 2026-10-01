@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
+import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 import { X, Bell, CreditCard, PackageX, History, CalendarClock, Truck, AlertTriangle, Trash2, Send, FileText, DatabaseBackup, Bot, Save, RotateCcw, Clock3, Users, FileArchive, Radio, Image as ImageIcon } from 'lucide-react';
-import { saveTelegramConfig, telegramRequest, uploadTelegramSnapshot, sendDailyReportNow, sendCustomersReportNow, sendAllReportsNow, sendBackupNow } from './services__telegramReports.js?v=7.9.4.76-company-brand-only';
+import { saveTelegramConfig, telegramRequest, uploadTelegramSnapshot, sendDailyReportNow, sendCustomersReportNow, sendAllReportsNow, sendBackupNow } from './services__telegramReports.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 
 const h = React.createElement;
 const DAY = 86400000;
@@ -71,19 +71,18 @@ export const NotificationsModal = ({ open, onClose }) => {
   const run=async(key,fn,success)=>{if(busy)return;setBusy(key);try{if(!reportRecipients.length)throw new Error('أضف Chat ID من إعدادات النظام أولاً، ويجب أن يكون صاحب المعرف قد فتح البوت وضغط Start');const result=await fn();app.showToast?.(`${success}${result?.sent?` إلى ${result.sent} مستخدم`:''}`,'success');const cfg=await saveTelegramConfig(currentSettings()).catch(()=>({configured:true,directReady:true,serverAvailable:false}));setServerStatus(cfg);}catch(e){app.showToast?.(e?.message||'تعذر تنفيذ العملية','error');}finally{setBusy('');}};
   const toggleAuto=async(kind,val)=>{
     if(kind==='report')setDailyReport(val);else setDailyBackup(val);
-    let next={...currentSettings(),[kind==='report'?'telegramDailyReportEnabled':'telegramDailyBackupEnabled']:val,...(kind==='report'?{telegramAutoReportEnabled:val}:{})};
-    const cfg=await saveTelegramConfig(next);
-    if(val&&!cfg?.configured){
-      next={...next,[kind==='report'?'telegramDailyReportEnabled':'telegramDailyBackupEnabled']:false,...(kind==='report'?{telegramAutoReportEnabled:false}:{})};
-      await saveTelegramConfig(next).catch(()=>{});
-      if(kind==='report')setDailyReport(false);else setDailyBackup(false);
-      throw new Error('أضف Chat ID من إعدادات النظام أولاً، وتأكد أن صاحب المعرف فتح بوت إرسال الفواتير وضغط Start');
-    }
+    const next={...currentSettings(),[kind==='report'?'telegramDailyReportEnabled':'telegramDailyBackupEnabled']:val,...(kind==='report'?{telegramAutoReportEnabled:val}:{})};
     await app.updateSettings({telegramDailyReportEnabled:!!next.telegramDailyReportEnabled,telegramAutoReportEnabled:!!next.telegramAutoReportEnabled,telegramDailyBackupEnabled:!!next.telegramDailyBackupEnabled});
-    if(val)await uploadTelegramSnapshot({...app,settings:next},{includeBackup:!!next.telegramDailyBackupEnabled});
-    app.showToast?.(val?'تم تفعيل الإرسال التلقائي كل 24 ساعة':'تم إيقاف الإرسال التلقائي','success');
+    const cfg=await saveTelegramConfig(next).catch(()=>({ok:true,configured:reportRecipients.length>0,directReady:reportRecipients.length>0,serverAvailable:false}));
+    if(val&&reportRecipients.length){
+      if(kind==='backup') await sendBackupNow({...app,settings:next});
+      else await uploadTelegramSnapshot({...app,settings:next},{includeBackup:!!next.telegramDailyBackupEnabled});
+    }
+    if(val&&kind==='backup'){try{window.dispatchEvent(new Event('oscar-backup-check'));}catch(_){}}
+    app.showToast?.(val?(reportRecipients.length?'تم تفعيل الإرسال التلقائي كل 24 ساعة':'تم التفعيل، وسيبدأ الإرسال بعد إضافة Chat ID'):'تم إيقاف الإرسال التلقائي',reportRecipients.length?'success':'warning');
     setServerStatus(cfg?.serverAvailable ? await telegramRequest({action:'status'}).catch(()=>cfg) : cfg);
   };
+  const toggleBusy=async(kind)=>{if(busy)return;const val=kind==='report'?!dailyReport:!dailyBackup;setBusy(`toggle-${kind}`);try{await toggleAuto(kind,val);}catch(e){app.showToast?.(e?.message||'تعذر تحديث الإعداد','error');if(kind==='report')setDailyReport(!val);else setDailyBackup(!val);}finally{setBusy('');}};
   const dismissOne=async(id)=>{const old=Array.isArray(app.settings.dismissedNotificationIds)?app.settings.dismissedNotificationIds:[];await app.updateSettings({dismissedNotificationIds:[...new Set([...old,id])]});};
   const dismissAll=async()=>{const old=Array.isArray(app.settings.dismissedNotificationIds)?app.settings.dismissedNotificationIds:[];await app.updateSettings({dismissedNotificationIds:[...new Set([...old,...alerts.map(a=>a.id)])]});};
   const restoreDismissed=async()=>{await app.updateSettings({dismissedNotificationIds:[]});};
@@ -103,8 +102,8 @@ export const NotificationsModal = ({ open, onClose }) => {
             h('div',{className:'text-[9px] text-slate-400'},'لا تحتاج إلى إدخال Bot Token هنا؛ يتم استخدام بوت الفواتير وChat ID المحفوظ في إعدادات النظام تلقائياً.')
           ),
           h('div',{className:'grid sm:grid-cols-2 gap-2'},
-            h('button',{type:'button',onClick:()=>run('toggle-report',()=>toggleAuto('report',!dailyReport),dailyReport?'تم إيقاف التقرير التلقائي':'تم تفعيل التقرير التلقائي'),className:`rounded-xl border p-3 flex items-center justify-between gap-3 text-right ${dailyReport?'border-emerald-300 bg-emerald-100':'border-slate-200 bg-white'}`},h('div',{className:'flex items-center gap-2'},h(Clock3,{className:'w-4 h-4 text-emerald-700'}),h('div',null,h('div',{className:'text-[11px] font-black'},'إرسال التقرير كل 24 ساعة'),h('div',{className:'text-[9px] text-slate-500'},'نص + صورة + PDF تلقائياً'))),h('span',{className:`w-10 h-5 rounded-full p-0.5 ${dailyReport?'bg-emerald-600':'bg-slate-300'}`},h('span',{className:`block w-4 h-4 rounded-full bg-white transition ${dailyReport?'translate-x-0':'translate-x-5'}`}))),
-            h('button',{type:'button',onClick:()=>run('toggle-backup',()=>toggleAuto('backup',!dailyBackup),dailyBackup?'تم إيقاف النسخ التلقائي':'تم تفعيل النسخ التلقائي'),className:`rounded-xl border p-3 flex items-center justify-between gap-3 text-right ${dailyBackup?'border-blue-300 bg-blue-100':'border-slate-200 bg-white'}`},h('div',{className:'flex items-center gap-2'},h(DatabaseBackup,{className:'w-4 h-4 text-blue-700'}),h('div',null,h('div',{className:'text-[11px] font-black'},'نسخة احتياطية كل 24 ساعة'),h('div',{className:'text-[9px] text-slate-500'},'ملف JSON كامل إلى البوت'))),h('span',{className:`w-10 h-5 rounded-full p-0.5 ${dailyBackup?'bg-blue-600':'bg-slate-300'}`},h('span',{className:`block w-4 h-4 rounded-full bg-white transition ${dailyBackup?'translate-x-0':'translate-x-5'}`})))
+            h('button',{type:'button',onClick:()=>toggleBusy('report'),className:`rounded-xl border p-3 flex items-center justify-between gap-3 text-right ${dailyReport?'border-emerald-300 bg-emerald-100':'border-slate-200 bg-white'}`},h('div',{className:'flex items-center gap-2'},h(Clock3,{className:'w-4 h-4 text-emerald-700'}),h('div',null,h('div',{className:'text-[11px] font-black'},'إرسال التقرير كل 24 ساعة'),h('div',{className:'text-[9px] text-slate-500'},'نص + صورة + PDF تلقائياً'))),h('span',{className:`w-10 h-5 rounded-full p-0.5 ${dailyReport?'bg-emerald-600':'bg-slate-300'}`},h('span',{className:`block w-4 h-4 rounded-full bg-white transition ${dailyReport?'translate-x-0':'translate-x-5'}`}))),
+            h('button',{type:'button',onClick:()=>toggleBusy('backup'),className:`rounded-xl border p-3 flex items-center justify-between gap-3 text-right ${dailyBackup?'border-blue-300 bg-blue-100':'border-slate-200 bg-white'}`},h('div',{className:'flex items-center gap-2'},h(DatabaseBackup,{className:'w-4 h-4 text-blue-700'}),h('div',null,h('div',{className:'text-[11px] font-black'},'نسخة احتياطية كل 24 ساعة'),h('div',{className:'text-[9px] text-slate-500'},'ملف JSON كامل إلى البوت'))),h('span',{className:`w-10 h-5 rounded-full p-0.5 ${dailyBackup?'bg-blue-600':'bg-slate-300'}`},h('span',{className:`block w-4 h-4 rounded-full bg-white transition ${dailyBackup?'translate-x-0':'translate-x-5'}`})))
           ),
           h('div',{className:'grid sm:grid-cols-2 gap-2'},
             h(ActionButton,{Icon:Send,title:'إرسال جميع التقارير الآن',sub:'PDF شامل + صورة ملخص + النص فوراً',busy:busy==='all',onClick:()=>run('all',()=>sendAllReportsNow(appForSend()),'تم إرسال جميع التقارير للبوت')}),
@@ -112,7 +111,7 @@ export const NotificationsModal = ({ open, onClose }) => {
             h(ActionButton,{Icon:Users,title:'PDF العملاء والديون',sub:'كل العملاء • لنا/علينا • المسدد والمديون',tone:'violet',busy:busy==='customers',onClick:()=>run('customers',()=>sendCustomersReportNow(appForSend()),'تم إرسال تقرير العملاء والديون')}),
             h(ActionButton,{Icon:FileArchive,title:'إرسال النسخة الاحتياطية الآن',sub:'نسخة JSON كاملة من قاعدة البيانات',tone:'amber',busy:busy==='backup',onClick:()=>run('backup',()=>sendBackupNow(appForSend()),'تم إرسال النسخة الاحتياطية للبوت')})
           ),
-          h('div',{className:'rounded-xl bg-white border border-slate-200 px-3 py-2 text-[9.5px] text-slate-500 leading-5 flex items-start gap-2'},h(Radio,{className:`w-3.5 h-3.5 mt-0.5 shrink-0 ${serverStatus?.configured?'text-emerald-600':'text-amber-500'}`}),serverStatus?.configured?(serverStatus?.serverAvailable?'بوت إرسال الفواتير مربوط. الإرسال اللحظي جاهز، والإرسال التلقائي كل 24 ساعة يعمل من server.js حتى لو الصفحة مغلقة.':'البوت ومعرفات Chat ID مربوطة والإرسال اللحظي يعمل مباشرة. لتشغيل إرسال 24 ساعة بعد إغلاق الصفحة شغّل server.js على الاستضافة.'):'أضف Chat ID من إعدادات النظام، وتأكد أن صاحب المعرف فتح بوت إرسال الفواتير وضغط Start مرة واحدة.')
+          h('div',{className:'rounded-xl bg-white border border-slate-200 px-3 py-2 text-[9.5px] text-slate-500 leading-5 flex items-start gap-2'},h(Radio,{className:`w-3.5 h-3.5 mt-0.5 shrink-0 ${serverStatus?.configured?'text-emerald-600':'text-amber-500'}`}),serverStatus?.configured?(serverStatus?.serverAvailable?'الإرسال التلقائي جاهز. إذا ظل الخادم يعمل تُرسل النسخة في موعدها حتى لو الصفحة مغلقة، وإذا كان البرنامج مغلقاً وقت الاستحقاق فسيتم إرسال النسخة المتأخرة فور أول فتح للبرنامج.':'الإرسال التلقائي جاهز. إذا مرّت 24 ساعة والبرنامج مغلق، تُرسل النسخة الكاملة فور أول فتح للبرنامج واتصال الإنترنت.'):'أضف Chat ID من إعدادات النظام، وتأكد أن صاحب المعرف فتح بوت إرسال الفواتير وضغط Start مرة واحدة.')
         ),
         h('section',{className:'rounded-2xl border border-slate-200 p-3 space-y-2'},
           h('div',{className:'flex items-center justify-between gap-2'},h('div',null,h('div',{className:'text-xs font-black text-slate-900'},'تنبيهات النظام'),h('div',{className:'text-[10px] text-slate-500'},`${alerts.length} تنبيه يحتاج المراجعة`)),h('div',{className:'flex gap-1'},h('button',{type:'button',onClick:restoreDismissed,className:'p-2 rounded-lg border text-slate-500',title:'إعادة التنبيهات المحذوفة'},h(RotateCcw,{className:'w-3.5 h-3.5'})),alerts.length?h('button',{type:'button',onClick:dismissAll,className:'inline-flex items-center gap-1 px-2.5 py-2 rounded-lg border border-rose-200 text-rose-600 text-[10px] font-black'},h(Trash2,{className:'w-3.5 h-3.5'}),'حذف الكل'):null)),

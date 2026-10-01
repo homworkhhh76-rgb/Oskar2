@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useApp } from './context__AppContext.js?v=7.9.4.76-company-brand-only';
-import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.76-company-brand-only';
+import { useApp } from './context__AppContext.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { SearchableDropdown } from './components__common__Dropdown.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 import { Trash2, Plus, Minus, CreditCard, User, UserPlus, ChevronDown, LayoutGrid, Search, PauseCircle, Clock, ShoppingBag, X } from 'lucide-react';
 
 const h = React.createElement;
@@ -167,7 +167,7 @@ export const FullCartView = ({ onOpenPayment, onToggleLayout }) => {
       ...(activeMenuItem.availableUnits||[]).map((u)=>h('button',{key:u.id,type:'button',onClick:()=>{setActiveUnitDropdown(null);setUnitMenuPos(null);updateCartItemUnit(activeMenuItem.productId,activeMenuItem.unitId,u.id);},className:`w-full text-right px-3 py-2 text-xs rounded-lg flex items-center justify-between gap-3 ${u.id===activeMenuItem.unitId?'bg-emerald-600 text-white font-bold':'text-slate-700 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800'}`},h('span',{className:'truncate'},u.name),h('span',{className:'text-[10px] font-mono opacity-80 shrink-0'},`${u.salePrice} ${settings.currencySymbol}`)))
     ),document.body) : null;
   const customerPortal = showQuickCustomer&&typeof document!=='undefined' ? createPortal(
-    h('div',{className:'fixed inset-0 p-4 flex items-center justify-center',style:{zIndex:2147483500,background:'rgba(15,23,42,.55)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)'},onPointerDown:(e)=>{if(e.target===e.currentTarget)setShowQuickCustomer(false);}},
+    h('div',{className:'fixed inset-0 p-4 flex items-center justify-center',style:{zIndex:2147483500,background:'rgba(15,23,42,.55)'},onPointerDown:(e)=>{if(e.target===e.currentTarget)setShowQuickCustomer(false);}},
       h('form',{onSubmit:addQuickCustomer,className:'w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-4 space-y-3 text-right'},
         h('div',{className:'flex items-center justify-between'},h('h3',{className:'font-black text-sm'},'إضافة عميل سريع'),h('button',{type:'button',onClick:()=>setShowQuickCustomer(false),className:'p-1 text-slate-400'},h(X,{className:'w-5 h-5'}))),
         h('input',{required:true,value:quickName,onChange:(e)=>setQuickName(e.target.value),placeholder:'اسم العميل *',autoFocus:false,className:'w-full px-3 py-2 text-xs border rounded-xl bg-white dark:bg-slate-800'}),
