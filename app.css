@@ -5486,3 +5486,28 @@ button,a[href],[role="button"],[class*="cursor-pointer"]{
 @media (min-width:1100px){.oscar-pos-product-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}}
 @media (min-width:1450px){.oscar-pos-product-grid{grid-template-columns:repeat(6,minmax(0,1fr))}}
 @media (min-width:1800px){.oscar-pos-product-grid{grid-template-columns:repeat(7,minmax(0,1fr))}}
+
+/* Oscar high-refresh UI tuning: keep overlays/cart on compositor-friendly properties. */
+:root{--oscar-ui-fast:110ms;--oscar-ui-modal:150ms;}
+button,a,[role="button"]{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.fixed.inset-0,.oscar-bounded-modal,#full-cart-modal-backdrop,.barcode-camera-overlay{
+  animation:oscar-ui-fade var(--oscar-ui-fast) ease-out both;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+  transform:translateZ(0);
+  overscroll-behavior:contain;
+}
+.fixed.inset-0>form,.fixed.inset-0>div,.oscar-bounded-modal>form,.oscar-bounded-modal>div,
+#full-cart-modal-box,.barcode-camera-overlay>div{
+  animation:oscar-ui-pop var(--oscar-ui-modal) cubic-bezier(.2,.8,.2,1) both;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+  transform-origin:center;
+}
+#full-cart-modal-box{contain:layout paint;will-change:transform,opacity}
+#full-cart-modal-backdrop{will-change:opacity}
+@keyframes oscar-ui-fade{from{opacity:0}to{opacity:1}}
+@keyframes oscar-ui-pop{from{opacity:.55;transform:translate3d(0,7px,0) scale(.992)}to{opacity:1;transform:translate3d(0,0,0) scale(1)}}
+@media (prefers-reduced-motion:reduce){.fixed.inset-0,.oscar-bounded-modal,#full-cart-modal-backdrop,.barcode-camera-overlay,.fixed.inset-0>form,.fixed.inset-0>div,.oscar-bounded-modal>form,.oscar-bounded-modal>div,#full-cart-modal-box,.barcode-camera-overlay>div{animation:none!important;transition:none!important}}
+/* Avoid GPU-expensive live blur on full-screen overlays; the dark scrim remains. */
+.fixed.inset-0,.oscar-bounded-modal,.barcode-camera-overlay{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}

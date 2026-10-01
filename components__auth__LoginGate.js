@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Upload, ShieldCheck, Building2, FileText, X, ChevronDown, Search, Image as ImageIcon, MapPin, Phone, Check, LogIn } from 'lucide-react';
-import { DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.76-company-brand-only';
-import { TRIAL_DATABASE, TRIAL_LIMITS } from './trial__config.js?v=7.9.4.76-company-brand-only';
+import { Upload, ShieldCheck, Building2, FileText, X, ChevronDown, Search, Image as ImageIcon, MapPin, Phone, Check, LogIn, Headphones } from 'lucide-react';
+import { DEFAULT_LOGO_DATA_URL } from './brand__logo.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
+import { TRIAL_DATABASE, TRIAL_LIMITS } from './trial__config.js?v=7.9.4.82-smooth-stock-shortlinks-report-images';
 
 const h = React.createElement;
 const CURRENCY_COUNTRY={ILS:'PS',USD:'US',JOD:'JO',EGP:'EG',SAR:'SA',AED:'AE',TRY:'TR',EUR:'EU',GBP:'GB',AUD:'AU',CAD:'CA',CHF:'CH',CNY:'CN',JPY:'JP',INR:'IN',KWD:'KW',QAR:'QA',BHD:'BH',OMR:'OM',LBP:'LB',SYP:'SY',IQD:'IQ',YER:'YE',MAD:'MA',TND:'TN',DZD:'DZ',LYD:'LY',SDG:'SD',MRU:'MR',SOS:'SO',DJF:'DJ',KMF:'KM',AFN:'AF',ALL:'AL',AMD:'AM',ANG:'CW',AOA:'AO',ARS:'AR',AWG:'AW',AZN:'AZ',BAM:'BA',BBD:'BB',BDT:'BD',BGN:'BG',BIF:'BI',BMD:'BM',BND:'BN',BOB:'BO',BRL:'BR',BSD:'BS',BTN:'BT',BWP:'BW',BYN:'BY',BZD:'BZ',CDF:'CD',CLP:'CL',COP:'CO',CRC:'CR',CUP:'CU',CVE:'CV',CZK:'CZ',DKK:'DK',DOP:'DO',ERN:'ER',ETB:'ET',FJD:'FJ',FKP:'FK',GEL:'GE',GHS:'GH',GIP:'GI',GMD:'GM',GNF:'GN',GTQ:'GT',GYD:'GY',HKD:'HK',HNL:'HN',HTG:'HT',HUF:'HU',IDR:'ID',IRR:'IR',ISK:'IS',JMD:'JM',KES:'KE',KGS:'KG',KHR:'KH',KPW:'KP',KRW:'KR',KYD:'KY',KZT:'KZ',LAK:'LA',LKR:'LK',LRD:'LR',LSL:'LS',MDL:'MD',MGA:'MG',MKD:'MK',MMK:'MM',MNT:'MN',MOP:'MO',MUR:'MU',MVR:'MV',MWK:'MW',MXN:'MX',MYR:'MY',MZN:'MZ',NAD:'NA',NGN:'NG',NIO:'NI',NOK:'NO',NPR:'NP',NZD:'NZ',PAB:'PA',PEN:'PE',PGK:'PG',PHP:'PH',PKR:'PK',PLN:'PL',PYG:'PY',RON:'RO',RSD:'RS',RUB:'RU',RWF:'RW',SBD:'SB',SCR:'SC',SEK:'SE',SGD:'SG',SHP:'SH',SLE:'SL',SRD:'SR',SSP:'SS',STN:'ST',SZL:'SZ',THB:'TH',TJS:'TJ',TMT:'TM',TOP:'TO',TTD:'TT',TWD:'TW',TZS:'TZ',UAH:'UA',UGX:'UG',UYU:'UY',UZS:'UZ',VES:'VE',VND:'VN',VUV:'VU',WST:'WS',XAF:'CM',XCD:'AG',XOF:'SN',XPF:'PF',ZAR:'ZA',ZMW:'ZM',ZWG:'ZW'};
@@ -183,6 +183,7 @@ export const LoginGate=({children})=>{
         h('button',{type:'submit',className:'auth2-primary',disabled:trialBusy},trialBusy?h('span',{className:'spinner'}):h(Building2,{className:'icon'}),h('span',null,trialBusy?'جارٍ تجهيز الطلب...':'متابعة للدفع — 20₪')),
       ):null,
       h('div',{className:'auth2-foot'},h(ShieldCheck,{className:'icon'}),h('span',null,'بياناتك محفوظة داخل مساحة شركتك المستقلة.'))
-    )
+    ),
+    h('a',{href:'./support.html',title:'الدعم الفني','aria-label':'الدعم الفني',style:{position:'fixed',left:'18px',bottom:'max(18px, env(safe-area-inset-bottom))',width:'54px',height:'54px',borderRadius:'18px',display:'grid',placeItems:'center',background:'linear-gradient(135deg,#10b981,#047857)',color:'#fff',boxShadow:'0 14px 30px rgba(5,150,105,.30)',border:'1px solid rgba(255,255,255,.35)',zIndex:80,textDecoration:'none'}},h(Headphones,{style:{width:'25px',height:'25px'}}))
   );
 };
